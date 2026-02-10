@@ -7,10 +7,12 @@ interface ChatState {
   activeAgentId: string;
   sidebarOpen: boolean;
   selectedModel: string;
+  thinkingMode: boolean;
 
   setActiveAgent: (agentId: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setSelectedModel: (model: string) => void;
+  setThinkingMode: (on: boolean) => void;
   createConversation: (agentId: string) => string;
   setActiveConversation: (id: string | null) => void;
   addMessage: (conversationId: string, message: Message) => void;
@@ -24,12 +26,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeAgentId: 'brand-book',
   sidebarOpen: true,
   selectedModel: 'claude-opus-4.5',
+  thinkingMode: true,
 
   setActiveAgent: (agentId) => set({ activeAgentId: agentId, activeConversationId: null }),
-
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
-
   setSelectedModel: (model) => set({ selectedModel: model }),
+  setThinkingMode: (on) => set({ thinkingMode: on }),
 
   createConversation: (agentId) => {
     const id = crypto.randomUUID();

@@ -4,52 +4,105 @@
 
 @layer base {
   :root {
-    /* ChatGPT-style dark theme as default */
-    --background: 0 0% 13%; /* #212121 */
-    --foreground: 0 0% 93%; /* #ECECEC */
+    /* Light theme */
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
 
-    --card: 0 0% 9%; /* #171717 */
-    --card-foreground: 0 0% 93%;
+    --card: 0 0% 97%;
+    --card-foreground: 0 0% 9%;
 
-    --popover: 0 0% 18%; /* #2F2F2F */
-    --popover-foreground: 0 0% 93%;
+    --popover: 0 0% 94%;
+    --popover-foreground: 0 0% 9%;
 
-    --primary: 160 83% 35%; /* #10a37f */
+    --primary: 160 83% 35%;
     --primary-foreground: 0 0% 100%;
 
-    --secondary: 0 0% 18%; /* #2F2F2F */
+    --secondary: 0 0% 94%;
+    --secondary-foreground: 0 0% 9%;
+
+    --muted: 0 0% 94%;
+    --muted-foreground: 220 9% 46%;
+
+    --accent: 0 0% 90%;
+    --accent-foreground: 0 0% 9%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 90%;
+    --input: 0 0% 83%;
+    --ring: 160 83% 35%;
+
+    --radius: 0.5rem;
+
+    --bg-primary: 0 0% 100%;
+    --bg-secondary: 0 0% 97%;
+    --bg-tertiary: 0 0% 94%;
+    --bg-hover: 0 0% 90%;
+
+    --text-primary: 0 0% 9%;
+    --text-secondary: 220 13% 26%;
+    --text-muted: 220 9% 46%;
+    --text-placeholder: 220 9% 46%;
+
+    --border-secondary: 220 13% 83%;
+    --border-focus: 220 9% 46%;
+
+    --accent-link: 214 100% 50%;
+
+    --sidebar-background: 0 0% 97%;
+    --sidebar-foreground: 0 0% 9%;
+    --sidebar-primary: 160 83% 35%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 94%;
+    --sidebar-accent-foreground: 0 0% 9%;
+    --sidebar-border: 0 0% 90%;
+    --sidebar-ring: 160 83% 35%;
+  }
+
+  .dark {
+    --background: 0 0% 13%;
+    --foreground: 0 0% 93%;
+
+    --card: 0 0% 9%;
+    --card-foreground: 0 0% 93%;
+
+    --popover: 0 0% 18%;
+    --popover-foreground: 0 0% 93%;
+
+    --primary: 160 83% 35%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 0 0% 18%;
     --secondary-foreground: 0 0% 93%;
 
     --muted: 0 0% 18%;
-    --muted-foreground: 0 0% 56%; /* #8E8E8E */
+    --muted-foreground: 0 0% 56%;
 
-    --accent: 0 0% 21%; /* #353535 */
+    --accent: 0 0% 21%;
     --accent-foreground: 0 0% 93%;
 
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 0 0% 18%; /* #2F2F2F */
-    --input: 0 0% 31%; /* #4F4F4F */
+    --border: 0 0% 18%;
+    --input: 0 0% 31%;
     --ring: 160 83% 35%;
 
-    --radius: 0.5rem;
-
-    /* Custom tokens */
     --bg-primary: 0 0% 13%;
     --bg-secondary: 0 0% 9%;
     --bg-tertiary: 0 0% 18%;
     --bg-hover: 0 0% 21%;
 
     --text-primary: 0 0% 93%;
-    --text-secondary: 0 0% 71%; /* #B4B4B4 */
+    --text-secondary: 0 0% 71%;
     --text-muted: 0 0% 56%;
-    --text-placeholder: 0 0% 43%; /* #6E6E6E */
+    --text-placeholder: 0 0% 43%;
 
     --border-secondary: 0 0% 31%;
     --border-focus: 0 0% 43%;
 
-    --accent-link: 214 100% 67%; /* #58A6FF */
+    --accent-link: 214 100% 67%;
 
     --sidebar-background: 0 0% 9%;
     --sidebar-foreground: 0 0% 93%;
@@ -64,7 +117,7 @@
 
 @layer base {
   * {
-    @apply border-border;
+    @apply border-border transition-colors duration-200;
   }
 
   body {
@@ -72,7 +125,6 @@
     font-family: 'Söhne', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
 
-  /* Scrollbar styling */
   ::-webkit-scrollbar {
     width: 6px;
   }
@@ -116,7 +168,7 @@
 .prose-chat blockquote {
   @apply border-l-[3px] pl-4 py-3 pr-4 rounded-r-lg my-4;
   border-color: hsl(var(--border-secondary));
-  background: hsl(0 0% 10%);
+  background: hsl(var(--bg-tertiary));
   color: hsl(var(--text-secondary));
 }
 .prose-chat a {
@@ -127,11 +179,11 @@
 }
 .prose-chat code {
   @apply px-1.5 py-0.5 rounded text-sm font-mono;
-  background: hsl(0 0% 10%);
+  background: hsl(var(--bg-tertiary));
 }
 .prose-chat pre {
   @apply rounded-lg p-4 my-4 overflow-x-auto;
-  background: hsl(0 0% 10%);
+  background: hsl(var(--bg-tertiary));
 }
 .prose-chat pre code {
   @apply p-0 bg-transparent;
@@ -147,4 +199,13 @@
   animation: blink 1s infinite;
   color: hsl(var(--text-muted));
   margin-left: 1px;
+}
+
+/* Voice recording pulse */
+@keyframes pulse-recording {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(1.1); }
+}
+.recording-pulse {
+  animation: pulse-recording 1.5s ease-in-out infinite;
 }

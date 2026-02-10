@@ -16,7 +16,6 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
         transition={{ duration: 0.4 }}
         className="text-center max-w-[600px] w-full"
       >
-        {/* Agent avatar */}
         <div
           className="w-20 h-20 rounded-full mx-auto mb-4 flex items-center justify-center text-4xl"
           style={{ background: agent.color + '22' }}
@@ -24,10 +23,8 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
           {agent.emoji}
         </div>
 
-        {/* Agent name */}
         <h1 className="text-3xl font-bold text-foreground mb-2">{agent.name}</h1>
 
-        {/* Recommended model */}
         <div className="flex items-center justify-center gap-1.5 mb-4">
           <CheckCircle className="w-3.5 h-3.5 text-primary" />
           <span className="text-sm text-muted-foreground">
@@ -35,28 +32,41 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
           </span>
         </div>
 
-        {/* Description */}
-        <p className="text-text-secondary text-[15px] leading-relaxed max-w-[500px] mx-auto mb-8">
+        <p className="text-muted-foreground text-[15px] leading-relaxed max-w-[500px] mx-auto mb-6">
           {agent.description}
         </p>
 
         {/* Progress indicator */}
-        <div className="flex items-center justify-center gap-2 mb-8">
+        <div className="flex flex-col items-center gap-2 mb-8">
           <span className="text-xs text-muted-foreground">Etapa {agent.order} de 7</span>
           <div className="flex gap-1">
             {Array.from({ length: 7 }).map((_, i) => (
               <div
                 key={i}
-                className={`w-6 h-1.5 rounded-full ${
-                  i + 1 <= agent.order ? 'bg-primary' : 'bg-secondary'
+                className={`h-1.5 rounded-full transition-colors ${
+                  i + 1 < agent.order
+                    ? 'bg-primary w-8'
+                    : i + 1 === agent.order
+                    ? 'bg-primary w-8 animate-pulse'
+                    : 'bg-muted w-8'
                 }`}
               />
+            ))}
+          </div>
+          <div className="flex flex-wrap justify-center gap-x-4 gap-y-1 mt-1">
+            {['Brand Book', 'Pesquisa', 'ICP', 'Pilares', 'Matriz', 'Marketing', 'Roteiro'].map((label, i) => (
+              <span
+                key={i}
+                className={`text-[10px] ${i + 1 <= agent.order ? 'text-primary' : 'text-muted-foreground'}`}
+              >
+                {label}
+              </span>
             ))}
           </div>
         </div>
 
         {/* Starters grid */}
-        <div className="grid grid-cols-2 gap-3 max-w-[500px] mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-[500px] mx-auto">
           {agent.starters.map((starter, i) => (
             <motion.button
               key={i}
