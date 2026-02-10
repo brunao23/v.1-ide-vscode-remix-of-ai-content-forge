@@ -2,95 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
-
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    /* ChatGPT-style dark theme as default */
+    --background: 0 0% 13%; /* #212121 */
+    --foreground: 0 0% 93%; /* #ECECEC */
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 9%; /* #171717 */
+    --card-foreground: 0 0% 93%;
 
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 18%; /* #2F2F2F */
+    --popover-foreground: 0 0% 93%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 160 83% 35%; /* #10a37f */
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 0 0% 18%; /* #2F2F2F */
+    --secondary-foreground: 0 0% 93%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 0 0% 18%;
+    --muted-foreground: 0 0% 56%; /* #8E8E8E */
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 0 0% 21%; /* #353535 */
+    --accent-foreground: 0 0% 93%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 0 0% 18%; /* #2F2F2F */
+    --input: 0 0% 31%; /* #4F4F4F */
+    --ring: 160 83% 35%;
 
     --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
+    /* Custom tokens */
+    --bg-primary: 0 0% 13%;
+    --bg-secondary: 0 0% 9%;
+    --bg-tertiary: 0 0% 18%;
+    --bg-hover: 0 0% 21%;
 
-    --sidebar-foreground: 240 5.3% 26.1%;
+    --text-primary: 0 0% 93%;
+    --text-secondary: 0 0% 71%; /* #B4B4B4 */
+    --text-muted: 0 0% 56%;
+    --text-placeholder: 0 0% 43%; /* #6E6E6E */
 
-    --sidebar-primary: 240 5.9% 10%;
+    --border-secondary: 0 0% 31%;
+    --border-focus: 0 0% 43%;
 
-    --sidebar-primary-foreground: 0 0% 98%;
+    --accent-link: 214 100% 67%; /* #58A6FF */
 
-    --sidebar-accent: 240 4.8% 95.9%;
-
-    --sidebar-accent-foreground: 240 5.9% 10%;
-
-    --sidebar-border: 220 13% 91%;
-
-    --sidebar-ring: 217.2 91.2% 59.8%;
-  }
-
-  .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
-
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
-    --sidebar-background: 240 5.9% 10%;
-    --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-background: 0 0% 9%;
+    --sidebar-foreground: 0 0% 93%;
+    --sidebar-primary: 160 83% 35%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 240 3.7% 15.9%;
-    --sidebar-accent-foreground: 240 4.8% 95.9%;
-    --sidebar-border: 240 3.7% 15.9%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-accent: 0 0% 18%;
+    --sidebar-accent-foreground: 0 0% 93%;
+    --sidebar-border: 0 0% 18%;
+    --sidebar-ring: 160 83% 35%;
   }
 }
 
@@ -101,5 +69,82 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+    font-family: 'Söhne', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--border-secondary));
+    border-radius: 3px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--text-muted));
+  }
+}
+
+/* Markdown prose styling */
+.prose-chat {
+  @apply text-foreground leading-relaxed;
+}
+.prose-chat p {
+  @apply mb-4;
+}
+.prose-chat h2 {
+  @apply text-xl font-semibold mt-6 mb-3;
+}
+.prose-chat h3 {
+  @apply text-lg font-semibold mt-4 mb-2;
+}
+.prose-chat strong {
+  @apply font-semibold;
+}
+.prose-chat ul, .prose-chat ol {
+  @apply pl-6 mb-4 space-y-2;
+}
+.prose-chat ol {
+  list-style-type: decimal;
+}
+.prose-chat ul {
+  list-style-type: disc;
+}
+.prose-chat blockquote {
+  @apply border-l-[3px] pl-4 py-3 pr-4 rounded-r-lg my-4;
+  border-color: hsl(var(--border-secondary));
+  background: hsl(0 0% 10%);
+  color: hsl(var(--text-secondary));
+}
+.prose-chat a {
+  color: hsl(var(--accent-link));
+}
+.prose-chat a:hover {
+  text-decoration: underline;
+}
+.prose-chat code {
+  @apply px-1.5 py-0.5 rounded text-sm font-mono;
+  background: hsl(0 0% 10%);
+}
+.prose-chat pre {
+  @apply rounded-lg p-4 my-4 overflow-x-auto;
+  background: hsl(0 0% 10%);
+}
+.prose-chat pre code {
+  @apply p-0 bg-transparent;
+}
+
+/* Typing cursor animation */
+@keyframes blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+.typing-cursor::after {
+  content: '|';
+  animation: blink 1s infinite;
+  color: hsl(var(--text-muted));
+  margin-left: 1px;
 }
