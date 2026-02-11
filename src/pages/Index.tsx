@@ -1,16 +1,16 @@
 import Sidebar from '@/components/layout/Sidebar';
 import ChatArea from '@/components/chat/ChatArea';
+import MarketResearchPage from '@/pages/MarketResearchPage';
 import { useChatStore } from '@/stores/chatStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
 
 export default function Index() {
-  const { sidebarOpen, setSidebarOpen } = useChatStore();
+  const { sidebarOpen, setSidebarOpen, activePage, setActivePage } = useChatStore();
   const isMobile = useIsMobile();
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
-      {/* Mobile hamburger always visible when sidebar closed */}
       {isMobile && !sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
@@ -21,7 +21,11 @@ export default function Index() {
         </button>
       )}
       <Sidebar />
-      <ChatArea />
+      {activePage === 'market-research' ? (
+        <MarketResearchPage onBack={() => setActivePage('chat')} />
+      ) : (
+        <ChatArea />
+      )}
     </div>
   );
 }

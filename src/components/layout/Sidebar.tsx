@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { AGENTS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
 import { useTheme } from '@/hooks/useTheme';
-import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, Sun, Moon, X } from 'lucide-react';
+import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, Sun, Moon, X, FlaskConical } from 'lucide-react';
 import SearchModal from '@/components/modals/SearchModal';
 import ImagesModal from '@/components/modals/ImagesModal';
 import AppsModal from '@/components/modals/AppsModal';
@@ -10,7 +10,7 @@ import DocumentsModal from '@/components/modals/DocumentsModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Sidebar() {
-  const { sidebarOpen, setSidebarOpen, activeAgentId, setActiveAgent, conversations, activeConversationId, setActiveConversation } = useChatStore();
+  const { sidebarOpen, setSidebarOpen, activeAgentId, setActiveAgent, conversations, activeConversationId, setActiveConversation, setActivePage } = useChatStore();
   const { theme, toggleTheme } = useTheme();
   const isMobile = useIsMobile();
   const [searchOpen, setSearchOpen] = useState(false);
@@ -70,6 +70,7 @@ export default function Sidebar() {
 
       {/* Nav items */}
       <div className="px-2 space-y-0.5">
+        <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" />} label="Pesquisa de Mercado" onClick={() => { setActivePage('market-research'); if (isMobile) setSidebarOpen(false); }} />
         <NavItem icon={<Search className="w-[18px] h-[18px]" />} label="Buscar" onClick={() => setSearchOpen(true)} />
         <NavItem icon={<Image className="w-[18px] h-[18px]" />} label="Imagens" onClick={() => setImagesOpen(true)} />
         <NavItem icon={<AppWindow className="w-[18px] h-[18px]" />} label="Aplicativos" onClick={() => setAppsOpen(true)} />

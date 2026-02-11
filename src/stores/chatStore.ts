@@ -8,11 +8,13 @@ interface ChatState {
   sidebarOpen: boolean;
   selectedModel: string;
   thinkingMode: boolean;
+  activePage: 'chat' | 'market-research';
 
   setActiveAgent: (agentId: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setSelectedModel: (model: string) => void;
   setThinkingMode: (on: boolean) => void;
+  setActivePage: (page: 'chat' | 'market-research') => void;
   createConversation: (agentId: string) => string;
   setActiveConversation: (id: string | null) => void;
   addMessage: (conversationId: string, message: Message) => void;
@@ -27,8 +29,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
   sidebarOpen: true,
   selectedModel: 'claude-opus-4.5',
   thinkingMode: true,
+  activePage: 'chat',
 
-  setActiveAgent: (agentId) => set({ activeAgentId: agentId, activeConversationId: null }),
+  setActiveAgent: (agentId) => set({ activeAgentId: agentId, activeConversationId: null, activePage: 'chat' }),
+  setActivePage: (page) => set({ activePage: page }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSelectedModel: (model) => set({ selectedModel: model }),
   setThinkingMode: (on) => set({ thinkingMode: on }),
