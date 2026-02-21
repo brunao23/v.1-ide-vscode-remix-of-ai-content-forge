@@ -1,4 +1,4 @@
-import { Agent } from '@/types';
+import { Agent, AGENT_AVATARS } from '@/types';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 
@@ -16,10 +16,11 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
         transition={{ duration: 0.4 }}
         className="text-center max-w-[600px] w-full"
       >
-        {/* Agent avatar - neutral placeholder */}
-        <div className="w-20 h-20 rounded-2xl mx-auto mb-4 flex items-center justify-center text-4xl bg-muted">
-          {agent.emoji}
-        </div>
+        <img
+          src={AGENT_AVATARS[agent.id]}
+          alt={agent.name}
+          className="w-20 h-20 rounded-full object-cover mx-auto mb-4"
+        />
 
         <h1 className="text-3xl font-bold text-foreground mb-2">{agent.name}</h1>
 

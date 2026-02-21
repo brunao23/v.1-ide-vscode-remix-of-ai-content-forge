@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { AGENTS } from '@/types';
+import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
 import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical } from 'lucide-react';
 import SearchModal from '@/components/modals/SearchModal';
@@ -81,10 +81,11 @@ export default function Sidebar() {
             }`}
             aria-label={agent.name}
           >
-            {/* Neutral placeholder avatar instead of colored icons */}
-            <div className="w-6 h-6 rounded-md bg-muted flex items-center justify-center text-xs shrink-0">
-              {agent.emoji}
-            </div>
+            <img
+              src={AGENT_AVATARS[agent.id]}
+              alt={agent.name}
+              className="w-6 h-6 rounded-md object-cover shrink-0"
+            />
             <span className="text-sm text-foreground truncate">{agent.name}</span>
           </button>
         ))}

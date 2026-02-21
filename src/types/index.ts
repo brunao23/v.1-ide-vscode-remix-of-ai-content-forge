@@ -38,6 +38,16 @@ export interface Document {
   createdAt: Date;
 }
 
+export const AGENT_AVATARS: Record<string, string> = {
+  'brand-book': '/assets/agents/brand-book.png',
+  'market-research': '/assets/agents/pesquisador-mercado.png',
+  'icp-architect': '/assets/agents/arquiteto-icp.png',
+  'pillar-strategist': '/assets/agents/estrategista-pilares.png',
+  'matrix-generator': '/assets/agents/gerador-matriz.png',
+  'marketing-manager': '/assets/agents/gerente-marketing.png',
+  'scriptwriter': '/assets/agents/roteirista.png',
+};
+
 export const AGENTS: Agent[] = [
   {
     id: 'brand-book',
