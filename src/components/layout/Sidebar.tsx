@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
-import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical } from 'lucide-react';
+import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon } from 'lucide-react';
+import { useTheme } from '@/hooks/useTheme';
 import SearchModal from '@/components/modals/SearchModal';
 import ImagesModal from '@/components/modals/ImagesModal';
 import AppsModal from '@/components/modals/AppsModal';
@@ -112,17 +113,18 @@ export default function Sidebar() {
         )}
       </div>
 
-      {/* Footer - just avatar + name, no theme toggle */}
+      {/* Footer - avatar + name + theme toggle */}
       <div className="p-2 border-t border-border">
-        <button className="w-full flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-secondary transition-colors">
-          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+        <div className="w-full flex items-center gap-3 px-2 py-2">
+          <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center shrink-0">
             <span className="text-primary-foreground text-sm font-semibold">U</span>
           </div>
-          <div className="min-w-0 text-left">
+          <div className="min-w-0 text-left flex-1">
             <p className="text-sm font-medium text-foreground truncate">Usuário</p>
             <p className="text-xs text-muted-foreground">Pro</p>
           </div>
-        </button>
+          <ThemeToggle />
+        </div>
       </div>
     </aside>
   );
@@ -156,6 +158,23 @@ function NavItem({ icon, label, onClick }: { icon: React.ReactNode; label: strin
     >
       <span className="text-muted-foreground">{icon}</span>
       <span className="text-sm text-foreground">{label}</span>
+    </button>
+  );
+}
+
+function ThemeToggle() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <button
+      onClick={toggleTheme}
+      className="p-2 rounded-lg hover:bg-secondary transition-colors shrink-0"
+      aria-label={theme === 'dark' ? 'Modo claro' : 'Modo escuro'}
+    >
+      {theme === 'dark' ? (
+        <Sun className="w-4 h-4 text-muted-foreground" />
+      ) : (
+        <Moon className="w-4 h-4 text-muted-foreground" />
+      )}
     </button>
   );
 }
