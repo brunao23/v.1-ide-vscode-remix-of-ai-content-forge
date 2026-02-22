@@ -1,6 +1,8 @@
+import { useState, useEffect } from 'react';
 import { Agent, AGENT_AVATARS } from '@/types';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
+import AgentLoadingScreen from '@/components/agents/AgentLoadingScreen';
 
 interface Props {
   agent: Agent;
@@ -8,6 +10,23 @@ interface Props {
 }
 
 export default function ConversationStarters({ agent, onStarterClick }: Props) {
+  const [imageLoaded, setImageLoaded] = useState(false);
+
+  useEffect(() => {
+    setImageLoaded(false);
+  }, [agent.id]);
+
+  if (!imageLoaded) {
+    // Preload image
+    const img = new Image();
+    img.src = AGENT_AVATARS[agent.id];
+    img.onload = () => setImageLoaded(true);
+  }
+
+  if (!imageLoaded) {
+    return <AgentLoadingScreen />;
+  }
+
   return (
     <div className="flex flex-col items-center justify-center h-full px-4 pb-4" style={{ paddingTop: '15vh' }}>
       <motion.div
