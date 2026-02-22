@@ -44,10 +44,15 @@ export default function MessageBubble({ message, agentId }: Props) {
       </div>
 
       {/* Thinking indicator */}
-      {message.thinkingTime && (
-        <p className="text-sm text-muted-foreground mb-3 italic">
-          Pensou por {message.thinkingTime}s
-        </p>
+      {message.thinking && (
+        <details className="text-sm text-muted-foreground mb-3 cursor-pointer">
+          <summary className="italic hover:text-foreground transition-colors">
+            Pensou por {message.thinkingDuration?.toFixed(0) || '?'}s
+          </summary>
+          <div className="mt-2 p-3 bg-secondary rounded-lg text-sm text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
+            {message.thinking}
+          </div>
+        </details>
       )}
 
       {/* Message content */}

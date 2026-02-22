@@ -1,43 +1,56 @@
+import { supabase } from '@/integrations/supabase/client';
 import { AGENTS, Agent } from '@/types';
-import { useChatStore } from '@/stores/chatStore';
-
-// Simulated AI responses per agent
-const MOCK_RESPONSES: Record<string, string[]> = {
-  'brand-book': [
-    `## Vamos construir seu Brand Book! 📘\n\nQue ótimo que você quer definir a identidade da sua marca! Vou te guiar por um processo estratégico de perguntas para criar um Brand Book completo.\n\n### Primeira pergunta:\n\n**Qual é o nome da sua marca e qual problema ela resolve?**\n\nMe conte de forma simples: o que sua empresa faz e por que ela existe. Isso vai ser a base de todo o nosso trabalho.`,
-    `Excelente! Agora vamos aprofundar.\n\n### Segunda pergunta:\n\n**Qual é a missão da sua marca?**\n\nA missão deve responder: *"O que fazemos, para quem e como fazemos diferente?"*\n\nTente pensar em uma frase que capture a essência do impacto que sua marca quer causar no mundo.`,
-  ],
-  'market-research': [
-    `## Iniciando Pesquisa de Mercado 🔍\n\nVou analisar seu mercado com base no Brand Book que já temos. Deixe-me começar mapeando:\n\n1. **Concorrentes diretos e indiretos**\n2. **Tendências do segmento**\n3. **Oportunidades inexploradas**\n4. **Ameaças potenciais**\n\nAnalisando dados...`,
-  ],
-  'icp-architect': [
-    `## Construindo seu ICP 🎯\n\nCom base no Brand Book e na Pesquisa de Mercado, vou criar o perfil completo do seu cliente ideal.\n\n### Vamos começar:\n\n**Descreva em detalhes quem é a pessoa que mais se beneficia do seu produto/serviço.** Pense em:\n- Idade, gênero, localização\n- Profissão e renda\n- Estilo de vida\n- O que a mantém acordada à noite`,
-  ],
-};
+import { getModelById } from '@/config/models';
 
 export function getAgentById(id: string): Agent | undefined {
   return AGENTS.find(a => a.id === id);
 }
 
-export function simulateResponse(agentId: string, messageIndex: number): string {
-  const responses = MOCK_RESPONSES[agentId] || MOCK_RESPONSES['brand-book'];
-  return responses[messageIndex % responses.length] || responses[0];
+// System prompts per agent
+const AGENT_SYSTEM_PROMPTS: Record<string, string> = {
+  'brand-book': `Você é o Construtor de Brand Book, um especialista em branding e identidade de marca. Seu papel é guiar o usuário através de um processo estratégico de perguntas para criar um Brand Book completo. Faça uma pergunta por vez, seja detalhado nas explicações e use formatação markdown.`,
+  'market-research': `Você é o Pesquisador de Mercado, especialista em análise de mercado e concorrência. Analise tendências, concorrentes e oportunidades com base nas informações fornecidas. Use dados e insights acionáveis.`,
+  'icp-architect': `Você é o Arquiteto do ICP, especialista em definir o perfil do cliente ideal. Construa personas detalhadas com dores, desejos, linguagem e comportamentos do público-alvo.`,
+  'pillar-strategist': `Você é o Estrategista de Pilares de Conteúdo. Defina pilares e subpilares estratégicos de conteúdo alinhados à marca, mercado e público-alvo.`,
+  'matrix-generator': `Você é o Gerador de Matriz de Conteúdo. Crie combinações criativas de Big Ideas de conteúdo cruzando pilares, subpilares, formatos e ângulos.`,
+  'marketing-manager': `Você é o Gerente de Marketing. Crie calendários mensais de conteúdo organizados e estratégicos, com datas, formatos e objetivos claros.`,
+  'scriptwriter': `Você é o Roteirista de Infotainment. Escreva roteiros de vídeo prontos para gravação no estilo infotainment - educativo e entretenimento ao mesmo tempo. Use ganchos, storytelling e CTAs.`,
+};
+
+export function getSystemPrompt(agentId: string): string {
+  return AGENT_SYSTEM_PROMPTS[agentId] || AGENT_SYSTEM_PROMPTS['brand-book'];
 }
 
-export async function streamResponse(
-  text: string,
-  onChunk: (accumulated: string) => void,
-  onDone: () => void
-) {
-  let accumulated = '';
-  const chars = text.split('');
-  
-  for (let i = 0; i < chars.length; i++) {
-    accumulated += chars[i];
-    onChunk(accumulated);
-    // Variable speed: faster for spaces, slower for newlines
-    const delay = chars[i] === '\n' ? 60 : chars[i] === ' ' ? 15 : 20;
-    await new Promise(r => setTimeout(r, delay));
-  }
-  onDone();
+interface SendMessageParams {
+  messages: { role: string; content: string }[];
+  agentId: string;
+  modelId: string;
+  extendedThinking: boolean;
+  contextDocuments?: Record<string, string>;
+}
+
+export async function sendChatMessage(params: SendMessageParams): Promise<{
+  content: string;
+  thinking?: string;
+  thinkingDuration?: number;
+  usage?: { inputTokens: number; outputTokens: number };
+}> {
+  const model = getModelById(params.modelId);
+  const actualThinking = model?.supportsExtendedThinking && params.extendedThinking;
+
+  const { data, error } = await supabase.functions.invoke('chat', {
+    body: {
+      messages: params.messages,
+      systemPrompt: getSystemPrompt(params.agentId),
+      modelId: model?.apiModelId || 'claude-sonnet-4-5-20250514',
+      extendedThinking: actualThinking,
+      maxTokens: model?.maxTokens || 8000,
+      contextDocuments: params.contextDocuments,
+    },
+  });
+
+  if (error) throw new Error(error.message || 'Erro ao chamar a API');
+  if (data?.error) throw new Error(data.error);
+
+  return data;
 }

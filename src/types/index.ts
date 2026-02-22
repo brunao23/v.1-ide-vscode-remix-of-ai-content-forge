@@ -16,7 +16,8 @@ export interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-  thinkingTime?: number;
+  thinking?: string;
+  thinkingDuration?: number;
   isStreaming?: boolean;
 }
 
@@ -170,11 +171,5 @@ export const AGENTS: Agent[] = [
   },
 ];
 
-export const AI_MODELS = [
-  { id: 'claude-opus-4.5', name: 'Claude Opus 4.5', badge: 'Recomendado' },
-  { id: 'claude-sonnet-4.5', name: 'Claude Sonnet 4.5', badge: '' },
-  { id: 'gpt-4o', name: 'GPT-4o', badge: '' },
-  { id: 'gpt-5.2-thinking', name: 'GPT-5.2 Thinking', badge: '' },
-  { id: 'gemini-pro', name: 'Gemini Pro', badge: '' },
-  { id: 'gemini-flash', name: 'Gemini Flash', badge: 'Rápido' },
-];
+// AI_MODELS is now in src/config/models.ts
+export { AI_MODELS } from '@/config/models';
