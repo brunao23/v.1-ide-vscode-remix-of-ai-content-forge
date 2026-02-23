@@ -32,28 +32,96 @@ export default function DocumentStatusBadge({ agentId, completedDocs }: Document
 
   return (
     <TooltipProvider delayDuration={200}>
+      {/* SVG Filter for liquid glass distortion */}
+      <svg width="0" height="0" style={{ position: 'absolute' }}>
+        <defs>
+          <filter id="glass-distortion-badge" x="0%" y="0%" width="100%" height="100%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.04 0.04"
+              numOctaves="2"
+              seed="42"
+              result="noise"
+            />
+            <feGaussianBlur
+              in="noise"
+              stdDeviation="1.5"
+              result="blurred"
+            />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="blurred"
+              scale="12"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+          <filter id="glass-distortion-tooltip" x="0%" y="0%" width="100%" height="100%">
+            <feTurbulence
+              type="fractalNoise"
+              baseFrequency="0.025 0.025"
+              numOctaves="2"
+              seed="92"
+              result="noise"
+            />
+            <feGaussianBlur
+              in="noise"
+              stdDeviation="2"
+              result="blurred"
+            />
+            <feDisplacementMap
+              in="SourceGraphic"
+              in2="blurred"
+              scale="30"
+              xChannelSelector="R"
+              yChannelSelector="G"
+            />
+          </filter>
+        </defs>
+      </svg>
+
       <Tooltip>
         <TooltipTrigger asChild>
-          <div
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full cursor-default transition-all duration-300 hover:scale-105"
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '2px solid transparent',
-              boxShadow: allReady
-                ? '0 0 0 2px rgba(16, 163, 127, 0.5), 0 16px 32px rgba(0, 0, 0, 0.12)'
-                : '0 0 0 2px rgba(255, 255, 255, 0.6), 0 16px 32px rgba(0, 0, 0, 0.12)',
-              backdropFilter: 'blur(16px)',
-              WebkitBackdropFilter: 'blur(16px)',
-            }}
-          >
-            {allReady ? (
-              <Check className="w-3.5 h-3.5 text-primary" />
-            ) : (
-              <AlertCircle className="w-3.5 h-3.5 text-yellow-500" />
-            )}
-            <span className={`text-xs font-medium ${allReady ? 'text-primary' : 'text-foreground'}`}>
-              {allReady ? 'Pronto' : `${done}/${total} pendentes`}
-            </span>
+          <div className="liquid-glass-badge" style={{ position: 'relative', isolation: 'isolate' }}>
+            {/* Glass distortion pseudo-layers via wrapper */}
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                boxShadow: 'inset 0 0 8px -2px rgba(255, 255, 255, 0.5)',
+                zIndex: 0,
+              }}
+            />
+            <div
+              className="absolute inset-0 rounded-full pointer-events-none"
+              style={{
+                backdropFilter: 'blur(8px)',
+                WebkitBackdropFilter: 'blur(8px)',
+                filter: 'url(#glass-distortion-badge)',
+                WebkitFilter: 'url(#glass-distortion-badge)',
+                zIndex: -1,
+                borderRadius: 'inherit',
+              }}
+            />
+            <div
+              className="relative z-10 inline-flex items-center gap-1.5 px-4 py-2 rounded-full cursor-default transition-all duration-300 hover:scale-105"
+              style={{
+                boxShadow: allReady
+                  ? '0px 0px 14px -6px rgba(16, 163, 127, 0.4)'
+                  : '0px 0px 14px -6px rgba(255, 255, 255, 0.25)',
+              }}
+            >
+              {allReady ? (
+                <Check className="w-3.5 h-3.5 text-primary" />
+              ) : (
+                <AlertCircle className="w-3.5 h-3.5 text-yellow-500" />
+              )}
+              <span
+                className={`text-xs font-medium ${allReady ? 'text-primary' : 'text-foreground'}`}
+                style={{ textShadow: '0 1px 2px rgba(0,0,0,0.15)' }}
+              >
+                {allReady ? 'Pronto' : `${done}/${total} pendentes`}
+              </span>
+            </div>
           </div>
         </TooltipTrigger>
         <TooltipContent
@@ -62,37 +130,59 @@ export default function DocumentStatusBadge({ agentId, completedDocs }: Document
           sideOffset={8}
         >
           <div
-            className="p-4 rounded-2xl max-w-[220px]"
-            style={{
-              background: 'rgba(255, 255, 255, 0.08)',
-              border: '2px solid transparent',
-              boxShadow: '0 0 0 2px rgba(255, 255, 255, 0.5), 0 16px 32px rgba(0, 0, 0, 0.18)',
-              backdropFilter: 'blur(20px)',
-              WebkitBackdropFilter: 'blur(20px)',
-            }}
+            className="liquid-glass-tooltip rounded-2xl max-w-[220px]"
+            style={{ position: 'relative', isolation: 'isolate' }}
           >
-            <p className="text-xs font-semibold text-foreground mb-2.5">
-              Documentos necessários
-            </p>
-            <div className="space-y-1.5">
-              {agent.requires.map((reqId) => {
-                const isReady = completedDocs[reqId];
-                return (
-                  <div key={reqId} className="flex items-center gap-2">
-                    {isReady ? (
-                      <Check className="w-3 h-3 text-primary shrink-0" />
-                    ) : (
-                      <AlertCircle className="w-3 h-3 text-yellow-500 shrink-0" />
-                    )}
-                    <span className={`text-xs ${isReady ? 'text-muted-foreground' : 'text-foreground font-medium'}`}>
-                      {AGENT_DOC_LABELS[reqId] || reqId}
-                    </span>
-                    {!isReady && (
-                      <span className="text-[10px] text-yellow-500 ml-auto">Pendente</span>
-                    )}
-                  </div>
-                );
-              })}
+            {/* Inner glow layer */}
+            <div
+              className="absolute inset-0 rounded-2xl pointer-events-none"
+              style={{
+                boxShadow: 'inset 0 0 12px -2px rgba(255, 255, 255, 0.6)',
+                zIndex: 0,
+              }}
+            />
+            {/* Backdrop blur + distortion layer */}
+            <div
+              className="absolute inset-0 rounded-2xl pointer-events-none"
+              style={{
+                backdropFilter: 'blur(6px)',
+                WebkitBackdropFilter: 'blur(6px)',
+                filter: 'url(#glass-distortion-tooltip)',
+                WebkitFilter: 'url(#glass-distortion-tooltip)',
+                zIndex: -1,
+              }}
+            />
+            {/* Content */}
+            <div className="relative z-10 p-4">
+              <p
+                className="text-xs font-semibold text-foreground mb-2.5"
+                style={{ textShadow: '0 1px 3px rgba(0,0,0,0.15)' }}
+              >
+                Documentos necessários
+              </p>
+              <div className="space-y-1.5">
+                {agent.requires.map((reqId) => {
+                  const isReady = completedDocs[reqId];
+                  return (
+                    <div key={reqId} className="flex items-center gap-2">
+                      {isReady ? (
+                        <Check className="w-3 h-3 text-primary shrink-0" />
+                      ) : (
+                        <AlertCircle className="w-3 h-3 text-yellow-500 shrink-0" />
+                      )}
+                      <span
+                        className={`text-xs ${isReady ? 'text-muted-foreground' : 'text-foreground font-medium'}`}
+                        style={{ textShadow: '0 1px 2px rgba(0,0,0,0.1)' }}
+                      >
+                        {AGENT_DOC_LABELS[reqId] || reqId}
+                      </span>
+                      {!isReady && (
+                        <span className="text-[10px] text-yellow-500 ml-auto">Pendente</span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           </div>
         </TooltipContent>
