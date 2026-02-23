@@ -91,6 +91,7 @@ export async function searchMarket(request: SearchRequest): Promise<SearchRespon
       ? images.map((img: any) => typeof img === 'string' ? img : img.url || img.src || '')
       : undefined;
 
+    console.log(`[MarketResearch] Post ${i}: displayUrl=${item.displayUrl}, thumbnail=${thumbnail}, videoUrl=${item.videoUrl}`);
     return {
       id: item.id || item.shortCode || `post_${Date.now()}_${i}`,
       post_url: item.url || item.post_url || '',
