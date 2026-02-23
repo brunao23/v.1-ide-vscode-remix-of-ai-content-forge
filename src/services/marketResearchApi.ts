@@ -57,8 +57,18 @@ export async function searchMarket(request: SearchRequest): Promise<SearchRespon
 
   const data = await res.json();
 
-  // Normalize response — the webhook may return an array or an object
-  const rawPosts = Array.isArray(data) ? data : data.posts || [];
+  // Normalize response — the webhook may return an array, a single object, or {posts:[...]}
+  let rawPosts: any[];
+  if (Array.isArray(data)) {
+    rawPosts = data;
+  } else if (data.posts && Array.isArray(data.posts)) {
+    rawPosts = data.posts;
+  } else if (data && data.id) {
+    // Single post object returned
+    rawPosts = [data];
+  } else {
+    rawPosts = [];
+  }
 
   const posts = rawPosts.map((item: any, i: number) => ({
     id: item.id || `post_${Date.now()}_${i}`,
