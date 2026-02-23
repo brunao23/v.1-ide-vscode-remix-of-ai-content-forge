@@ -37,6 +37,7 @@ export async function searchMarket(request: SearchRequest): Promise<SearchRespon
     resultsType: mapResultsType(request.post_type),
     searchLimit: 1,
     searchType: 'hashtag',
+    platform: request.platform,
   };
 
   const res = await fetch(WEBHOOK_URL, {
