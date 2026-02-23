@@ -45,6 +45,7 @@ export function useMarketResearch() {
         keyword: filters.searchType === 'keyword' ? filters.keyword : undefined,
         post_type: filters.postType,
         period_days: filters.periodDays,
+        results_limit: filters.resultsLimit,
         user_id: 'user_demo',
         request_id: crypto.randomUUID(),
       });
