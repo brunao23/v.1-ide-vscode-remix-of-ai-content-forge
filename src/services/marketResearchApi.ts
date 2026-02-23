@@ -33,7 +33,7 @@ export async function searchMarket(request: SearchRequest): Promise<SearchRespon
     addParentData: false,
     directUrls: buildDirectUrl(request.platform, request.username, request.keyword, request.search_type),
     onlyPostsNewerThan: buildPeriodFilter(request.period_days || 30),
-    resultsLimit: 20,
+    resultsLimit: request.results_limit || 20,
     resultsType: mapResultsType(request.post_type),
     searchLimit: 1,
     searchType: 'hashtag',

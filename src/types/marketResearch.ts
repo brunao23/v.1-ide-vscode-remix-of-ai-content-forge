@@ -43,6 +43,7 @@ export interface SearchRequest {
   keyword?: string;
   post_type: PostType;
   period_days: number;
+  results_limit?: number;
   user_id: string;
   request_id: string;
   cursor?: string;
@@ -73,6 +74,7 @@ export interface SearchFilters {
   keyword: string;
   postType: PostType;
   periodDays: number;
+  resultsLimit?: number;
 }
 
 export interface SavedSearch {

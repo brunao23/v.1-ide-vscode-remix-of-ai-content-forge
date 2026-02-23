@@ -45,12 +45,14 @@ export default function MarketResearchPage({ onBack }: Props) {
   const [postType, setPostType] = useState<PostType>('all');
   const [periodDays, setPeriodDays] = useState(30);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+  const [resultsLimit, setResultsLimit] = useState<string>('');
 
   const postTypeOptions = platform === 'instagram'
     ? [{ value: 'all', label: 'Todos' }, { value: 'carousel', label: 'Carrossel' }, { value: 'reels', label: 'Reels' }, { value: 'image', label: 'Imagem única' }]
     : [{ value: 'all', label: 'Todos' }, { value: 'video', label: 'Vídeos' }];
 
   const handleSearch = () => {
+    const parsedLimit = resultsLimit ? Math.min(20, Math.max(1, parseInt(resultsLimit, 10) || 20)) : undefined;
     const filters: SearchFilters = {
       searchType: tab,
       platform,
@@ -58,6 +60,7 @@ export default function MarketResearchPage({ onBack }: Props) {
       keyword,
       postType,
       periodDays,
+      resultsLimit: parsedLimit,
     };
     if (tab === 'profile' && !username.trim()) return;
     if (tab === 'keyword' && !keyword.trim()) return;
@@ -127,6 +130,18 @@ export default function MarketResearchPage({ onBack }: Props) {
                   </SelectContent>
                 </Select>
               </div>
+              <div className="space-y-1.5">
+                <label className="text-sm text-muted-foreground">Limite de posts (1-20)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={resultsLimit}
+                  onChange={e => setResultsLimit(e.target.value)}
+                  placeholder="Padrão: 20"
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
+              </div>
             </div>
           </TabsContent>
 
@@ -171,6 +186,18 @@ export default function MarketResearchPage({ onBack }: Props) {
                     {PERIOD_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm text-muted-foreground">Limite de posts (1-20)</label>
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={resultsLimit}
+                  onChange={e => setResultsLimit(e.target.value)}
+                  placeholder="Padrão: 20"
+                  className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                />
               </div>
             </div>
           </TabsContent>
