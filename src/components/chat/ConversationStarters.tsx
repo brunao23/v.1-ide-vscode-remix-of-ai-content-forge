@@ -3,6 +3,7 @@ import { Agent, AGENT_AVATARS } from '@/types';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
 import AgentLoadingScreen from '@/components/agents/AgentLoadingScreen';
+import DocumentStatusBadge from '@/components/agents/DocumentStatusBadge';
 
 interface Props {
   agent: Agent;
@@ -17,7 +18,6 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
   }, [agent.id]);
 
   if (!imageLoaded) {
-    // Preload image
     const img = new Image();
     img.src = AGENT_AVATARS[agent.id];
     img.onload = () => setImageLoaded(true);
@@ -26,6 +26,17 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
   if (!imageLoaded) {
     return <AgentLoadingScreen />;
   }
+
+  // Mock completed docs — replace with real data later
+  const completedDocs: Record<string, boolean> = {
+    'brand-book': true,
+    'market-research': true,
+    'icp-architect': false,
+    'pillar-strategist': false,
+    'matrix-generator': false,
+    'marketing-manager': false,
+    'scriptwriter': false,
+  };
 
   return (
     <div className="flex flex-col items-center justify-center h-full px-4 pb-4" style={{ paddingTop: '15vh' }}>
@@ -43,7 +54,6 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
 
         <h1 className="text-3xl font-bold text-foreground mb-2">{agent.name}</h1>
 
-        {/* Model badge in GRAY with check, not green */}
         <div className="flex items-center justify-center gap-1.5 mb-4">
           <Check className="w-4 h-4 text-muted-foreground" />
           <span className="text-sm text-muted-foreground">
@@ -51,13 +61,17 @@ export default function ConversationStarters({ agent, onStarterClick }: Props) {
           </span>
         </div>
 
-        <p className="text-muted-foreground text-[15px] leading-relaxed max-w-[500px] mx-auto mb-8">
+        <p className="text-muted-foreground text-[15px] leading-relaxed max-w-[500px] mx-auto mb-4">
           {agent.description}
         </p>
 
-        {/* NO progress bar - ChatGPT doesn't have this */}
+        {/* Document status badge */}
+        {agent.requires.length > 0 && (
+          <div className="flex justify-center mb-6">
+            <DocumentStatusBadge agentId={agent.id} completedDocs={completedDocs} />
+          </div>
+        )}
 
-        {/* Starters grid - smaller, more subtle */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-lg mx-auto">
           {agent.starters.map((starter, i) => (
             <motion.button
