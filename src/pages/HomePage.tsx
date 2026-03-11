@@ -163,9 +163,9 @@ export default function HomePage() {
             <div className="bg-secondary border border-border rounded-[28px] px-4 py-2.5 focus-within:border-muted-foreground/40 transition-colors">
               <AttachedFiles files={attachedFiles} onRemove={removeFile} />
 
-              <div className="flex items-end gap-2">
+              <div className="flex items-center gap-2">
                 {/* Plus button with dropdown */}
-                <div className="relative shrink-0 mb-0.5">
+                <div className="relative shrink-0">
                   <button
                     onClick={() => setShowPlusMenu(!showPlusMenu)}
                     className="w-8 h-8 rounded-full bg-muted-foreground/10 hover:bg-muted-foreground/20 flex items-center justify-center transition-colors"
