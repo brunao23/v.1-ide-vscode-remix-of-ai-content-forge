@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
-import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon } from 'lucide-react';
+import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon, Home } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import SearchModal from '@/components/modals/SearchModal';
 import ImagesModal from '@/components/modals/ImagesModal';
@@ -49,7 +49,7 @@ export default function Sidebar() {
           {isMobile ? <X className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
         </button>
         <button
-          onClick={() => setActiveConversation(null)}
+          onClick={() => { setActiveConversation(null); setActivePage('home'); }}
           className="p-2 rounded-lg hover:bg-secondary transition-colors"
           title="Novo chat"
           aria-label="Novo chat"
@@ -60,6 +60,7 @@ export default function Sidebar() {
 
       {/* Nav items */}
       <div className="px-2 space-y-0.5">
+        <NavItem icon={<Home className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Início" onClick={() => { setActivePage('home'); if (isMobile) setSidebarOpen(false); }} />
         <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" onClick={() => { setActivePage('market-research'); if (isMobile) setSidebarOpen(false); }} />
         <NavItem icon={<Search className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Buscar" onClick={() => setSearchOpen(true)} />
         <NavItem icon={<Image className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Imagens" onClick={() => setImagesOpen(true)} />

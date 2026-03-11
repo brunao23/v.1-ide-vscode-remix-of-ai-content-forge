@@ -1,6 +1,7 @@
 import Sidebar from '@/components/layout/Sidebar';
 import ChatArea from '@/components/chat/ChatArea';
 import MarketResearchPage from '@/pages/MarketResearchPage';
+import HomePage from '@/pages/HomePage';
 import { useChatStore } from '@/stores/chatStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
@@ -8,6 +9,17 @@ import { Menu } from 'lucide-react';
 export default function Index() {
   const { sidebarOpen, setSidebarOpen, activePage, setActivePage } = useChatStore();
   const isMobile = useIsMobile();
+
+  const renderPage = () => {
+    switch (activePage) {
+      case 'home':
+        return <HomePage />;
+      case 'market-research':
+        return <MarketResearchPage onBack={() => setActivePage('home')} />;
+      default:
+        return <ChatArea />;
+    }
+  };
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
@@ -21,11 +33,7 @@ export default function Index() {
         </button>
       )}
       <Sidebar />
-      {activePage === 'market-research' ? (
-        <MarketResearchPage onBack={() => setActivePage('chat')} />
-      ) : (
-        <ChatArea />
-      )}
+      {renderPage()}
     </div>
   );
 }
