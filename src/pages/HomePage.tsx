@@ -170,24 +170,25 @@ export default function HomePage() {
           <div className="relative">
             <button
               onClick={() => setModelDropdown(!modelDropdown)}
-              className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary transition-colors"
+              className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-secondary transition-colors"
               aria-label="Selecionar modelo"
             >
-              <span className="text-base font-semibold text-foreground">
+              <span className="text-[17px] font-normal text-foreground">
                 {currentModel?.provider === 'anthropic' ? 'Claude' : currentModel?.provider === 'openai' ? 'ChatGPT' : 'Gemini'}
               </span>
-              <span className="text-base text-muted-foreground font-normal">
-                {currentModel?.name.replace(/^Claude\s*/, '').replace(/^GPT-?\s*/, '') || 'Chat'}
+              <span className="text-[17px] font-light text-muted-foreground">
+                {currentModel?.name.replace(/^Claude\s*/, '').replace(/^ChatGPT\s*/, '') || 'Chat'}
               </span>
-              <ChevronDown className="w-4 h-4 text-muted-foreground" />
+              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
 
             {modelDropdown && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setModelDropdown(false)} />
-                <div className="absolute top-full left-0 mt-1 z-50 bg-popover rounded-xl shadow-lg border border-border min-w-[260px] p-2">
-                  <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Modelo</p>
-                  {AI_MODELS.map((model) => (
+                <div className="absolute top-full left-0 mt-1 z-50 bg-popover rounded-xl shadow-lg border border-border min-w-[280px] p-2">
+                  {/* ChatGPT group */}
+                  <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">ChatGPT</p>
+                  {AI_MODELS.filter(m => m.provider === 'openai').map((model) => (
                     <button
                       key={model.id}
                       onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}
@@ -199,7 +200,34 @@ export default function HomePage() {
                         <span className="block font-medium">{model.name}</span>
                         <span className="block text-xs text-muted-foreground">{model.description}</span>
                       </div>
-                      {selectedModel === model.id && <Check className="w-4 h-4 text-muted-foreground ml-2 shrink-0" />}
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                        {selectedModel === model.id && <Check className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Separator */}
+                  <div className="my-1.5 mx-3 border-t border-border" />
+
+                  {/* Claude group */}
+                  <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Claude</p>
+                  {AI_MODELS.filter(m => m.provider === 'anthropic').map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between ${
+                        selectedModel === model.id ? 'bg-secondary text-foreground' : 'hover:bg-secondary text-foreground'
+                      }`}
+                    >
+                      <div>
+                        <span className="block font-medium">{model.name}</span>
+                        <span className="block text-xs text-muted-foreground">{model.description}</span>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                        {selectedModel === model.id && <Check className="w-4 h-4 text-muted-foreground" />}
+                      </div>
                     </button>
                   ))}
                 </div>

@@ -11,6 +11,36 @@ export interface AIModel {
 }
 
 export const AI_MODELS: AIModel[] = [
+  // ChatGPT models
+  {
+    id: "chatgpt-5.3-instant",
+    name: "ChatGPT 5.3 Instant",
+    provider: "openai",
+    apiModelId: "gpt-5.3-instant",
+    description: "Rápido para tarefas simples",
+    supportsExtendedThinking: false,
+    maxTokens: 4000,
+    badge: "Rápido",
+  },
+  {
+    id: "chatgpt-5.3",
+    name: "ChatGPT 5.3",
+    provider: "openai",
+    apiModelId: "gpt-5.3",
+    description: "Equilíbrio entre velocidade e qualidade",
+    supportsExtendedThinking: true,
+    maxTokens: 8000,
+  },
+  {
+    id: "chatgpt-5.3-pro",
+    name: "ChatGPT 5.3 Pro",
+    provider: "openai",
+    apiModelId: "gpt-5.3-pro",
+    description: "Modelo mais avançado do ChatGPT",
+    supportsExtendedThinking: true,
+    maxTokens: 16000,
+  },
+  // Claude models
   {
     id: "claude-opus-4.5",
     name: "Claude Opus 4.5",
