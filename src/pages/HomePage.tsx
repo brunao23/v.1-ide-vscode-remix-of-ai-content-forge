@@ -176,8 +176,8 @@ export default function HomePage() {
               <span className="text-[17px] font-normal text-foreground">
                 {currentModel?.provider === 'anthropic' ? 'Claude' : currentModel?.provider === 'openai' ? 'ChatGPT' : 'Gemini'}
               </span>
-              <span className="text-[17px] font-light text-muted-foreground">
-                {currentModel?.name.replace(/^Claude\s*/, '').replace(/^ChatGPT\s*/, '') || 'Chat'}
+              <span className="text-[17px] font-normal text-muted-foreground">
+                {currentModel?.name.replace(/^Claude\s*/, '').replace(/^ChatGPT\s*/, '').replace(/^Gemini\s*/, '') || 'Chat'}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
@@ -213,6 +213,30 @@ export default function HomePage() {
                   {/* Claude group */}
                   <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Claude</p>
                   {AI_MODELS.filter(m => m.provider === 'anthropic').map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}
+                      className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between ${
+                        selectedModel === model.id ? 'bg-secondary text-foreground' : 'hover:bg-secondary text-foreground'
+                      }`}
+                    >
+                      <div>
+                        <span className="block font-medium">{model.name}</span>
+                        <span className="block text-xs text-muted-foreground">{model.description}</span>
+                      </div>
+                      <div className="flex items-center gap-2 ml-2 shrink-0">
+                        {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                        {selectedModel === model.id && <Check className="w-4 h-4 text-muted-foreground" />}
+                      </div>
+                    </button>
+                  ))}
+
+                  {/* Separator */}
+                  <div className="my-1.5 mx-3 border-t border-border" />
+
+                  {/* Gemini group */}
+                  <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Gemini</p>
+                  {AI_MODELS.filter(m => m.provider === 'google').map((model) => (
                     <button
                       key={model.id}
                       onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}

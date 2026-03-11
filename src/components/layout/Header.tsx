@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { getAgentById } from '@/services/chatService';
 import { AI_MODELS } from '@/types';
-import { ChevronDown, Share, MoreHorizontal, PanelLeft, Menu } from 'lucide-react';
+import { ChevronDown, Share, MoreHorizontal, PanelLeft, Menu, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import gemzLogo from '@/assets/gemz-logo.png';
 
@@ -50,19 +50,38 @@ export default function Header() {
           {modelDropdown && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setModelDropdown(false)} />
-              <div className="absolute top-full left-0 mt-1 z-50 bg-popover rounded-xl shadow-lg border border-border min-w-[220px] p-2">
-                <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Modelo</p>
-                {AI_MODELS.map((model) => (
-                  <button
-                    key={model.id}
-                    onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}
-                    className={`w-full text-left px-3 py-2 rounded-md text-sm transition-colors ${
-                      selectedModel === model.id ? 'bg-secondary text-foreground' : 'hover:bg-secondary text-foreground'
-                    }`}
-                  >
-                    <span>{model.name}{model.badge && <span className="text-xs text-muted-foreground"> {model.badge}</span>}</span>
-                  </button>
-                ))}
+              <div className="absolute top-full left-0 mt-1 z-50 bg-popover rounded-xl shadow-lg border border-border min-w-[280px] p-2 max-h-[70vh] overflow-y-auto">
+                {(['openai', 'anthropic', 'google'] as const).map((provider, idx) => {
+                  const providerModels = AI_MODELS.filter(m => m.provider === provider);
+                  if (providerModels.length === 0) return null;
+                  const label = provider === 'openai' ? 'ChatGPT' : provider === 'anthropic' ? 'Claude' : 'Gemini';
+                  return (
+                    <div key={provider}>
+                      {idx > 0 && <div className="my-1.5 mx-3 border-t border-border" />}
+                      <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">{label}</p>
+                      {providerModels.map((model) => (
+                        <button
+                          key={model.id}
+                          onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}
+                          className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between ${
+                            selectedModel === model.id ? 'bg-secondary text-foreground' : 'hover:bg-secondary text-foreground'
+                          }`}
+                        >
+                          <div>
+                            <span className="block font-medium">{model.name}</span>
+                            <span className="block text-xs text-muted-foreground">{model.description}</span>
+                          </div>
+                          <div className="flex items-center gap-2 ml-2 shrink-0">
+                            {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                            {selectedModel === model.id && (
+                              <Check className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
               </div>
             </>
           )}
