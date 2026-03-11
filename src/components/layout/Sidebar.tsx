@@ -79,7 +79,7 @@ export default function Sidebar() {
             key={agent.id}
             onClick={() => { setActiveAgent(agent.id); if (isMobile) setSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-              activeAgentId === agent.id ? 'bg-secondary' : 'hover:bg-secondary'
+              activePage === 'chat' && activeAgentId === agent.id ? 'bg-secondary' : 'hover:bg-secondary'
             }`}
             aria-label={agent.name}
           >
