@@ -57,7 +57,7 @@ export default function Header() {
                     }`}
                   >
                     <span>{model.name}</span>
-                    {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                    {model.badge && <span className="text-xs text-muted-foreground ml-2">{model.badge}</span>}
                   </button>
                 ))}
               </div>
