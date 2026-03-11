@@ -91,7 +91,7 @@ export default function Sidebar() {
             <img
               src={AGENT_AVATARS[agent.id]}
               alt={agent.name}
-              className="w-6 h-6 rounded-md object-cover shrink-0"
+              className="w-6 h-6 rounded-full object-cover shrink-0"
             />
             <span className="text-sm text-foreground truncate">{agent.name}</span>
           </button>
