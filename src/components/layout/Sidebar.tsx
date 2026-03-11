@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import gemzLogo from '@/assets/gemz-logo.png';
 import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
 import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon, Home } from 'lucide-react';
@@ -41,13 +42,17 @@ export default function Sidebar() {
     <aside className={`${isMobile ? 'w-full' : 'w-[260px]'} h-screen bg-card flex flex-col shrink-0`}>
       {/* Header - just toggle + new chat */}
       <div className="h-12 px-3 flex items-center justify-between">
-        <button
-          onClick={() => setSidebarOpen(false)}
-          className="p-2 rounded-lg hover:bg-secondary transition-colors"
-          aria-label="Fechar sidebar"
-        >
-          {isMobile ? <X className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
-        </button>
+        <div className="flex items-center gap-1">
+          <img src={gemzLogo} alt="Gemz AI" className="w-[18px] h-[18px] rounded-sm" />
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-2 rounded-lg hover:bg-secondary transition-colors"
+            title="Fechar barra lateral"
+            aria-label="Fechar sidebar"
+          >
+            {isMobile ? <X className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
+          </button>
+        </div>
         <button
           onClick={() => { setActiveConversation(null); setActivePage('home'); }}
           className="p-2 rounded-lg hover:bg-secondary transition-colors"
