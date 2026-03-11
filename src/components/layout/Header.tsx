@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { getAgentById } from '@/services/chatService';
 import { AI_MODELS } from '@/types';
-import { ChevronDown, Share, MoreHorizontal, PanelLeft, Menu } from 'lucide-react';
+import { ChevronDown, Share, MoreHorizontal, PanelLeft, Menu, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import gemzLogo from '@/assets/gemz-logo.png';
 
