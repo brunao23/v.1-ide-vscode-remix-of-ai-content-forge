@@ -174,7 +174,10 @@ export default function HomePage() {
               aria-label="Selecionar modelo"
             >
               <span className="text-base font-semibold text-foreground">
-                {currentModel?.name || 'Chat'}
+                {currentModel?.provider === 'anthropic' ? 'Claude' : currentModel?.provider === 'openai' ? 'ChatGPT' : 'Gemini'}
+              </span>
+              <span className="text-base text-muted-foreground font-normal">
+                {currentModel?.name.replace(/^Claude\s*/, '').replace(/^GPT-?\s*/, '') || 'Chat'}
               </span>
               <ChevronDown className="w-4 h-4 text-muted-foreground" />
             </button>
