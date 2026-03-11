@@ -32,7 +32,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activePage: 'home',
 
   setActiveAgent: (agentId) => set({ activeAgentId: agentId, activeConversationId: null, activePage: 'chat' }),
-  setActivePage: (page) => set({ activePage: page }),
+  setActivePage: (page) => set({ activePage: page, ...(page !== 'chat' ? { activeAgentId: '' } : {}) }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSelectedModel: (model) => set({ selectedModel: model }),
   setThinkingMode: (on) => set({ thinkingMode: on }),
