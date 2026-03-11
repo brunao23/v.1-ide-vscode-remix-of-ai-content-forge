@@ -29,8 +29,8 @@
 }
 
 @font-face {
-  font-family: 'ITC Garamond Std Book Narrow';
-  src: url('@/assets/fonts/itc-garamond-std-book-narrow.otf') format('opentype');
+  font-family: 'ITC Garamond Std Lt Cond';
+  src: url('@/assets/fonts/ITCGaramondStd-LtCond.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
