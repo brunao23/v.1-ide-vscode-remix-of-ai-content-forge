@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Font faces for custom fonts */
+@font-face {
+  font-family: 'ITC Garamond Std Book';
+  src: url('@/assets/fonts/itc-garamond-std-book.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'ITC Garamond Std Book Narrow';
+  src: url('@/assets/fonts/itc-garamond-std-book-narrow.otf') format('opentype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
 @layer base {
   :root {
     /* Light theme */
@@ -223,4 +240,20 @@
   position: relative;
   isolation: isolate;
   box-shadow: 0px 0px 21px -8px rgba(255, 255, 255, 0.3);
+}
+
+/* Greeting typography - ITC Garamond */
+.greeting-prompt {
+  font-family: 'ITC Garamond Std Book', Garamond, Georgia, serif;
+  font-weight: normal;
+}
+
+.greeting-name {
+  font-family: 'ITC Garamond Std Book', Garamond, Georgia, serif;
+  font-weight: normal;
+}
+
+.greeting-question {
+  font-family: 'ITC Garamond Std Book Narrow', 'ITC Garamond Std Book', Garamond, Georgia, serif;
+  font-weight: normal;
 }

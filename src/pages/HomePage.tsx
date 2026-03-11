@@ -274,8 +274,10 @@ export default function HomePage() {
       {!hasMessages ? (
         /* Empty state — centered greeting + input */
         <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <h1 className="text-[32px] font-medium text-foreground mb-6">
-            Como posso ajudar, {firstName}?
+          <h1 className="text-[32px] text-foreground mb-6">
+            <span className="greeting-prompt">Como posso ajudar,</span>
+            <span className="greeting-name"> {firstName}</span>
+            <span className="greeting-question">?</span>
           </h1>
 
           {/* Centered input */}
