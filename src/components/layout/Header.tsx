@@ -4,6 +4,7 @@ import { getAgentById } from '@/services/chatService';
 import { AI_MODELS } from '@/types';
 import { ChevronDown, Share, MoreHorizontal, PanelLeft, Menu } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import gemzLogo from '@/assets/gemz-logo.png';
 
 export default function Header() {
   const { activeAgentId, selectedModel, setSelectedModel, sidebarOpen, setSidebarOpen } = useChatStore();
@@ -16,14 +17,17 @@ export default function Header() {
     <header className="h-12 flex items-center justify-between px-4 shrink-0">
       <div className="flex items-center gap-2">
         {!sidebarOpen && (
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-2 rounded-lg hover:bg-secondary transition-colors"
-            title="Abrir barra lateral"
-            aria-label="Abrir sidebar"
-          >
-            {isMobile ? <Menu className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
-          </button>
+          <>
+            <img src={gemzLogo} alt="Gemz AI" className="w-[18px] h-[18px] rounded-sm" />
+            <button
+              onClick={() => setSidebarOpen(true)}
+              className="p-2 rounded-lg hover:bg-secondary transition-colors"
+              title="Abrir barra lateral"
+              aria-label="Abrir sidebar"
+            >
+              {isMobile ? <Menu className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
+            </button>
+          </>
         )}
 
         <div className="relative">

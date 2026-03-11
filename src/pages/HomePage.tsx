@@ -3,6 +3,7 @@ import { useChatStore } from '@/stores/chatStore';
 import { sendChatMessage } from '@/services/chatService';
 import { AI_MODELS, Message } from '@/types';
 import { Plus, ArrowUp, Square, Paperclip, ImagePlus, Search, Globe, Mic, AudioLines, ChevronDown, Check, PanelLeft, Menu } from 'lucide-react';
+import gemzLogo from '@/assets/gemz-logo.png';
 import { AttachedFiles, UploadedFile } from '@/components/chat/FileUploadButton';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { useAuth } from '@/contexts/AuthContext';
@@ -153,14 +154,17 @@ export default function HomePage() {
       <header className="h-12 flex items-center justify-between px-4 shrink-0">
         <div className="flex items-center gap-2">
           {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="p-2 rounded-lg hover:bg-secondary transition-colors"
-              title="Abrir barra lateral"
-              aria-label="Abrir sidebar"
-            >
-              {isMobile ? <Menu className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
-            </button>
+            <>
+              <img src={gemzLogo} alt="Gemz AI" className="w-[18px] h-[18px] rounded-sm" />
+              <button
+                onClick={() => setSidebarOpen(true)}
+                className="p-2 rounded-lg hover:bg-secondary transition-colors"
+                title="Abrir barra lateral"
+                aria-label="Abrir sidebar"
+              >
+                {isMobile ? <Menu className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
+              </button>
+            </>
           )}
 
           <div className="relative">
