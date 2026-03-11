@@ -26,7 +26,10 @@ export default function HomePage() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
 
-  const firstName = user?.email?.split('@')[0] || 'Usuário';
+  const firstName = (() => {
+    const raw = user?.email?.split('@')[0] || 'Usuário';
+    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  })();
   const hasMessages = messages.length > 0;
 
   useEffect(() => {

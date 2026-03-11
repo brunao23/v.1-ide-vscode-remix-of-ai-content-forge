@@ -10,7 +10,7 @@ import DocumentsModal from '@/components/modals/DocumentsModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function Sidebar() {
-  const { sidebarOpen, setSidebarOpen, activeAgentId, setActiveAgent, conversations, activeConversationId, setActiveConversation, setActivePage } = useChatStore();
+  const { sidebarOpen, setSidebarOpen, activeAgentId, setActiveAgent, conversations, activeConversationId, setActiveConversation, setActivePage, activePage } = useChatStore();
   const isMobile = useIsMobile();
   const [searchOpen, setSearchOpen] = useState(false);
   const [imagesOpen, setImagesOpen] = useState(false);
@@ -60,8 +60,8 @@ export default function Sidebar() {
 
       {/* Nav items */}
       <div className="px-2 space-y-0.5">
-        <NavItem icon={<Home className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Início" onClick={() => { setActivePage('home'); if (isMobile) setSidebarOpen(false); }} />
-        <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" onClick={() => { setActivePage('market-research'); if (isMobile) setSidebarOpen(false); }} />
+        <NavItem icon={<Home className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Início" active={activePage === 'home'} onClick={() => { setActivePage('home'); if (isMobile) setSidebarOpen(false); }} />
+        <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" active={activePage === 'market-research'} onClick={() => { setActivePage('market-research'); if (isMobile) setSidebarOpen(false); }} />
         <NavItem icon={<Search className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Buscar" onClick={() => setSearchOpen(true)} />
         <NavItem icon={<Image className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Imagens" onClick={() => setImagesOpen(true)} />
         <NavItem icon={<AppWindow className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aplicativos" onClick={() => setAppsOpen(true)} />
@@ -79,7 +79,7 @@ export default function Sidebar() {
             key={agent.id}
             onClick={() => { setActiveAgent(agent.id); if (isMobile) setSidebarOpen(false); }}
             className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-left transition-colors ${
-              activeAgentId === agent.id ? 'bg-secondary' : 'hover:bg-secondary'
+              activePage === 'chat' && activeAgentId === agent.id ? 'bg-secondary' : 'hover:bg-secondary'
             }`}
             aria-label={agent.name}
           >
@@ -150,11 +150,13 @@ export default function Sidebar() {
   );
 }
 
-function NavItem({ icon, label, onClick }: { icon: React.ReactNode; label: string; onClick?: () => void }) {
+function NavItem({ icon, label, onClick, active }: { icon: React.ReactNode; label: string; onClick?: () => void; active?: boolean }) {
   return (
     <button
       onClick={onClick}
-      className="w-full flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-secondary transition-colors"
+      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
+        active ? 'bg-secondary' : 'hover:bg-secondary'
+      }`}
       aria-label={label}
     >
       <span className="text-muted-foreground">{icon}</span>
