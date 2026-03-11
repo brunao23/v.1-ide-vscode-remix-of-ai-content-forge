@@ -175,6 +175,7 @@ export default function ChatArea() {
             onSend={handleSend}
             isStreaming={isStreaming}
             onStop={handleStop}
+            hideDisclaimer={!conversation || conversation.messages.length === 0}
           />
         </div>
       </div>

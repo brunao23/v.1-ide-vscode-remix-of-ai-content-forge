@@ -8,9 +8,10 @@ interface Props {
   onSend: (message: string) => void;
   isStreaming: boolean;
   onStop?: () => void;
+  hideDisclaimer?: boolean;
 }
 
-export default function ChatInput({ onSend, isStreaming, onStop }: Props) {
+export default function ChatInput({ onSend, isStreaming, onStop, hideDisclaimer = false }: Props) {
   const [value, setValue] = useState('');
   const [thinkDropdown, setThinkDropdown] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([]);
@@ -144,9 +145,11 @@ export default function ChatInput({ onSend, isStreaming, onStop }: Props) {
         </div>
       </div>
 
-      <p className="text-center text-xs text-muted-foreground mt-3 mb-2">
-        A IA pode cometer erros. Confira informações importantes.
-      </p>
+      {!hideDisclaimer && (
+        <p className="text-center text-xs text-muted-foreground mt-3 mb-2">
+          A IA pode cometer erros. Confira informações importantes.
+        </p>
+      )}
     </div>
   );
 }
