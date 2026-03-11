@@ -16,16 +16,20 @@ const PLUS_MENU_ITEMS = [
 ];
 
 export default function HomePage() {
-  const { selectedModel, thinkingMode } = useChatStore();
+  const { selectedModel, setSelectedModel, thinkingMode, sidebarOpen, setSidebarOpen } = useChatStore();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [inputValue, setInputValue] = useState('');
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([]);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
+  const [modelDropdown, setModelDropdown] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+  const isMobile = useIsMobile();
+
+  const currentModel = AI_MODELS.find(m => m.id === selectedModel);
 
   const firstName = (() => {
     const raw = user?.email?.split('@')[0] || 'Usuário';
