@@ -154,18 +154,18 @@ export default function HomePage() {
       {!hasMessages ? (
         /* Empty state — centered greeting + input */
         <div className="flex-1 flex flex-col items-center justify-center px-4">
-          <h1 className="text-[32px] font-medium text-foreground mb-10">
+          <h1 className="text-[32px] font-medium text-foreground mb-6">
             Como posso ajudar, {firstName}?
           </h1>
 
           {/* Centered input */}
           <div className="w-full max-w-[680px] relative">
-            <div className="bg-secondary border border-border rounded-[28px] px-4 py-3 focus-within:border-muted-foreground/40 transition-colors">
+            <div className="bg-secondary border border-border rounded-[28px] px-4 py-2.5 focus-within:border-muted-foreground/40 transition-colors">
               <AttachedFiles files={attachedFiles} onRemove={removeFile} />
 
-              <div className="flex items-end gap-2">
+              <div className="flex items-center gap-2">
                 {/* Plus button with dropdown */}
-                <div className="relative shrink-0 mb-0.5">
+                <div className="relative shrink-0">
                   <button
                     onClick={() => setShowPlusMenu(!showPlusMenu)}
                     className="w-8 h-8 rounded-full bg-muted-foreground/10 hover:bg-muted-foreground/20 flex items-center justify-center transition-colors"
@@ -204,7 +204,7 @@ export default function HomePage() {
                   aria-label="Mensagem"
                 />
 
-                <div className="flex items-center gap-1 shrink-0 mb-0.5">
+                <div className="flex items-center gap-1 shrink-0">
                   {isStreaming ? (
                     <button
                       onClick={() => setIsStreaming(false)}
