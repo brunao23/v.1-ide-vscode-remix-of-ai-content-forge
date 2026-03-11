@@ -33,19 +33,18 @@ export default function Header() {
         <div className="relative">
           <button
             onClick={() => setModelDropdown(!modelDropdown)}
-            className="flex items-center gap-2 px-2 py-1 rounded-lg hover:bg-secondary transition-colors"
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg hover:bg-secondary transition-colors"
             aria-label="Selecionar modelo"
           >
-            <span className="text-base font-semibold text-foreground truncate max-w-[150px] sm:max-w-none">
+            <span className="text-[17px] font-normal text-foreground truncate max-w-[200px] sm:max-w-none">
               {agent?.name || 'Chat'}
             </span>
-            {/* Model name in GRAY, not green */}
             {currentModel && (
-              <span className="text-sm text-muted-foreground hidden sm:inline">
+              <span className="text-[17px] font-normal text-muted-foreground hidden sm:inline">
                 {currentModel.name}
               </span>
             )}
-            <ChevronDown className="w-4 h-4 text-muted-foreground" />
+            <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
           </button>
 
           {modelDropdown && (
