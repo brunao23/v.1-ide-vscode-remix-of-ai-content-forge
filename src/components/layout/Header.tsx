@@ -19,6 +19,7 @@ export default function Header() {
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-secondary transition-colors"
+            title="Abrir barra lateral"
             aria-label="Abrir sidebar"
           >
             {isMobile ? <Menu className="w-[18px] h-[18px] text-muted-foreground" /> : <PanelLeft className="w-[18px] h-[18px] text-muted-foreground" />}
