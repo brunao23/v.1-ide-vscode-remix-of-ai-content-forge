@@ -307,8 +307,8 @@ export default function MarketResearchPage({ onBack }: Props) {
 /* Filter row with icon */
 function FilterRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-3.5 gap-3">
-      <div className="flex items-center gap-3">
+    <div className="flex items-center py-3.5 gap-3">
+      <div className="flex items-center gap-3 min-w-[160px]">
         {icon}
         <span className="text-sm text-muted-foreground">{label}</span>
       </div>
