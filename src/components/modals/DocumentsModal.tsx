@@ -103,58 +103,70 @@ export default function DocumentsModal({ open, onClose }: Props) {
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
-      <div className="fixed inset-4 md:inset-12 z-50 bg-card rounded-xl border border-border shadow-2xl flex flex-col overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">Documentos</h2>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setNewDocOpen(true)}
-              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:opacity-90 transition-opacity"
-            >
-              + Novo documento
-            </button>
-            <button onClick={onClose} className="p-2 rounded-lg hover:bg-secondary" aria-label="Fechar">
-              <X className="w-5 h-5 text-muted-foreground" />
-            </button>
+      <div className="fixed inset-4 md:inset-12 z-50 bg-background rounded-xl border border-border/40 shadow-2xl flex flex-col overflow-hidden">
+        {/* Header */}
+        <div className="px-6 py-5 border-b border-border/40 shrink-0">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-foreground">Documentos</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Gerencie os documentos criados pelos agentes</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setNewDocOpen(true)}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg border border-border/60 text-sm text-foreground hover:bg-secondary/30 transition-colors"
+              >
+                + Novo documento
+              </button>
+              <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors" aria-label="Fechar">
+                <X className="w-5 h-5 text-foreground" strokeWidth={1.5} />
+              </button>
+            </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-3xl mx-auto space-y-6">
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-[640px] mx-auto px-6 py-8 space-y-8">
             {Object.entries(grouped).map(([type, typeDocs]) => (
               <div key={type}>
-                <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wide mb-3">{type}</h3>
-                <div className="space-y-2">
-                  {typeDocs.map(doc => (
-                    <div key={doc.id} className="flex items-center gap-4 p-4 rounded-xl bg-secondary border border-border hover:border-muted-foreground/30 transition-colors group">
-                      <span className="text-2xl">{doc.emoji}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground">{doc.title}</p>
-                        <p className="text-sm text-muted-foreground">
-                          Criado em {doc.createdAt} • {getAgentName(doc.agentId)}
-                        </p>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{type}</p>
+                <div className="space-y-0">
+                  {typeDocs.map((doc, i) => (
+                    <div key={doc.id}>
+                      <div className="flex items-center gap-4 py-5 group">
+                        <div className="w-9 h-9 rounded-[8px] bg-secondary/60 flex items-center justify-center shrink-0 text-lg">
+                          {doc.emoji}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-foreground">{doc.title}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            Criado em {doc.createdAt} • {getAgentName(doc.agentId)}
+                          </p>
+                        </div>
+                        <div className="relative shrink-0">
+                          <button
+                            onClick={() => setMenuOpen(menuOpen === doc.id ? null : doc.id)}
+                            className="p-2 rounded-lg hover:bg-secondary/60 opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label="Menu de ações"
+                          >
+                            <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                          </button>
+                          {menuOpen === doc.id && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
+                              <div className="absolute right-0 top-full mt-1 z-20 bg-popover rounded-lg shadow-lg border border-border/40 min-w-[160px] p-1">
+                                <MenuItem icon={<Eye className="w-4 h-4" />} label="Abrir" onClick={() => { setViewerDoc(doc); setViewerMode('view'); setMenuOpen(null); }} />
+                                <MenuItem icon={<Pencil className="w-4 h-4" />} label="Editar" onClick={() => { setViewerDoc(doc); setViewerMode('edit'); setMenuOpen(null); }} />
+                                <MenuItem icon={<Download className="w-4 h-4" />} label="Baixar PDF" onClick={() => handleDownloadPDF(doc)} />
+                                <MenuItem icon={<Download className="w-4 h-4" />} label="Baixar DOCX" onClick={() => handleDownloadDOCX(doc)} />
+                                <MenuItem icon={<Trash2 className="w-4 h-4" />} label="Excluir" destructive onClick={() => handleDelete(doc.id)} />
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <div className="relative">
-                        <button
-                          onClick={() => setMenuOpen(menuOpen === doc.id ? null : doc.id)}
-                          className="p-2 rounded-lg hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity"
-                          aria-label="Menu de ações"
-                        >
-                          <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
-                        </button>
-                        {menuOpen === doc.id && (
-                          <>
-                            <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(null)} />
-                            <div className="absolute right-0 top-full mt-1 z-20 bg-popover rounded-lg shadow-lg border border-border min-w-[160px] p-1">
-                              <MenuItem icon={<Eye className="w-4 h-4" />} label="Abrir" onClick={() => { setViewerDoc(doc); setViewerMode('view'); setMenuOpen(null); }} />
-                              <MenuItem icon={<Pencil className="w-4 h-4" />} label="Editar" onClick={() => { setViewerDoc(doc); setViewerMode('edit'); setMenuOpen(null); }} />
-                              <MenuItem icon={<Download className="w-4 h-4" />} label="Baixar PDF" onClick={() => handleDownloadPDF(doc)} />
-                              <MenuItem icon={<Download className="w-4 h-4" />} label="Baixar DOCX" onClick={() => handleDownloadDOCX(doc)} />
-                              <MenuItem icon={<Trash2 className="w-4 h-4" />} label="Excluir" destructive onClick={() => handleDelete(doc.id)} />
-                            </div>
-                          </>
-                        )}
-                      </div>
+                      {i < typeDocs.length - 1 && <div className="border-t border-border/30" />}
                     </div>
                   ))}
                 </div>
@@ -162,10 +174,12 @@ export default function DocumentsModal({ open, onClose }: Props) {
             ))}
 
             {docs.length === 0 && (
-              <div className="text-center py-16 text-muted-foreground">
-                <FileText className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                <p className="text-lg font-medium">Nenhum documento ainda</p>
-                <p className="text-sm mt-1">Complete as etapas dos agentes para gerar documentos</p>
+              <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
+                <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
+                  <FileText className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+                </div>
+                <p className="text-sm text-muted-foreground">Nenhum documento ainda</p>
+                <p className="text-xs text-muted-foreground">Complete as etapas dos agentes para gerar documentos</p>
               </div>
             )}
           </div>
