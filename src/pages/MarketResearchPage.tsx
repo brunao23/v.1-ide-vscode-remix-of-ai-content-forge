@@ -215,11 +215,9 @@ export default function MarketResearchPage({ onBack }: Props) {
       });
 
       if (!res.ok) throw new Error('Webhook error');
-      setWebhookStatus('success');
-      setWebhookSent(true);
 
-      // Hide success message after 4s — progress bar takes over
-      setTimeout(() => setWebhookStatus('idle'), 4000);
+      // Start polling for Make.com callback confirmation
+      pollForCallback(requestId);
     } catch (err) {
       setWebhookStatus('error');
       setWebhookError(true);
