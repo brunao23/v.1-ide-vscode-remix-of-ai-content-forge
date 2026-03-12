@@ -28,13 +28,6 @@ const LATEST_MODELS = [
   },
 ];
 
-// Older models shown in flyout submenu
-const OLDER_MODELS = [
-  { id: 'chatgpt-5.3-pro', name: 'GPT-5.2 Instant' },
-  { id: 'claude-opus-4.5', name: 'GPT-5.2 Thinking' },
-  { id: 'claude-sonnet-4.5', name: 'GPT-5 Thinking mini' },
-  { id: 'gemini-2.5-pro', name: 'o3' },
-];
 
 export default function Header() {
   const { activeAgentId, selectedModel, setSelectedModel, sidebarOpen, setSidebarOpen, activePage } = useChatStore();
