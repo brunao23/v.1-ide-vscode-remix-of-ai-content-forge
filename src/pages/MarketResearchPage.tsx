@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { PlatformIcon, PLATFORM_LIST } from '@/components/market-research/PlatformIcons';
 import { useMarketResearch } from '@/hooks/useMarketResearch';
@@ -50,6 +50,8 @@ export default function MarketResearchPage({ onBack }: Props) {
   const [resultsLimit, setResultsLimit] = useState<string>('');
   const [webhookSent, setWebhookSent] = useState(false);
   const [webhookError, setWebhookError] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isSearching, setIsSearching] = useState(false);
 
   const postTypeOptions = platform === 'instagram'
     ? [
@@ -65,8 +67,13 @@ export default function MarketResearchPage({ onBack }: Props) {
     : [{ value: 'all', label: 'Todos' }];
 
   const handleSearch = async () => {
+    if (isSearching) return;
     const inputValue = tab === 'profile' ? username.trim() : keyword.trim();
     if (!inputValue) return;
+
+    setIsSearching(true);
+    setWebhookStatus('idle');
+    setWebhookError(false);
 
     const limitNum = resultsLimit ? Math.min(20, Math.max(1, parseInt(resultsLimit, 10) || 20)) : 20;
 
@@ -147,7 +154,6 @@ export default function MarketResearchPage({ onBack }: Props) {
       };
     }
 
-    setWebhookError(false);
     try {
       const res = await fetch('https://hook.us1.make.com/rgp4sp2c0xxuv9hq3fft1my1jqxxytsg', {
         method: 'POST',
@@ -156,10 +162,15 @@ export default function MarketResearchPage({ onBack }: Props) {
       });
 
       if (!res.ok) throw new Error('Webhook error');
-      toast.success('Pesquisa enviada com sucesso!');
+      setWebhookStatus('success');
       setWebhookSent(true);
+
+      // Hide success message after 4s — progress bar takes over
+      setTimeout(() => setWebhookStatus('idle'), 4000);
     } catch (err) {
+      setWebhookStatus('error');
       setWebhookError(true);
+      setIsSearching(false);
       return;
     }
 
@@ -168,6 +179,7 @@ export default function MarketResearchPage({ onBack }: Props) {
       resultsLimit: limitNum,
     };
     search(filters);
+    setIsSearching(false);
   };
 
   const searched = posts.length > 0 || error || loading;
@@ -355,13 +367,32 @@ export default function MarketResearchPage({ onBack }: Props) {
           <div className="flex justify-end">
             <button
               onClick={handleSearch}
-              disabled={loading}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50"
+              disabled={isSearching || loading}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
-              {loading ? 'Raspando dados...' : 'Pesquisar'}
+              {(isSearching || loading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
+              {(isSearching || loading) ? 'Processando...' : 'Pesquisar'}
             </button>
           </div>
+
+          {/* Immediate webhook status feedback */}
+          {webhookStatus === 'success' && (
+            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 animate-in fade-in duration-300">
+              <p className="text-sm text-primary flex items-center gap-2">
+                <Check className="w-4 h-4" strokeWidth={2} />
+                Solicitação enviada com sucesso! Aguarde enquanto coletamos os dados.
+              </p>
+            </div>
+          )}
+
+          {webhookStatus === 'error' && (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 animate-in fade-in duration-300">
+              <p className="text-sm text-destructive flex items-center gap-2">
+                <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
+                Falha ao enviar solicitação. Tente novamente ou acione o administrador.
+              </p>
+            </div>
+          )}
 
           {/* Progress Bar */}
           <ResearchProgressBar
@@ -369,8 +400,8 @@ export default function MarketResearchPage({ onBack }: Props) {
             onComplete={() => setWebhookSent(false)}
           />
 
-          {/* Loading */}
-          {loading && !webhookSent && (
+          {/* Loading — only show if no webhook status visible */}
+          {loading && !webhookSent && webhookStatus === 'idle' && (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
               <p className="text-sm text-muted-foreground">
@@ -379,20 +410,20 @@ export default function MarketResearchPage({ onBack }: Props) {
             </div>
           )}
 
-          {/* Error — webhook or search */}
-          {(webhookError || (error && !loading)) && !webhookSent && (
+          {/* Error — only show webhook errors when no status banner is visible */}
+          {webhookError && webhookStatus !== 'error' && !webhookSent && (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <AlertTriangle className="w-8 h-8 text-destructive/70" strokeWidth={1.5} />
               <p className="text-sm text-foreground">Não foi possível completar a pesquisa</p>
               <p className="text-xs text-muted-foreground">O sistema pode estar fora do ar. Tente novamente ou acione o administrador.</p>
-              <button onClick={handleSearch} className="px-4 py-1.5 rounded-lg border border-border/50 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground">
+              <button onClick={() => { setWebhookError(false); setWebhookStatus('idle'); }} className="px-4 py-1.5 rounded-lg border border-border/50 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground">
                 Tentar novamente
               </button>
             </div>
           )}
 
           {/* Empty */}
-          {!searched && (
+          {!searched && webhookStatus === 'idle' && (
             <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
               <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
                 <Search className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
