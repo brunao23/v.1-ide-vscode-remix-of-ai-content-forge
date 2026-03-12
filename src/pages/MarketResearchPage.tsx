@@ -85,6 +85,9 @@ export default function MarketResearchPage({ onBack }: Props) {
       return d.toISOString().split('T')[0];
     };
 
+    // Generate unique request ID for this search
+    const requestId = crypto.randomUUID();
+
     let payload: Record<string, any>;
 
     if (platform === 'instagram') {
@@ -99,6 +102,7 @@ export default function MarketResearchPage({ onBack }: Props) {
       };
 
       payload = {
+        requestId,
         plataforma: 'instagram',
         addParentData: false,
         directUrls: [directUrl],
@@ -110,6 +114,7 @@ export default function MarketResearchPage({ onBack }: Props) {
       };
     } else if (platform === 'tiktok') {
       payload = {
+        requestId,
         plataforma: 'tiktok',
         commentsPerPost: 0,
         excludePinnedPosts: false,
@@ -131,6 +136,7 @@ export default function MarketResearchPage({ onBack }: Props) {
       // YouTube
       const isUrl = inputValue.includes('youtube.com') || inputValue.includes('youtu.be');
       payload = {
+        requestId,
         plataforma: 'youtube',
         downloadSubtitles: false,
         hasCC: false,
