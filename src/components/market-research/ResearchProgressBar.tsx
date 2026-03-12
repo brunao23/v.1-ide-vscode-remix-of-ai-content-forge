@@ -38,7 +38,7 @@ export default function ResearchProgressBar({ active, onComplete }: ResearchProg
       const next = Math.min(cur + increment, 95);
       progressRef.current = next;
       setProgress(next);
-    }, 100);
+    }, 400);
 
     return () => clearInterval(interval);
   }, [active]);
