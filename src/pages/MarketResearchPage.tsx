@@ -82,7 +82,7 @@ export default function MarketResearchPage({ onBack }: Props) {
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[640px] mx-auto px-6 py-8 space-y-8">
           {/* Intro section */}
-          <div className="space-y-4">
+          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
             <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
               Análise de Competidores
             </h2>
