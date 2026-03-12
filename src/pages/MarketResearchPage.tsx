@@ -379,8 +379,8 @@ export default function MarketResearchPage({ onBack }: Props) {
             </div>
           )}
 
-          {/* Error */}
-          {error && !loading && !webhookSent && (
+          {/* Error — webhook or search */}
+          {(webhookError || (error && !loading)) && !webhookSent && (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <AlertTriangle className="w-8 h-8 text-destructive/70" strokeWidth={1.5} />
               <p className="text-sm text-foreground">Não foi possível completar a pesquisa</p>
