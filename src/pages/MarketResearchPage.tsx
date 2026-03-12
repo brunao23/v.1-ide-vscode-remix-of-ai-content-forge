@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowLeft, Search, Loader2, AlertTriangle, Grid3X3, User, Image, Calendar, ListOrdered, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered } from 'lucide-react';
+import { PlatformIcon, PLATFORM_LIST } from '@/components/market-research/PlatformIcons';
 import { useMarketResearch } from '@/hooks/useMarketResearch';
 import { SearchFilters, SearchType, Platform, PostType, SortBy, SortOrder, Post } from '@/types/marketResearch';
 import PostCard from '@/components/market-research/PostCard';
@@ -113,14 +114,23 @@ export default function MarketResearchPage({ onBack }: Props) {
           <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-0">
             <div className="divide-y divide-border/40">
               {/* Plataforma */}
-              <FilterRow icon={<Grid3X3 className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />} label="Plataforma">
+              <FilterRow icon={<PlatformIcon platform={platform} size={18} />} label="Plataforma">
                 <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
-                  <SelectTrigger className="w-auto min-w-[140px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
-                    <SelectValue />
+                  <SelectTrigger className="w-auto min-w-[160px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
+                    <div className="flex items-center gap-2">
+                      <PlatformIcon platform={platform} size={18} />
+                      <SelectValue />
+                    </div>
                   </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="instagram">Instagram</SelectItem>
-                    <SelectItem value="tiktok">TikTok</SelectItem>
+                  <SelectContent className="min-w-[200px]">
+                    {PLATFORM_LIST.map(p => (
+                      <SelectItem key={p.value} value={p.value}>
+                        <div className="flex items-center gap-2.5">
+                          <PlatformIcon platform={p.value} size={22} />
+                          <span>{p.label}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </FilterRow>
