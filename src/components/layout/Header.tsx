@@ -2,31 +2,10 @@ import { useState } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { getAgentById } from '@/services/chatService';
 import { AI_MODELS } from '@/types';
-import { ChevronDown, ChevronRight, Share, MoreHorizontal, PanelLeft, Menu, Check, Sparkles, Zap, Brain } from 'lucide-react';
+import { ChevronDown, ChevronRight, Share, MoreHorizontal, PanelLeft, Menu, Check } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import gemzLogo from '@/assets/gemz-logo.png';
 
-// Latest models shown in main dropdown
-const LATEST_MODELS = [
-  {
-    id: 'auto',
-    name: 'Auto',
-    description: 'Escolhe por quanto tempo pensar',
-    icon: Sparkles,
-  },
-  {
-    id: 'chatgpt-5.3-instant',
-    name: 'Instant 5.3',
-    description: 'Respostas imediatas',
-    icon: Zap,
-  },
-  {
-    id: 'chatgpt-5.3',
-    name: 'Thinking 5.4',
-    description: 'Pensa mais para gerar respostas melhores',
-    icon: Brain,
-  },
-];
 
 
 export default function Header() {
@@ -40,7 +19,7 @@ export default function Header() {
 
   // Display name for the selector
   const displayName = isHome
-    ? (LATEST_MODELS.find(m => m.id === selectedModel)?.name || currentModel?.name || 'Auto')
+    ? (currentModel?.name || 'Claude Opus 4.5')
     : (agent?.name || 'Chat');
 
   return (
@@ -83,33 +62,46 @@ export default function Header() {
 
               {isHome ? (
                 /* ========== HOME: Flyout submenu style ========== */
-                <div className="absolute top-full left-0 mt-1 z-50 bg-popover rounded-xl shadow-lg border border-border min-w-[300px] p-1.5">
-                  {/* Latest section */}
-                  {LATEST_MODELS.map((model) => {
-                    const Icon = model.icon;
+                <div className="absolute top-full left-0 mt-1 z-50 bg-popover rounded-xl shadow-lg border border-border min-w-[280px] p-1.5">
+                  {/* ChatGPT */}
+                  <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">ChatGPT</p>
+                  {AI_MODELS.filter(m => m.provider === 'openai').map((model) => {
                     const isSelected = selectedModel === model.id;
                     return (
                       <button
                         key={model.id}
                         onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}
-                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center gap-3 ${
-                          isSelected ? 'bg-secondary' : 'hover:bg-secondary'
+                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between cursor-pointer transition-[background-color] duration-150 ease-in-out ${
+                          isSelected ? 'bg-secondary' : 'hover:bg-[hsl(0_0%_23%)]'
                         }`}
                       >
-                        <Icon className="w-4 h-4 text-muted-foreground shrink-0" strokeWidth={1.5} />
-                        <div className="flex-1 min-w-0">
-                          <span className="block font-medium text-foreground">{model.name}</span>
-                          <span className="block text-xs text-muted-foreground">{model.description}</span>
-                        </div>
+                        <span className="text-foreground">{model.name}</span>
                         {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
                       </button>
                     );
                   })}
 
-                  {/* Separator */}
+                  {/* Claude */}
                   <div className="my-1.5 mx-3 border-t border-border" />
+                  <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Claude</p>
+                  {AI_MODELS.filter(m => m.provider === 'anthropic').map((model) => {
+                    const isSelected = selectedModel === model.id;
+                    return (
+                      <button
+                        key={model.id}
+                        onClick={() => { setSelectedModel(model.id); setModelDropdown(false); }}
+                        className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between cursor-pointer transition-[background-color] duration-150 ease-in-out ${
+                          isSelected ? 'bg-secondary' : 'hover:bg-[hsl(0_0%_23%)]'
+                        }`}
+                      >
+                        <span className="text-foreground">{model.name}</span>
+                        {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                      </button>
+                    );
+                  })}
 
-                  {/* More models trigger */}
+                  {/* Mais modelos → Gemini flyout */}
+                  <div className="my-1.5 mx-3 border-t border-border" />
                   <div
                     className="relative"
                     onMouseEnter={() => setShowOlderSubmenu(true)}
@@ -117,39 +109,28 @@ export default function Header() {
                   >
                     <button
                       onClick={() => setShowOlderSubmenu(!showOlderSubmenu)}
-                      className="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between hover:bg-secondary"
+                      className="w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between cursor-pointer transition-[background-color] duration-150 ease-in-out hover:bg-[hsl(0_0%_23%)]"
                     >
                       <span className="text-foreground font-medium">Mais modelos</span>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </button>
 
-                    {/* Flyout submenu - all models grouped by provider */}
                     {showOlderSubmenu && (
-                      <div className="absolute left-full top-0 ml-1 bg-popover rounded-xl shadow-lg border border-border min-w-[240px] p-1.5 max-h-[60vh] overflow-y-auto">
-                        {(['openai', 'anthropic', 'google'] as const).map((provider, idx) => {
-                          const providerModels = AI_MODELS.filter(m => m.provider === provider);
-                          if (providerModels.length === 0) return null;
-                          const label = provider === 'openai' ? 'ChatGPT' : provider === 'anthropic' ? 'Claude' : 'Gemini';
+                      <div className="absolute left-full top-0 ml-1 bg-popover rounded-xl shadow-lg border border-border min-w-[240px] p-1.5">
+                        <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">Gemini</p>
+                        {AI_MODELS.filter(m => m.provider === 'google').map((model) => {
+                          const isSelected = selectedModel === model.id;
                           return (
-                            <div key={provider}>
-                              {idx > 0 && <div className="my-1.5 mx-3 border-t border-border" />}
-                              <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">{label}</p>
-                              {providerModels.map((model) => {
-                                const isSelected = selectedModel === model.id;
-                                return (
-                                  <button
-                                    key={model.id}
-                                    onClick={() => { setSelectedModel(model.id); setModelDropdown(false); setShowOlderSubmenu(false); }}
-                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${
-                                      isSelected ? 'bg-secondary' : 'hover:bg-secondary'
-                                    }`}
-                                  >
-                                    <span className="text-foreground">{model.name}</span>
-                                    {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
-                                  </button>
-                                );
-                              })}
-                            </div>
+                            <button
+                              key={model.id}
+                              onClick={() => { setSelectedModel(model.id); setModelDropdown(false); setShowOlderSubmenu(false); }}
+                              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between cursor-pointer transition-[background-color] duration-150 ease-in-out ${
+                                isSelected ? 'bg-secondary' : 'hover:bg-[hsl(0_0%_23%)]'
+                              }`}
+                            >
+                              <span className="text-foreground">{model.name}</span>
+                              {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                            </button>
                           );
                         })}
                       </div>
