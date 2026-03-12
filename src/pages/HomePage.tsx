@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { sendChatMessage } from '@/services/chatService';
 import { AI_MODELS, Message } from '@/types';
-import { Plus, ArrowUp, Square, Paperclip, ImagePlus, Search, Globe, Mic, AudioLines, ChevronDown, ChevronRight, Check, PanelLeft, Menu, Sparkles, Zap, Brain } from 'lucide-react';
+import { Plus, ArrowUp, Square, Paperclip, ImagePlus, Search, Globe, Mic, AudioLines, ChevronDown, ChevronRight, Check, PanelLeft, Menu } from 'lucide-react';
 import gemzLogo from '@/assets/gemz-logo.png';
 import { AttachedFiles, UploadedFile } from '@/components/chat/FileUploadButton';
 import MessageBubble from '@/components/chat/MessageBubble';
