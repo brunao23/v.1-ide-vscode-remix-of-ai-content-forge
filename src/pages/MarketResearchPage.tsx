@@ -50,6 +50,8 @@ export default function MarketResearchPage({ onBack }: Props) {
   const [resultsLimit, setResultsLimit] = useState<string>('');
   const [webhookSent, setWebhookSent] = useState(false);
   const [webhookError, setWebhookError] = useState(false);
+  const [webhookStatus, setWebhookStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [isSearching, setIsSearching] = useState(false);
 
   const postTypeOptions = platform === 'instagram'
     ? [
