@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { ArrowLeft, Search, Loader2, AlertTriangle, Grid3X3, User, Image, Calendar, ListOrdered, ChevronRight } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered } from 'lucide-react';
+import { PlatformIcon, PLATFORM_LIST } from '@/components/market-research/PlatformIcons';
 import { useMarketResearch } from '@/hooks/useMarketResearch';
 import { SearchFilters, SearchType, Platform, PostType, SortBy, SortOrder, Post } from '@/types/marketResearch';
 import PostCard from '@/components/market-research/PostCard';
