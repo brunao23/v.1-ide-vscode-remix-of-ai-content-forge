@@ -72,6 +72,7 @@ export default function Sidebar() {
         <NavItem icon={<Image className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Imagens" onClick={() => setImagesOpen(true)} />
         <NavItem icon={<AppWindow className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aplicativos" onClick={() => setAppsOpen(true)} />
         <NavItem icon={<BookOpen className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Documentos" onClick={() => setDocsOpen(true)} />
+        <NavItem icon={<ClipboardCheck className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Implementação" active={activePage === 'implementation'} onClick={() => { setActivePage('implementation'); if (isMobile) setSidebarOpen(false); }} />
       </div>
 
       {/* Agents Section - label "GPTs" not "AGENTES" */}
