@@ -49,6 +49,8 @@ export default function MarketResearchPage({ onBack }: Props) {
 
   const postTypeOptions = platform === 'instagram'
     ? [{ value: 'all', label: 'Todos' }, { value: 'carousel', label: 'Carrossel' }, { value: 'reels', label: 'Reels' }, { value: 'image', label: 'Imagem única' }]
+    : platform === 'youtube'
+    ? [{ value: 'all', label: 'Todos' }, { value: 'video', label: 'Vídeos' }, { value: 'shorts', label: 'Shorts' }]
     : [{ value: 'all', label: 'Todos' }, { value: 'video', label: 'Vídeos' }];
 
   const handleSearch = () => {

@@ -1,4 +1,4 @@
-export type Platform = 'instagram' | 'tiktok';
+export type Platform = 'instagram' | 'tiktok' | 'youtube';
 export type PostType = 'all' | 'carousel' | 'reels' | 'image' | 'video';
 export type SearchType = 'profile' | 'keyword';
 export type SortBy = 'engagement' | 'likes' | 'comments' | 'shares' | 'views' | 'recent';

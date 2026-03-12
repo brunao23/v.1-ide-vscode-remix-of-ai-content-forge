@@ -78,4 +78,5 @@ export function PlatformIcon({ platform, size = 24, className = '' }: PlatformIc
 export const PLATFORM_LIST = [
   { value: 'instagram', label: 'Instagram' },
   { value: 'tiktok', label: 'TikTok' },
+  { value: 'youtube', label: 'YouTube' },
 ] as const;
