@@ -143,8 +143,8 @@ export default function DocumentsModal({ open, onClose }: Props) {
                   {typeDocs.map((doc, i) => (
                     <div key={doc.id}>
                       <div className="flex items-center gap-4 py-5 group">
-                        <div className="w-9 h-9 rounded-[8px] bg-secondary/60 flex items-center justify-center shrink-0 text-lg">
-                          {doc.emoji}
+                        <div className="w-9 h-9 rounded-[8px] bg-secondary/60 flex items-center justify-center shrink-0">
+                          {DOC_ICONS[doc.icon] || fallbackIcon}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground">{doc.title}</p>
