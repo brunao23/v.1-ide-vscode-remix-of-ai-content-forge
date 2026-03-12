@@ -184,6 +184,27 @@ export type Database = {
         }
         Relationships: []
       }
+      pesquisa_callbacks: {
+        Row: {
+          created_at: string
+          id: string
+          request_id: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          request_id: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          request_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
