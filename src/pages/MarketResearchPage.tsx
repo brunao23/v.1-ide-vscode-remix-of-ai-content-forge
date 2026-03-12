@@ -52,6 +52,53 @@ export default function MarketResearchPage({ onBack }: Props) {
   const [webhookError, setWebhookError] = useState(false);
   const [webhookStatus, setWebhookStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isSearching, setIsSearching] = useState(false);
+  const [verifyingConnection, setVerifyingConnection] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const stopPolling = useCallback(() => {
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
+    }
+  }, []);
+
+  const pollForCallback = useCallback((requestId: string) => {
+    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+    const url = `https://${projectId}.supabase.co/functions/v1/pesquisa-status?requestId=${requestId}`;
+    
+    setVerifyingConnection(true);
+    let elapsed = 0;
+    const POLL_INTERVAL = 1000;
+    const TIMEOUT = 10000;
+
+    pollingRef.current = setInterval(async () => {
+      elapsed += POLL_INTERVAL;
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.confirmed) {
+          stopPolling();
+          setVerifyingConnection(false);
+          setWebhookStatus('success');
+          setWebhookSent(true);
+          setTimeout(() => setWebhookStatus('idle'), 4000);
+          return;
+        }
+      } catch {
+        // Network error — continue polling
+      }
+
+      if (elapsed >= TIMEOUT) {
+        stopPolling();
+        setVerifyingConnection(false);
+        setWebhookStatus('error');
+        setWebhookError(true);
+        setIsSearching(false);
+      }
+    }, POLL_INTERVAL);
+  }, [stopPolling]);
 
   const postTypeOptions = platform === 'instagram'
     ? [
