@@ -28,13 +28,6 @@ const LATEST_MODELS = [
   },
 ];
 
-// Older models shown in flyout submenu
-const OLDER_MODELS = [
-  { id: 'chatgpt-5.3-pro', name: 'GPT-5.2 Instant' },
-  { id: 'claude-opus-4.5', name: 'GPT-5.2 Thinking' },
-  { id: 'claude-sonnet-4.5', name: 'GPT-5 Thinking mini' },
-  { id: 'gemini-2.5-pro', name: 'o3' },
-];
 
 export default function Header() {
   const { activeAgentId, selectedModel, setSelectedModel, sidebarOpen, setSidebarOpen, activePage } = useChatStore();
@@ -116,37 +109,47 @@ export default function Header() {
                   {/* Separator */}
                   <div className="my-1.5 mx-3 border-t border-border" />
 
-                  {/* Older models trigger */}
-                  <div className="relative">
+                  {/* More models trigger */}
+                  <div
+                    className="relative"
+                    onMouseEnter={() => setShowOlderSubmenu(true)}
+                    onMouseLeave={() => setShowOlderSubmenu(false)}
+                  >
                     <button
-                      onMouseEnter={() => setShowOlderSubmenu(true)}
                       onClick={() => setShowOlderSubmenu(!showOlderSubmenu)}
                       className="w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between hover:bg-secondary"
                     >
-                      <span className="text-foreground font-medium">Modelos antigos</span>
+                      <span className="text-foreground font-medium">Mais modelos</span>
                       <ChevronRight className="w-4 h-4 text-muted-foreground" />
                     </button>
 
-                    {/* Flyout submenu */}
+                    {/* Flyout submenu - all models grouped by provider */}
                     {showOlderSubmenu && (
-                      <div
-                        className="absolute left-full top-0 ml-1 bg-popover rounded-xl shadow-lg border border-border min-w-[220px] p-1.5"
-                        onMouseEnter={() => setShowOlderSubmenu(true)}
-                        onMouseLeave={() => setShowOlderSubmenu(false)}
-                      >
-                        {OLDER_MODELS.map((model) => {
-                          const isSelected = selectedModel === model.id;
+                      <div className="absolute left-full top-0 ml-1 bg-popover rounded-xl shadow-lg border border-border min-w-[240px] p-1.5 max-h-[60vh] overflow-y-auto">
+                        {(['openai', 'anthropic', 'google'] as const).map((provider, idx) => {
+                          const providerModels = AI_MODELS.filter(m => m.provider === provider);
+                          if (providerModels.length === 0) return null;
+                          const label = provider === 'openai' ? 'ChatGPT' : provider === 'anthropic' ? 'Claude' : 'Gemini';
                           return (
-                            <button
-                              key={model.id}
-                              onClick={() => { setSelectedModel(model.id); setModelDropdown(false); setShowOlderSubmenu(false); }}
-                              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition-colors flex items-center justify-between ${
-                                isSelected ? 'bg-secondary' : 'hover:bg-secondary'
-                              }`}
-                            >
-                              <span className="text-foreground">{model.name}</span>
-                              {isSelected && <Check className="w-4 h-4 text-muted-foreground" />}
-                            </button>
+                            <div key={provider}>
+                              {idx > 0 && <div className="my-1.5 mx-3 border-t border-border" />}
+                              <p className="px-3 py-1.5 text-xs text-muted-foreground font-medium">{label}</p>
+                              {providerModels.map((model) => {
+                                const isSelected = selectedModel === model.id;
+                                return (
+                                  <button
+                                    key={model.id}
+                                    onClick={() => { setSelectedModel(model.id); setModelDropdown(false); setShowOlderSubmenu(false); }}
+                                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center justify-between ${
+                                      isSelected ? 'bg-secondary' : 'hover:bg-secondary'
+                                    }`}
+                                  >
+                                    <span className="text-foreground">{model.name}</span>
+                                    {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                                  </button>
+                                );
+                              })}
+                            </div>
                           );
                         })}
                       </div>
