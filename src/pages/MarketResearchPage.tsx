@@ -426,26 +426,36 @@ export default function MarketResearchPage({ onBack }: Props) {
             </button>
           </div>
 
-          {/* Immediate webhook status feedback */}
-          {webhookStatus === 'success' && (
+          {/* Verifying connection status */}
+          {verifyingConnection && (
+            <div className="rounded-lg border border-border/40 bg-secondary/30 px-4 py-3 animate-in fade-in duration-300">
+              <p className="text-sm text-muted-foreground flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Verificando conexão...
+              </p>
+            </div>
+          )}
+
+          {/* Confirmed — success feedback */}
+          {webhookStatus === 'success' && !verifyingConnection && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 animate-in fade-in duration-300">
               <p className="text-sm text-primary flex items-center gap-2">
                 <Check className="w-4 h-4" strokeWidth={2} />
-                Solicitação enviada com sucesso! Aguarde enquanto coletamos os dados.
+                Conexão confirmada! Coletando dados...
               </p>
             </div>
           )}
 
-          {webhookStatus === 'error' && (
+          {webhookStatus === 'error' && !verifyingConnection && (
             <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 animate-in fade-in duration-300">
               <p className="text-sm text-destructive flex items-center gap-2">
                 <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
-                Falha ao enviar solicitação. Tente novamente ou acione o administrador.
+                Cenário de coleta não está ativo ou houve um erro. Verifique o Make.com.
               </p>
             </div>
           )}
 
-          {/* Progress Bar */}
+          {/* Progress Bar — only after confirmed */}
           <ResearchProgressBar
             active={webhookSent}
             onComplete={() => setWebhookSent(false)}
