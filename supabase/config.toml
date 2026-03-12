@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.pesquisa-callback]
 verify_jwt = false
+
+[functions.pesquisa-status]
+verify_jwt = false
