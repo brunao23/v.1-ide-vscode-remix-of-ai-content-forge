@@ -1,4 +1,4 @@
-import { X, MoreHorizontal, FileText, Download, Pencil, Trash2, Eye } from 'lucide-react';
+import { X, MoreHorizontal, FileText, Download, Pencil, Trash2, Eye, BookOpen, BarChart3, Target } from 'lucide-react';
 import { AGENTS } from '@/types';
 import { useState } from 'react';
 import NewDocumentModal from '@/components/documents/NewDocumentModal';
