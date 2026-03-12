@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered } from 'lucide-react';
+import { toast } from 'sonner';
 import { PlatformIcon, PLATFORM_LIST } from '@/components/market-research/PlatformIcons';
 import { useMarketResearch } from '@/hooks/useMarketResearch';
 import { SearchFilters, SearchType, Platform, PostType, SortBy, SortOrder, Post } from '@/types/marketResearch';
