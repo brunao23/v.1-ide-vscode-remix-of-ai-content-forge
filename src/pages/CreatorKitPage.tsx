@@ -1,24 +1,30 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, Search } from 'lucide-react';
 import Header from '@/components/layout/Header';
 
 const SECTIONS = [
   {
     title: 'Vendas e Produto',
     description: 'Construa a base estratégica do seu negócio',
-    agentIds: ['brand-book', 'market-research', 'icp-architect'],
+    agentIds: ['brand-book', 'market-research', 'icp-architect', 'expert-social-selling', 'criador-documento-oferta'],
+  },
+  {
+    title: 'Estratégia e Sistemas',
+    description: 'Ferramentas de estratégia e automação para escalar',
+    agentIds: ['amanda-ai', 'arquiteta-perfil-icp', 'programa-rivotril', 'estrategias-sprint-20k', 'arquiteta-workshops'],
   },
   {
     title: 'Conteúdo',
     description: 'Crie e gerencie sua estratégia de conteúdo',
-    agentIds: ['pillar-strategist', 'matrix-generator', 'marketing-manager', 'scriptwriter'],
+    agentIds: ['pillar-strategist', 'matrix-generator', 'marketing-manager', 'scriptwriter', 'feedback-conteudo', 'copywriter-campanhas', 'vsl-invisivel'],
   },
 ];
 
 export default function CreatorKitPage() {
   const { setActiveAgent } = useChatStore();
+  const [searchQuery, setSearchQuery] = useState('');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     Object.fromEntries(SECTIONS.map(s => [s.title, true]))
   );
@@ -27,19 +33,43 @@ export default function CreatorKitPage() {
     setOpenSections(prev => ({ ...prev, [title]: !prev[title] }));
   };
 
+  const filteredSections = useMemo(() => {
+    if (!searchQuery.trim()) return SECTIONS;
+    const q = searchQuery.toLowerCase();
+    return SECTIONS.map(section => ({
+      ...section,
+      agentIds: section.agentIds.filter(id => {
+        const agent = AGENTS.find(a => a.id === id);
+        return agent && (agent.name.toLowerCase().includes(q) || agent.description.toLowerCase().includes(q));
+      }),
+    })).filter(section => section.agentIds.length > 0);
+  }, [searchQuery]);
+
   return (
     <div className="flex-1 flex flex-col h-screen overflow-hidden">
       <Header />
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-[720px] mx-auto px-6 py-10">
           {/* Page title */}
-          <div className="mb-8">
+          <div className="mb-6">
             <h1 className="text-2xl font-semibold text-foreground">
               CreatorFounder™️ Kit
             </h1>
             <p className="text-sm text-muted-foreground mt-1">
               Todos os agentes organizados por etapa do seu negócio.
             </p>
+
+            {/* Search bar */}
+            <div className="relative mt-4">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Pesquisar agentes..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full h-10 pl-10 pr-4 rounded-lg bg-secondary border border-border text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              />
+            </div>
           </div>
 
           {/* Sections */}
