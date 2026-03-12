@@ -48,6 +48,7 @@ export default function MarketResearchPage({ onBack }: Props) {
   const [periodDays, setPeriodDays] = useState(30);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [resultsLimit, setResultsLimit] = useState<string>('');
+  const [webhookSent, setWebhookSent] = useState(false);
 
   const postTypeOptions = platform === 'instagram'
     ? [
