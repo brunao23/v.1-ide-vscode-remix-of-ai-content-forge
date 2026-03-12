@@ -1,14 +1,13 @@
-import { useEffect, useState } from 'react';
-import { Check, Search, Download, BarChart3, FileText, Sparkles } from 'lucide-react';
-import { Progress } from '@/components/ui/progress';
+import { useEffect, useRef, useState } from 'react';
+import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const STEPS = [
-  { label: 'Enviando solicitação', icon: Search, duration: 2000 },
-  { label: 'Coletando dados', icon: Download, duration: 4000 },
-  { label: 'Analisando conteúdo', icon: BarChart3, duration: 5000 },
-  { label: 'Processando métricas', icon: FileText, duration: 4000 },
-  { label: 'Finalizando relatório', icon: Sparkles, duration: 3000 },
+  'Enviando solicitação',
+  'Coletando dados',
+  'Analisando conteúdo',
+  'Processando métricas',
+  'Finalizando relatório',
 ];
 
 interface ResearchProgressBarProps {
@@ -17,94 +16,92 @@ interface ResearchProgressBarProps {
 }
 
 export default function ResearchProgressBar({ active, onComplete }: ResearchProgressBarProps) {
-  const [currentStep, setCurrentStep] = useState(0);
   const [progress, setProgress] = useState(0);
+  const progressRef = useRef(0);
+
+  const currentStep = Math.min(Math.floor(progress / 20), STEPS.length - 1);
 
   useEffect(() => {
     if (!active) {
-      setCurrentStep(0);
       setProgress(0);
+      progressRef.current = 0;
       return;
     }
 
-    let stepIndex = 0;
-    let elapsed = 0;
-    const totalDuration = STEPS.reduce((sum, s) => sum + s.duration, 0);
-
+    // Monotonically increasing progress that slows down asymptotically
+    // Never goes backwards, never reaches 100 on its own
     const interval = setInterval(() => {
-      elapsed += 100;
-
-      // Calculate cumulative duration up to current step
-      let cumulative = 0;
-      for (let i = 0; i <= stepIndex; i++) {
-        cumulative += STEPS[i].duration;
-      }
-
-      const stepStart = cumulative - STEPS[stepIndex].duration;
-      const stepElapsed = elapsed - stepStart;
-
-      if (stepElapsed >= STEPS[stepIndex].duration && stepIndex < STEPS.length - 1) {
-        stepIndex++;
-        setCurrentStep(stepIndex);
-      }
-
-      const overallProgress = Math.min((elapsed / totalDuration) * 100, 100);
-      setProgress(overallProgress);
-
-      if (elapsed >= totalDuration) {
-        clearInterval(interval);
-        onComplete?.();
-      }
+      const cur = progressRef.current;
+      // Slow down as we approach 95 — always moving forward
+      const remaining = 95 - cur;
+      const increment = Math.max(0.05, remaining * 0.008);
+      const next = Math.min(cur + increment, 95);
+      progressRef.current = next;
+      setProgress(next);
     }, 100);
 
     return () => clearInterval(interval);
+  }, [active]);
+
+  // When deactivated after being active, snap to 100 briefly
+  useEffect(() => {
+    if (!active && progressRef.current > 5) {
+      setProgress(100);
+      const t = setTimeout(() => {
+        onComplete?.();
+        setProgress(0);
+        progressRef.current = 0;
+      }, 600);
+      return () => clearTimeout(t);
+    }
   }, [active, onComplete]);
 
-  if (!active) return null;
+  if (!active && progress === 0) return null;
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6 space-y-5 animate-in fade-in slide-in-from-bottom-2 duration-300">
-      <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-foreground">
-            {STEPS[currentStep].label}...
-          </p>
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {Math.round(progress)}%
-          </span>
+    <div className="rounded-xl border border-border/50 bg-card/80 p-5 space-y-4 animate-in fade-in duration-300">
+      {/* Progress bar */}
+      <div className="space-y-1.5">
+        <p className="text-xs text-muted-foreground tracking-wide">
+          {STEPS[currentStep]}...
+        </p>
+        <div className="h-[3px] w-full rounded-full bg-secondary/50 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-primary/70 transition-[width] duration-300 ease-out"
+            style={{ width: `${progress}%` }}
+          />
         </div>
-        <Progress value={progress} className="h-1.5" />
       </div>
 
-      <div className="flex items-center justify-between gap-1">
-        {STEPS.map((step, i) => {
-          const Icon = step.icon;
-          const isComplete = i < currentStep;
-          const isCurrent = i === currentStep;
+      {/* Steps */}
+      <div className="flex items-start justify-between gap-1">
+        {STEPS.map((label, i) => {
+          const isComplete = i < currentStep || progress >= 100;
+          const isCurrent = i === currentStep && progress < 100;
 
           return (
             <div key={i} className="flex flex-col items-center gap-1.5 flex-1 min-w-0">
               <div
                 className={cn(
-                  'w-8 h-8 rounded-full flex items-center justify-center transition-all duration-300',
-                  isComplete && 'bg-primary text-primary-foreground',
-                  isCurrent && 'bg-primary/20 text-primary ring-2 ring-primary/30',
-                  !isComplete && !isCurrent && 'bg-secondary/60 text-muted-foreground'
+                  'w-7 h-7 rounded-full flex items-center justify-center transition-all duration-500',
+                  isComplete && 'bg-primary/80 text-primary-foreground',
+                  isCurrent && 'bg-secondary text-foreground/70',
+                  !isComplete && !isCurrent && 'bg-secondary/40 text-muted-foreground/40'
                 )}
               >
                 {isComplete ? (
-                  <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
+                  <Check className="w-3 h-3" strokeWidth={2} />
                 ) : (
-                  <Icon className={cn('w-3.5 h-3.5', isCurrent && 'animate-pulse')} strokeWidth={1.5} />
+                  <span className="text-[9px] font-medium">{i + 1}</span>
                 )}
               </div>
               <span
                 className={cn(
                   'text-[10px] text-center leading-tight truncate w-full',
-                  isCurrent ? 'text-foreground font-medium' : 'text-muted-foreground'
+                  isCurrent ? 'text-foreground/80' : 'text-muted-foreground/50'
                 )}
               >
-                {step.label}
+                {label}
               </span>
             </div>
           );

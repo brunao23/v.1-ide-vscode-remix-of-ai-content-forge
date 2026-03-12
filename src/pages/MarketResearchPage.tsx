@@ -378,11 +378,11 @@ export default function MarketResearchPage({ onBack }: Props) {
           )}
 
           {/* Error */}
-          {error && !loading && (
+          {error && !loading && !webhookSent && (
             <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
               <AlertTriangle className="w-8 h-8 text-destructive/70" strokeWidth={1.5} />
               <p className="text-sm text-foreground">Não foi possível completar a pesquisa</p>
-              <p className="text-xs text-muted-foreground">{error}</p>
+              <p className="text-xs text-muted-foreground">O sistema pode estar fora do ar. Tente novamente ou acione o administrador.</p>
               <button onClick={handleSearch} className="px-4 py-1.5 rounded-lg border border-border/50 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground">
                 Tentar novamente
               </button>
