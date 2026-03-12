@@ -74,7 +74,7 @@ export default function CreatorKitPage() {
 
           {/* Sections */}
           <div className="space-y-4">
-            {SECTIONS.map((section) => {
+            {filteredSections.map((section) => {
               const isOpen = openSections[section.title];
               const sectionAgents = section.agentIds
                 .map(id => AGENTS.find(a => a.id === id))
