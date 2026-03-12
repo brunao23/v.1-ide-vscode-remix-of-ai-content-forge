@@ -133,7 +133,7 @@ export default function MarketResearchPage({ onBack }: Props) {
                     value={username}
                     onChange={e => setUsername(e.target.value)}
                     placeholder="@username ou nome"
-                    className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-full max-w-[200px]"
+                    className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-full min-w-0 flex-1 break-all"
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
                   />
                 </FilterRow>
