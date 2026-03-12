@@ -16,11 +16,6 @@ const PLUS_MENU_ITEMS = [
   { id: 'web', label: 'Busca na web', icon: Globe },
 ];
 
-const LATEST_MODELS_HOME = [
-  { id: 'auto', name: 'Auto', description: 'Escolhe por quanto tempo pensar', icon: Sparkles },
-  { id: 'chatgpt-5.3-instant', name: 'Instant 5.3', description: 'Respostas imediatas', icon: Zap },
-  { id: 'chatgpt-5.3', name: 'Thinking 5.4', description: 'Pensa mais para gerar respostas melhores', icon: Brain },
-];
 
 export default function HomePage() {
   const { selectedModel, setSelectedModel, thinkingMode, sidebarOpen, setSidebarOpen } = useChatStore();
