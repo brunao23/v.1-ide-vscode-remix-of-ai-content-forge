@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowLeft, Search, Loader2, AlertTriangle, Inbox, ChevronDown } from 'lucide-react';
+import { ArrowLeft, Search, Loader2, AlertTriangle, Grid3X3, User, Image, Calendar, ListOrdered, ChevronRight } from 'lucide-react';
 import { useMarketResearch } from '@/hooks/useMarketResearch';
 import { SearchFilters, SearchType, Platform, PostType, SortBy, SortOrder, Post } from '@/types/marketResearch';
 import PostCard from '@/components/market-research/PostCard';
@@ -71,16 +71,21 @@ export default function MarketResearchPage({ onBack }: Props) {
   return (
     <div className="flex-1 flex flex-col h-screen bg-background overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 py-3 border-b border-border/50 shrink-0">
-        <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors" aria-label="Voltar">
-          <ArrowLeft className="w-5 h-5 text-foreground" strokeWidth={1.5} />
-        </button>
-        <h1 className="text-lg font-semibold text-foreground">Pesquisa de Mercado</h1>
+      <div className="px-4 py-4 border-b border-border/40 shrink-0">
+        <div className="flex items-center gap-3">
+          <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors" aria-label="Voltar">
+            <ArrowLeft className="w-5 h-5 text-foreground" strokeWidth={1.5} />
+          </button>
+          <div>
+            <h1 className="text-lg font-semibold text-foreground">Pesquisa de Mercado</h1>
+            <p className="text-xs text-muted-foreground mt-0.5">Analise posts de concorrentes e tendências do seu nicho</p>
+          </div>
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto">
         <div className="max-w-2xl mx-auto px-4 py-6 space-y-6">
-          {/* Tabs - text style */}
+          {/* Tabs */}
           <div className="flex items-center gap-6">
             <button
               onClick={() => setTab('profile')}
@@ -104,94 +109,96 @@ export default function MarketResearchPage({ onBack }: Props) {
             </button>
           </div>
 
-          {/* Form Fields - vertical list */}
-          <div className="divide-y divide-border/30">
-            {/* Plataforma */}
-            <SettingsRow label="Plataforma">
-              <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
-                <SelectTrigger className="w-auto min-w-[140px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="instagram">Instagram</SelectItem>
-                  <SelectItem value="tiktok">TikTok</SelectItem>
-                </SelectContent>
-              </Select>
-            </SettingsRow>
+          {/* Filters Card */}
+          <div className="rounded-2xl border border-border/60 bg-card p-5 space-y-0">
+            <div className="divide-y divide-border/40">
+              {/* Plataforma */}
+              <FilterRow icon={<Grid3X3 className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />} label="Plataforma">
+                <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+                  <SelectTrigger className="w-auto min-w-[140px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="instagram">Instagram</SelectItem>
+                    <SelectItem value="tiktok">TikTok</SelectItem>
+                  </SelectContent>
+                </Select>
+              </FilterRow>
 
-            {/* Username or Keyword */}
-            {tab === 'profile' ? (
-              <SettingsRow label="Usuário">
+              {/* Username or Keyword */}
+              {tab === 'profile' ? (
+                <FilterRow icon={<User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />} label="Usuário">
+                  <input
+                    type="text"
+                    value={username}
+                    onChange={e => setUsername(e.target.value)}
+                    placeholder="@username ou nome"
+                    className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-full max-w-[200px]"
+                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  />
+                </FilterRow>
+              ) : (
+                <FilterRow icon={<Search className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />} label="Palavra-chave">
+                  <input
+                    type="text"
+                    value={keyword}
+                    onChange={e => setKeyword(e.target.value)}
+                    placeholder="Ex: marketing digital"
+                    className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-full max-w-[200px]"
+                    onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  />
+                </FilterRow>
+              )}
+
+              {/* Tipo de Post */}
+              <FilterRow icon={<Image className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />} label="Tipo de Post">
+                <Select value={postType} onValueChange={(v) => setPostType(v as PostType)}>
+                  <SelectTrigger className="w-auto min-w-[140px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {postTypeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterRow>
+
+              {/* Período */}
+              <FilterRow icon={<Calendar className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />} label="Período">
+                <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
+                  <SelectTrigger className="w-auto min-w-[160px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PERIOD_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </FilterRow>
+
+              {/* Limite */}
+              <FilterRow icon={<ListOrdered className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />} label="Limite de posts">
                 <input
-                  type="text"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="@username ou nome"
-                  className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-full max-w-[200px]"
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={resultsLimit}
+                  onChange={e => setResultsLimit(e.target.value)}
+                  placeholder="20"
+                  className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-16"
                 />
-              </SettingsRow>
-            ) : (
-              <SettingsRow label="Palavra-chave">
-                <input
-                  type="text"
-                  value={keyword}
-                  onChange={e => setKeyword(e.target.value)}
-                  placeholder="Ex: marketing digital"
-                  className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-full max-w-[200px]"
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                />
-              </SettingsRow>
-            )}
+              </FilterRow>
+            </div>
 
-            {/* Tipo de Post */}
-            <SettingsRow label="Tipo de Post">
-              <Select value={postType} onValueChange={(v) => setPostType(v as PostType)}>
-                <SelectTrigger className="w-auto min-w-[140px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {postTypeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </SettingsRow>
-
-            {/* Período */}
-            <SettingsRow label="Período">
-              <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
-                <SelectTrigger className="w-auto min-w-[160px] border-0 bg-transparent hover:bg-secondary/40 h-9 text-sm text-foreground focus:ring-0 focus:ring-offset-0 justify-end gap-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERIOD_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </SettingsRow>
-
-            {/* Limite */}
-            <SettingsRow label="Limite de posts">
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={resultsLimit}
-                onChange={e => setResultsLimit(e.target.value)}
-                placeholder="20"
-                className="bg-transparent text-sm text-foreground text-right placeholder:text-muted-foreground/50 focus:outline-none w-16"
-              />
-            </SettingsRow>
-          </div>
-
-          {/* Search Button */}
-          <div className="flex justify-end pt-2">
-            <button
-              onClick={handleSearch}
-              disabled={loading}
-              className="flex items-center gap-2 px-5 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50"
-            >
-              {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
-              {loading ? 'Raspando dados...' : 'Pesquisar'}
-            </button>
+            {/* Search Button inside card */}
+            <div className="flex justify-end pt-5">
+              <button
+                onClick={handleSearch}
+                disabled={loading}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
+                {loading ? 'Raspando dados...' : 'Pesquisar'}
+              </button>
+            </div>
           </div>
 
           {/* Loading State */}
@@ -218,9 +225,12 @@ export default function MarketResearchPage({ onBack }: Props) {
 
           {/* Empty initial state */}
           {!searched && (
-            <div className="flex flex-col items-center justify-center py-12 text-center">
+            <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
+                <Search className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+              </div>
               <p className="text-sm text-muted-foreground">
-                Pesquise perfis ou palavras-chave para analisar conteúdo.
+                Pesquise perfis ou palavras-chave para analisar conteúdo
               </p>
             </div>
           )}
@@ -228,7 +238,6 @@ export default function MarketResearchPage({ onBack }: Props) {
           {/* Results */}
           {posts.length > 0 && !loading && (
             <>
-              {/* Toolbar */}
               <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
                 <p className="text-xs text-muted-foreground">
                   {response?.pagination?.total || posts.length} posts encontrados
@@ -254,14 +263,12 @@ export default function MarketResearchPage({ onBack }: Props) {
                 </div>
               </div>
 
-              {/* Post Grid */}
               <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}`}>
                 {posts.map(post => (
                   <PostCard key={post.id} post={post} onClick={() => setSelectedPost(post)} />
                 ))}
               </div>
 
-              {/* Load More */}
               {hasMore && (
                 <div className="flex justify-center pt-4">
                   <button
@@ -287,7 +294,6 @@ export default function MarketResearchPage({ onBack }: Props) {
         </div>
       </div>
 
-      {/* Post Detail Modal */}
       <PostDetailModal
         post={selectedPost}
         open={!!selectedPost}
@@ -298,11 +304,14 @@ export default function MarketResearchPage({ onBack }: Props) {
   );
 }
 
-/* Settings-style row component */
-function SettingsRow({ label, children }: { label: string; children: React.ReactNode }) {
+/* Filter row with icon */
+function FilterRow({ icon, label, children }: { icon: React.ReactNode; label: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between py-3.5">
-      <span className="text-sm text-muted-foreground">{label}</span>
+    <div className="flex items-center justify-between py-3.5 gap-3">
+      <div className="flex items-center gap-3">
+        {icon}
+        <span className="text-sm text-muted-foreground">{label}</span>
+      </div>
       {children}
     </div>
   );
