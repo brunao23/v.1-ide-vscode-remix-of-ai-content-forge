@@ -2,6 +2,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import ChatArea from '@/components/chat/ChatArea';
 import MarketResearchPage from '@/pages/MarketResearchPage';
 import HomePage from '@/pages/HomePage';
+import CreatorKitPage from '@/pages/CreatorKitPage';
 import { useChatStore } from '@/stores/chatStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
@@ -16,6 +17,8 @@ export default function Index() {
         return <HomePage />;
       case 'market-research':
         return <MarketResearchPage onBack={() => setActivePage('home')} />;
+      case 'creator-kit':
+        return <CreatorKitPage />;
       default:
         return <ChatArea />;
     }
