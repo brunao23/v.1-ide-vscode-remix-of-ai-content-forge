@@ -176,7 +176,7 @@ export default function HomePage() {
               aria-label="Selecionar modelo"
             >
               <span className="text-[17px] font-normal text-foreground">
-                {LATEST_MODELS_HOME.find(m => m.id === selectedModel)?.name || currentModel?.name || 'Auto'}
+                {currentModel?.name || 'Claude Opus 4.5'}
               </span>
               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
             </button>
