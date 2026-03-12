@@ -418,11 +418,11 @@ export default function MarketResearchPage({ onBack }: Props) {
           <div className="flex justify-end">
             <button
               onClick={handleSearch}
-              disabled={isSearching || loading}
+              disabled={isSearching || loading || verifyingConnection}
               className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {(isSearching || loading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
-              {(isSearching || loading) ? 'Processando...' : 'Pesquisar'}
+              {(isSearching || loading || verifyingConnection) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
+              {verifyingConnection ? 'Verificando...' : (isSearching || loading) ? 'Processando...' : 'Pesquisar'}
             </button>
           </div>
 
