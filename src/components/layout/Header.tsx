@@ -19,7 +19,7 @@ export default function Header() {
 
   // Display name for the selector
   const displayName = isHome
-    ? (LATEST_MODELS.find(m => m.id === selectedModel)?.name || currentModel?.name || 'Auto')
+    ? (currentModel?.name || 'Claude Opus 4.5')
     : (agent?.name || 'Chat');
 
   return (
