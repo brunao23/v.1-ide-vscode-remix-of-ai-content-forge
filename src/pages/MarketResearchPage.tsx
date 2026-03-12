@@ -8,6 +8,7 @@ import PostCard from '@/components/market-research/PostCard';
 import PostDetailModal from '@/components/market-research/PostDetailModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import ResearchProgressBar from '@/components/market-research/ResearchProgressBar';
 
 const PERIOD_OPTIONS = [
   { value: '1', label: 'Último dia' },
