@@ -6,7 +6,6 @@ import { Plus, ArrowUp, Square, Paperclip, ImagePlus, Search, Globe, Mic, AudioL
 import gemzLogo from '@/assets/gemz-logo.png';
 import { AttachedFiles, UploadedFile } from '@/components/chat/FileUploadButton';
 import MessageBubble from '@/components/chat/MessageBubble';
-import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const PLUS_MENU_ITEMS = [
@@ -29,21 +28,11 @@ export default function HomePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
   const isMobile = useIsMobile();
 
   const currentModel = AI_MODELS.find(m => m.id === selectedModel);
 
-  const firstName = (() => {
-    const meta = user?.user_metadata;
-    const fullName = meta?.full_name || meta?.name || '';
-    if (fullName) {
-      const first = fullName.split(' ')[0];
-      return first.charAt(0).toUpperCase() + first.slice(1).toLowerCase();
-    }
-    const raw = user?.email?.split('@')[0] || 'Usuário';
-    return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
-  })();
+  const firstName = 'Usuário';
   const hasMessages = messages.length > 0;
 
   useEffect(() => {
