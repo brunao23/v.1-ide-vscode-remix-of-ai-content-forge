@@ -6,7 +6,6 @@ import { Plus, ArrowUp, Square, Paperclip, ImagePlus, Search, Globe, Mic, AudioL
 import gemzLogo from '@/assets/gemz-logo.png';
 import { AttachedFiles, UploadedFile } from '@/components/chat/FileUploadButton';
 import MessageBubble from '@/components/chat/MessageBubble';
-import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 const PLUS_MENU_ITEMS = [
