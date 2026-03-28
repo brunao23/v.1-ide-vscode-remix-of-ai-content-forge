@@ -5,6 +5,7 @@ import HomePage from '@/pages/HomePage';
 import CreatorKitPage from '@/pages/CreatorKitPage';
 import ImplementationPage from '@/pages/ImplementationPage';
 import AulasPage from '@/pages/AulasPage';
+import MetricsDashboard from '@/pages/MetricsDashboard';
 import { useChatStore } from '@/stores/chatStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Menu } from 'lucide-react';
