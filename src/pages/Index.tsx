@@ -32,6 +32,8 @@ export default function Index() {
         return <MetricsDashboard />;
       case 'calendario':
         return <CalendarPage />;
+      case 'news-feed':
+        return <NewsFeedPage />;
       default:
         return <ChatArea />;
     }
