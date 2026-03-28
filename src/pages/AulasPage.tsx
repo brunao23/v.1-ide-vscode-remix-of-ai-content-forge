@@ -42,12 +42,21 @@ export default function AulasPage() {
     <div className="flex h-full w-full overflow-hidden">
       {/* Lista de aulas */}
       <div className="w-[320px] shrink-0 border-r border-border bg-card flex flex-col overflow-hidden">
-        <div className="p-4 border-b border-border">
-          <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
-            <GraduationCap className="w-5 h-5" />
-            Aulas
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">Aprenda a usar a plataforma</p>
+        <div className="p-4 border-b border-border flex items-center justify-between">
+          <div>
+            <h1 className="text-lg font-semibold text-foreground flex items-center gap-2">
+              <GraduationCap className="w-5 h-5" />
+              Aulas
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">Aprenda a usar a plataforma</p>
+          </div>
+          <button
+            onClick={() => setShowAdmin(!showAdmin)}
+            className={`p-2 rounded-lg transition-colors ${showAdmin ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"}`}
+            title="Gerenciar aulas"
+          >
+            <Settings className="w-4 h-4" />
+          </button>
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
