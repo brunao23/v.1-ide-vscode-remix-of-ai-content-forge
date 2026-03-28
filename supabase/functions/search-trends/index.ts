@@ -64,7 +64,6 @@ Retorne APENAS o JSON válido, sem markdown.`;
         model: "perplexity/sonar",
         max_tokens: 2200,
         temperature: 0.3,
-        response_format: { type: "json_object" },
         messages: [{ role: "user", content: prompt }],
       }),
     });
