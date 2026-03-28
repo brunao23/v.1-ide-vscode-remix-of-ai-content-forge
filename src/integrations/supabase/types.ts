@@ -50,6 +50,102 @@ export type Database = {
         }
         Relationships: []
       }
+      client_metrics: {
+        Row: {
+          ad_spend: number | null
+          advertising_impressions_ig: number | null
+          advertising_reach_ig: number | null
+          cpm: number | null
+          created_at: string | null
+          daily_ad_spend: number | null
+          email_list_size: number | null
+          expenses: number | null
+          id: string
+          long_form_channel_size: number | null
+          long_form_monthly_audience: number | null
+          monthly_recurring_revenue: number | null
+          net_new_subscribers: number | null
+          new_clients: number | null
+          new_subscribers: number | null
+          period_month: number
+          period_year: number
+          profit: number | null
+          roas: number | null
+          short_form_channel_size: number | null
+          total_cash_collected: number | null
+          total_new_revenue: number | null
+          total_posts_made: number | null
+          total_reach_ig_impressions_li: number | null
+          total_videos_podcasts_made: number | null
+          updated_at: string | null
+          user_id: string
+          youtube_total_hours: number | null
+          youtube_total_views: number | null
+        }
+        Insert: {
+          ad_spend?: number | null
+          advertising_impressions_ig?: number | null
+          advertising_reach_ig?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          daily_ad_spend?: number | null
+          email_list_size?: number | null
+          expenses?: number | null
+          id?: string
+          long_form_channel_size?: number | null
+          long_form_monthly_audience?: number | null
+          monthly_recurring_revenue?: number | null
+          net_new_subscribers?: number | null
+          new_clients?: number | null
+          new_subscribers?: number | null
+          period_month: number
+          period_year: number
+          profit?: number | null
+          roas?: number | null
+          short_form_channel_size?: number | null
+          total_cash_collected?: number | null
+          total_new_revenue?: number | null
+          total_posts_made?: number | null
+          total_reach_ig_impressions_li?: number | null
+          total_videos_podcasts_made?: number | null
+          updated_at?: string | null
+          user_id: string
+          youtube_total_hours?: number | null
+          youtube_total_views?: number | null
+        }
+        Update: {
+          ad_spend?: number | null
+          advertising_impressions_ig?: number | null
+          advertising_reach_ig?: number | null
+          cpm?: number | null
+          created_at?: string | null
+          daily_ad_spend?: number | null
+          email_list_size?: number | null
+          expenses?: number | null
+          id?: string
+          long_form_channel_size?: number | null
+          long_form_monthly_audience?: number | null
+          monthly_recurring_revenue?: number | null
+          net_new_subscribers?: number | null
+          new_clients?: number | null
+          new_subscribers?: number | null
+          period_month?: number
+          period_year?: number
+          profit?: number | null
+          roas?: number | null
+          short_form_channel_size?: number | null
+          total_cash_collected?: number | null
+          total_new_revenue?: number | null
+          total_posts_made?: number | null
+          total_reach_ig_impressions_li?: number | null
+          total_videos_podcasts_made?: number | null
+          updated_at?: string | null
+          user_id?: string
+          youtube_total_hours?: number | null
+          youtube_total_views?: number | null
+        }
+        Relationships: []
+      }
       document_chunks: {
         Row: {
           chunk_index: number
@@ -311,11 +407,36 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
       search_documents: {
         Args: {
           filter_document_types?: string[]
@@ -332,7 +453,7 @@ export type Database = {
       }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "moderator" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -459,6 +580,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "moderator", "user"],
+    },
   },
 } as const
