@@ -95,7 +95,7 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
         loom_id: lessonForm.loom_id,
         duration: lessonForm.duration || null,
       }).eq("id", id);
-      if (error) { toast.error("Erro ao atualizar aula"); return; }
+      if (error) { console.error("Erro ao atualizar aula:", error); toast.error("Erro ao atualizar aula: " + error.message); return; }
       toast.success("Aula atualizada");
     } else {
       const moduleLessons = getLessonsByModule(moduleId);
