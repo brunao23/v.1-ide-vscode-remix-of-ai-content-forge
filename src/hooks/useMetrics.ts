@@ -30,6 +30,15 @@ export interface ClientMetrics {
   new_subscribers: number | null;
   net_new_subscribers: number | null;
   new_clients: number | null;
+  active_clients: number | null;
+  churned_end_of_contract: number | null;
+  churned_cancellation: number | null;
+  upsells_expansions: number | null;
+  clients_at_risk: number | null;
+  avg_client_tenure_months: number | null;
+  clients_over_6_months: number | null;
+  clients_3_to_6_months: number | null;
+  clients_under_3_months: number | null;
 }
 
 interface PeriodRange {
