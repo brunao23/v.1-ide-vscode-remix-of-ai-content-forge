@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.pesquisa-status]
 verify_jwt = false
+
+[functions.airtable-webhook]
+verify_jwt = false
