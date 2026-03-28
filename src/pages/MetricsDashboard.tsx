@@ -74,7 +74,7 @@ export default function MetricsDashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif", fontSize: '1.8rem' }}>
+            <h1 className="text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif", fontSize: '2.16rem' }}>
               Dashboard de Métricas
             </h1>
           </div>
