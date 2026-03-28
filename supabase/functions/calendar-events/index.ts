@@ -31,7 +31,11 @@ serve(async (req) => {
     }
 
     const icalText = await icalResponse.text();
+    console.log("iCal length:", icalText.length);
+    console.log("iCal preview:", icalText.slice(0, 500));
+    console.log("Contains VEVENT:", icalText.includes("BEGIN:VEVENT"));
     const events = parseICalToJSON(icalText);
+    console.log("Parsed events count:", events.length);
 
     return new Response(JSON.stringify(events), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
