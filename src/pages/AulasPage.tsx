@@ -2,10 +2,12 @@ import { useState } from "react";
 import { Play, Clock, CheckCircle, Lock, ChevronRight, ChevronDown, GraduationCap, Loader2, Settings } from "lucide-react";
 import { LoomEmbed } from "@/components/video/LoomEmbed";
 import { useLessons } from "@/hooks/useLessons";
+import { useIsAdmin } from "@/hooks/useIsAdmin";
 import AulasAdminPanel from "@/components/aulas/AulasAdminPanel";
 
 export default function AulasPage() {
   const { modules, completedLessons, loading, getLessonsByModule, toggleCompleted, refetch } = useLessons();
+  const isAdmin = useIsAdmin();
   const [selectedLesson, setSelectedLesson] = useState<{ id: string; title: string; description: string | null; loom_id: string; duration: string | null; module_id: string; order_index: number } | null>(null);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
   const [showAdmin, setShowAdmin] = useState(false);
@@ -50,13 +52,15 @@ export default function AulasPage() {
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Aprenda a usar a plataforma</p>
           </div>
-          <button
-            onClick={() => setShowAdmin(!showAdmin)}
-            className={`p-2 rounded-lg transition-colors ${showAdmin ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"}`}
-            title="Gerenciar aulas"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowAdmin(!showAdmin)}
+              className={`p-2 rounded-lg transition-colors ${showAdmin ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"}`}
+              title="Gerenciar aulas"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -120,7 +124,7 @@ export default function AulasPage() {
 
       {/* Admin panel or Video player */}
       <div className="flex-1 flex flex-col overflow-y-auto bg-background">
-        {showAdmin ? (
+        {showAdmin && isAdmin ? (
           <AulasAdminPanel modules={modules} getLessonsByModule={getLessonsByModule} onDataChanged={refetch} />
         ) : selectedLesson ? (
           <>
