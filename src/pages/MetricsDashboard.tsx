@@ -72,7 +72,7 @@ export default function MetricsDashboard() {
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-8 space-y-4">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mt-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8">
           <div>
             <h1 className="text-foreground pl-6" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif", fontSize: '2.6rem' }}>
               Dashboard de Métricas
