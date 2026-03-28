@@ -9,7 +9,7 @@ import { ClientsFunnel } from '@/components/metrics/ClientsFunnel';
 import { ClientCompositionBar } from '@/components/metrics/ClientCompositionBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
-import loulouLogo from '@/assets/loulou-studios-logo.jpg';
+import loulouLogo from '@/assets/loulou-studios-logo.png';
 
 function buildPeriodOptions() {
   const now = new Date();
