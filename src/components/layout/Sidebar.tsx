@@ -151,7 +151,6 @@ export default function Sidebar() {
         sidebarContent
       )}
       <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
-      <ImagesModal open={imagesOpen} onClose={() => setImagesOpen(false)} />
       <AppsModal open={appsOpen} onClose={() => setAppsOpen(false)} />
       <DocumentsModal open={docsOpen} onClose={() => setDocsOpen(false)} />
     </>
