@@ -28,42 +28,94 @@ serve(async (req) => {
       );
     }
 
-    // Use AddEvent API v2 to list events
-    const apiUrl = `https://api.addevent.com/calevent/v2/calendars/${CALENDAR_ID}/events`;
-    console.log("Fetching from:", apiUrl);
+    console.log("API_KEY length:", API_KEY.length);
+    console.log("CALENDAR_ID:", CALENDAR_ID);
 
-    const response = await fetch(apiUrl, {
-      headers: {
-        "Authorization": `Bearer ${API_KEY}`,
-        "Accept": "application/json",
-      },
-    });
+    // Try AddEvent API v1 (token as query param) first, then v2
+    const urls = [
+      `https://www.addevent.com/api/v1/me/calendars/events/list/?token=${API_KEY}&calendar_id=${CALENDAR_ID}`,
+      `https://api.addevent.com/calevent/v2/calendars/${CALENDAR_ID}/events`,
+    ];
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API error:", response.status, errorText);
-      return new Response(
-        JSON.stringify({ error: `Erro na API AddEvent: ${response.status}` }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    let events: any[] = [];
+    let lastError = "";
+
+    for (const url of urls) {
+      console.log("Trying:", url.replace(API_KEY, "***"));
+      const isV2 = url.includes("api.addevent.com");
+
+      const response = await fetch(url, {
+        headers: isV2
+          ? { Authorization: `Bearer ${API_KEY}`, Accept: "application/json" }
+          : { Accept: "application/json" },
+      });
+
+      const text = await response.text();
+      console.log("Response status:", response.status, "body length:", text.length, "preview:", text.slice(0, 300));
+
+      if (!response.ok) {
+        lastError = `${response.status}: ${text.slice(0, 200)}`;
+        continue;
+      }
+
+      try {
+        const data = JSON.parse(text);
+        // v1 format
+        if (data.events) {
+          events = data.events.map((e: any) => ({
+            id: e.id || e.uid || crypto.randomUUID(),
+            title: e.title || e.summary || "",
+            description: e.description || null,
+            start: e.date_start || e.start_date || e.start || null,
+            end: e.date_end || e.end_date || e.end || null,
+            location: e.location || null,
+            url: e.url || null,
+            timezone: e.timezone || null,
+          }));
+          break;
+        }
+        // v2 format
+        if (data.data) {
+          events = data.data.map((e: any) => ({
+            id: e.id || crypto.randomUUID(),
+            title: e.title || e.summary || e.name || "",
+            description: e.description || null,
+            start: e.start_date || e.date_start || null,
+            end: e.end_date || e.date_end || null,
+            location: e.location || null,
+            url: e.url || null,
+            timezone: e.timezone || null,
+          }));
+          break;
+        }
+        // Try as array
+        if (Array.isArray(data)) {
+          events = data.map((e: any) => ({
+            id: e.id || crypto.randomUUID(),
+            title: e.title || e.summary || "",
+            description: e.description || null,
+            start: e.date_start || e.start_date || e.start || null,
+            end: e.date_end || e.end_date || e.end || null,
+            location: e.location || null,
+            url: e.url || null,
+          }));
+          break;
+        }
+
+        // Unknown format - log and continue
+        console.log("Unknown data format, keys:", Object.keys(data));
+        lastError = "Unknown response format";
+      } catch (parseErr) {
+        console.error("Parse error:", parseErr);
+        lastError = `Parse error: ${parseErr}`;
+      }
     }
 
-    const data = await response.json();
-    console.log("API response keys:", Object.keys(data));
+    console.log("Final events count:", events.length);
 
-    // Map the API response to our event format
-    const events = (data.data || data.events || data || []).map((event: any) => ({
-      id: event.id || event.uid || crypto.randomUUID(),
-      title: event.title || event.summary || event.name || "",
-      description: event.description || event.notes || null,
-      start: event.start_date || event.date_start || event.start || null,
-      end: event.end_date || event.date_end || event.end || null,
-      location: event.location || null,
-      url: event.url || event.link || null,
-      timezone: event.timezone || null,
-    }));
-
-    console.log("Parsed events:", events.length);
+    if (events.length === 0 && lastError) {
+      console.error("All endpoints failed. Last error:", lastError);
+    }
 
     return new Response(JSON.stringify(events), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
