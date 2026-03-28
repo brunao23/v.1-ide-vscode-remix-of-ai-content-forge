@@ -11,7 +11,15 @@ serve(async (req) => {
   }
 
   try {
+    const API_KEY = Deno.env.get("ADDEVENT_API_KEY");
     const CALENDAR_ID = Deno.env.get("ADDEVENT_CALENDAR_ID");
+
+    if (!API_KEY) {
+      return new Response(
+        JSON.stringify({ error: "ADDEVENT_API_KEY não configurado" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     if (!CALENDAR_ID) {
       return new Response(
@@ -20,22 +28,42 @@ serve(async (req) => {
       );
     }
 
-    const ICAL_URL = `https://www.addevent.com/calendar/${CALENDAR_ID}.ics`;
-    const icalResponse = await fetch(ICAL_URL);
+    // Use AddEvent API v2 to list events
+    const apiUrl = `https://api.addevent.com/calevent/v2/calendars/${CALENDAR_ID}/events`;
+    console.log("Fetching from:", apiUrl);
 
-    if (!icalResponse.ok) {
+    const response = await fetch(apiUrl, {
+      headers: {
+        "Authorization": `Bearer ${API_KEY}`,
+        "Accept": "application/json",
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("API error:", response.status, errorText);
       return new Response(
-        JSON.stringify({ error: `Erro ao buscar calendário: ${icalResponse.status}` }),
+        JSON.stringify({ error: `Erro na API AddEvent: ${response.status}` }),
         { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const icalText = await icalResponse.text();
-    console.log("iCal length:", icalText.length);
-    console.log("iCal preview:", icalText.slice(0, 500));
-    console.log("Contains VEVENT:", icalText.includes("BEGIN:VEVENT"));
-    const events = parseICalToJSON(icalText);
-    console.log("Parsed events count:", events.length);
+    const data = await response.json();
+    console.log("API response keys:", Object.keys(data));
+
+    // Map the API response to our event format
+    const events = (data.data || data.events || data || []).map((event: any) => ({
+      id: event.id || event.uid || crypto.randomUUID(),
+      title: event.title || event.summary || event.name || "",
+      description: event.description || event.notes || null,
+      start: event.start_date || event.date_start || event.start || null,
+      end: event.end_date || event.date_end || event.end || null,
+      location: event.location || null,
+      url: event.url || event.link || null,
+      timezone: event.timezone || null,
+    }));
+
+    console.log("Parsed events:", events.length);
 
     return new Response(JSON.stringify(events), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -48,50 +76,3 @@ serve(async (req) => {
     );
   }
 });
-
-function parseICalToJSON(icalText: string) {
-  const events: any[] = [];
-  const eventBlocks = icalText.split("BEGIN:VEVENT");
-
-  for (let i = 1; i < eventBlocks.length; i++) {
-    const block = eventBlocks[i].split("END:VEVENT")[0];
-
-    // Unfold lines (RFC 5545: lines starting with space/tab are continuations)
-    const unfolded = block.replace(/\r?\n[ \t]/g, "");
-
-    const getField = (name: string): string | null => {
-      const regex = new RegExp(`^${name}(?:;[^:]*)?:(.+)$`, "m");
-      const match = unfolded.match(regex);
-      return match ? match[1].replace(/\\n/g, "\n").replace(/\\,/g, ",").replace(/\\\\/g, "\\").trim() : null;
-    };
-
-    const parseICalDate = (dateStr: string | null): string | null => {
-      if (!dateStr) return null;
-      const clean = dateStr.replace(/[^0-9TZ]/g, "");
-      if (clean.length < 8) return null;
-      const year = clean.slice(0, 4);
-      const month = clean.slice(4, 6);
-      const day = clean.slice(6, 8);
-      const hour = clean.length > 8 ? clean.slice(9, 11) || "00" : "00";
-      const min = clean.length > 8 ? clean.slice(11, 13) || "00" : "00";
-      return `${year}-${month}-${day}T${hour}:${min}:00`;
-    };
-
-    const title = getField("SUMMARY");
-    const start = parseICalDate(getField("DTSTART"));
-
-    if (title && start) {
-      events.push({
-        id: getField("UID") || `event-${i}`,
-        title,
-        description: getField("DESCRIPTION"),
-        start,
-        end: parseICalDate(getField("DTEND")),
-        location: getField("LOCATION"),
-        url: getField("URL"),
-      });
-    }
-  }
-
-  return events;
-}
