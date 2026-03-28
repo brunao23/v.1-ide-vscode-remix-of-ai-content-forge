@@ -1,0 +1,1 @@
+ALTER TABLE public.client_metrics DROP CONSTRAINT client_metrics_user_id_fkey;
