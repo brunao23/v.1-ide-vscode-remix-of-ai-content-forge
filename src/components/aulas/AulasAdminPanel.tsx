@@ -61,7 +61,7 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
         description: moduleForm.description || null,
         order_index: maxOrder,
       });
-      if (error) { toast.error("Erro ao criar módulo"); return; }
+      if (error) { console.error("Erro ao criar módulo:", error); toast.error("Erro ao criar módulo: " + error.message); return; }
       toast.success("Módulo criado");
     }
 
