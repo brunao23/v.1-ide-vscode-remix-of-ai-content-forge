@@ -2,7 +2,7 @@ import { useState } from 'react';
 import gemzLogo from '@/assets/gemz-logo.png';
 import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
-import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon, Home, Boxes, ClipboardCheck, GraduationCap } from 'lucide-react';
+import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon, Home, Boxes, ClipboardCheck, GraduationCap, BarChart3 } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import SearchModal from '@/components/modals/SearchModal';
 import ImagesModal from '@/components/modals/ImagesModal';
