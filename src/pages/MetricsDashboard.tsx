@@ -116,6 +116,32 @@ export default function MetricsDashboard() {
           </div>
         </div>
 
+        {/* Description box */}
+        <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+          <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
+            Dashboard de Métricas
+          </h2>
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground leading-relaxed">
+              Acompanhe a evolução do seu negócio mês a mês. Selecione o período desejado para visualizar receita, publicidade, audiência, clientes e saúde do negócio.
+            </p>
+            <ul className="space-y-1.5 text-sm text-muted-foreground">
+              <li className="flex items-start gap-2">
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span>Compare com o mês anterior automaticamente</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span>Filtre por mês, trimestre ou período personalizado</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span className="text-amber-400 mt-0.5">•</span>
+                <span>Métricas calculadas automaticamente a partir dos seus dados</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+
         {!metrics ? (
           <div className="rounded-[10px] bg-secondary border border-border p-8 text-center">
             <p className="text-muted-foreground">Nenhuma métrica encontrada para este período.</p>
