@@ -124,7 +124,7 @@ export default function AulasPage() {
 
       {/* Admin panel or Video player */}
       <div className="flex-1 flex flex-col overflow-y-auto bg-background">
-        {showAdmin ? (
+        {showAdmin && isAdmin ? (
           <AulasAdminPanel modules={modules} getLessonsByModule={getLessonsByModule} onDataChanged={refetch} />
         ) : selectedLesson ? (
           <>
