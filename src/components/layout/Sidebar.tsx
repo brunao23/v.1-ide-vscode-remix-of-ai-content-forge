@@ -15,7 +15,6 @@ export default function Sidebar() {
   const isMobile = useIsMobile();
   const [searchOpen, setSearchOpen] = useState(false);
   const [appsOpen, setAppsOpen] = useState(false);
-  const [appsOpen, setAppsOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
 
   const recentConversations = conversations.slice(0, 5);
