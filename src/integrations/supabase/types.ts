@@ -50,6 +50,53 @@ export type Database = {
         }
         Relationships: []
       }
+      articles: {
+        Row: {
+          created_at: string
+          feed_id: string
+          id: string
+          image: string | null
+          link: string
+          published_at: string | null
+          source_name: string | null
+          summary: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          feed_id: string
+          id?: string
+          image?: string | null
+          link: string
+          published_at?: string | null
+          source_name?: string | null
+          summary?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          feed_id?: string
+          id?: string
+          image?: string | null
+          link?: string
+          published_at?: string | null
+          source_name?: string | null
+          summary?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "articles_feed_id_fkey"
+            columns: ["feed_id"]
+            isOneToOne: false
+            referencedRelation: "user_feeds"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_metrics: {
         Row: {
           active_clients: number | null
@@ -399,6 +446,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_feeds: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_lesson_progress: {
         Row: {
           completed: boolean | null
@@ -448,6 +519,30 @@ export type Database = {
         Update: {
           id?: string
           role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          id: string
+          mercado: string | null
+          nicho: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          mercado?: string | null
+          nicho?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          id?: string
+          mercado?: string | null
+          nicho?: string | null
+          updated_at?: string
           user_id?: string
         }
         Relationships: []
