@@ -74,8 +74,9 @@ export default function MetricsDashboard() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-xl font-bold text-foreground">Dashboard de métricas</h1>
-            <p className="text-sm text-muted-foreground">{user?.email}</p>
+            <h1 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
+              Dashboard de Métricas
+            </h1>
           </div>
           <div className="flex items-center gap-3">
             <Select value={period} onValueChange={setPeriod}>
