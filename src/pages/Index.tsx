@@ -26,6 +26,8 @@ export default function Index() {
         return <ImplementationPage />;
       case 'aulas':
         return <AulasPage />;
+      case 'metrics':
+        return <MetricsDashboard />;
       default:
         return <ChatArea />;
     }
