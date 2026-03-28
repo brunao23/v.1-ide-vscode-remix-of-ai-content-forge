@@ -9,6 +9,7 @@ import { ClientsFunnel } from '@/components/metrics/ClientsFunnel';
 import { ClientCompositionBar } from '@/components/metrics/ClientCompositionBar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel, SelectSeparator } from '@/components/ui/select';
 import { Loader2 } from 'lucide-react';
+import loulouLogo from '@/assets/loulou-studios-logo.jpg';
 
 function buildPeriodOptions() {
   const now = new Date();
@@ -71,6 +72,10 @@ export default function MetricsDashboard() {
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-8 space-y-4">
+        {/* Logo */}
+        <div className="flex justify-end">
+          <img src={loulouLogo} alt="Loulou Studios" className="h-10 object-contain rounded" loading="lazy" />
+        </div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8">
           <div>
