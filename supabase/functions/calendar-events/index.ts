@@ -57,9 +57,12 @@ serve(async (req) => {
         });
       }
 
-      // Check if calendar is not public
+      // If calendar is not public, return empty array gracefully
       if (icalText.includes("unavailable to view")) {
-        errMsg = "O calendário AddEvent não está público. Vá em AddEvent > Settings do calendário e ative a opção de torná-lo público/publicado. Depois os eventos aparecerão automaticamente aqui.";
+        console.log("Calendar is not public, returning empty array");
+        return new Response(JSON.stringify([]), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
       }
 
       return new Response(
