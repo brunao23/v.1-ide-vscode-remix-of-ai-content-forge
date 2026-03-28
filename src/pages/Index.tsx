@@ -23,6 +23,8 @@ export default function Index() {
         return <CreatorKitPage />;
       case 'implementation':
         return <ImplementationPage />;
+      case 'aulas':
+        return <AulasPage />;
       default:
         return <ChatArea />;
     }
