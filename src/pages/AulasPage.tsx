@@ -52,13 +52,15 @@ export default function AulasPage() {
             </h1>
             <p className="text-sm text-muted-foreground mt-1">Aprenda a usar a plataforma</p>
           </div>
-          <button
-            onClick={() => setShowAdmin(!showAdmin)}
-            className={`p-2 rounded-lg transition-colors ${showAdmin ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"}`}
-            title="Gerenciar aulas"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+          {isAdmin && (
+            <button
+              onClick={() => setShowAdmin(!showAdmin)}
+              className={`p-2 rounded-lg transition-colors ${showAdmin ? "bg-primary text-primary-foreground" : "hover:bg-secondary text-muted-foreground"}`}
+              title="Gerenciar aulas"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex-1 overflow-y-auto p-3 space-y-2">
