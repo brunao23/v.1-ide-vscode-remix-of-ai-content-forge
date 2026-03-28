@@ -74,7 +74,7 @@ export default function MetricsDashboard() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8 pb-8 space-y-4">
         {/* Logo */}
         <div className="flex justify-end">
-          <img src={loulouLogo} alt="Loulou Studios" className="h-10 object-contain rounded" loading="lazy" />
+          <img src={loulouLogo} alt="Loulou Studios" className="h-12 object-contain rounded" loading="lazy" />
         </div>
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-8">
