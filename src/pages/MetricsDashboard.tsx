@@ -182,6 +182,88 @@ export default function MetricsDashboard() {
 
             {/* 8. Clientes / Funil */}
             <ClientsFunnel metrics={metrics} change={chg('new_clients')} />
+
+            {/* 9. Saúde do Negócio & Retenção */}
+            {(() => {
+              const activeClients = v('active_clients');
+              const churnCancel = v('churned_cancellation');
+              const churnEnd = v('churned_end_of_contract');
+              const mrr = v('monthly_recurring_revenue');
+              const retentionRate = activeClients + churnEnd + churnCancel > 0
+                ? Math.round(((activeClients - churnCancel) / (activeClients + churnEnd + churnCancel)) * 1000) / 10
+                : 0;
+              const mrrPerClient = activeClients > 0
+                ? Math.round(mrr / activeClients)
+                : 0;
+
+              return (
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    💚 Saúde do Negócio & Retenção
+                  </h3>
+
+                  {/* Row 1: Client Base */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <MetricCard
+                      title="Clientes Ativos"
+                      value={v('active_clients')}
+                      change={chg('active_clients')}
+                      highlight
+                    />
+                    <MetricCard
+                      title="Fim de Contrato"
+                      value={v('churned_end_of_contract')}
+                      changeLabel="Natural"
+                    />
+                    <MetricCard
+                      title="Churn (Cancelamento)"
+                      value={v('churned_cancellation')}
+                      change={chg('churned_cancellation')}
+                      variant="danger"
+                      invertColors
+                    />
+                    <MetricCard
+                      title="Upsells / Expansões"
+                      value={v('upsells_expansions')}
+                      change={chg('upsells_expansions')}
+                    />
+                  </div>
+
+                  {/* Row 2: Health Indicators */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <MetricCard
+                      title="Taxa de Retenção"
+                      value={`${retentionRate}%`}
+                      highlight
+                    />
+                    <MetricCard
+                      title="MRR por Cliente"
+                      value={mrrPerClient}
+                      format="currency"
+                    />
+                    <MetricCard
+                      title="Tempo Médio (meses)"
+                      value={metrics.avg_client_tenure_months ?? 0}
+                      change={chg('avg_client_tenure_months')}
+                    />
+                    <MetricCard
+                      title="Clientes em Risco"
+                      value={v('clients_at_risk')}
+                      change={chg('clients_at_risk')}
+                      invertColors
+                    />
+                  </div>
+
+                  {/* Row 3: Composition Bar */}
+                  <ClientCompositionBar
+                    over6Months={v('clients_over_6_months')}
+                    months3to6={v('clients_3_to_6_months')}
+                    under3Months={v('clients_under_3_months')}
+                    total={v('active_clients')}
+                  />
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
