@@ -8,13 +8,13 @@ interface ChatState {
   sidebarOpen: boolean;
   selectedModel: string;
   thinkingMode: boolean;
-  activePage: 'home' | 'chat' | 'market-research' | 'creator-kit' | 'implementation';
+  activePage: 'home' | 'chat' | 'market-research' | 'creator-kit' | 'implementation' | 'aulas';
 
   setActiveAgent: (agentId: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setSelectedModel: (model: string) => void;
   setThinkingMode: (on: boolean) => void;
-  setActivePage: (page: 'home' | 'chat' | 'market-research' | 'creator-kit' | 'implementation') => void;
+  setActivePage: (page: 'home' | 'chat' | 'market-research' | 'creator-kit' | 'implementation' | 'aulas') => void;
   createConversation: (agentId: string) => string;
   setActiveConversation: (id: string | null) => void;
   addMessage: (conversationId: string, message: Message) => void;

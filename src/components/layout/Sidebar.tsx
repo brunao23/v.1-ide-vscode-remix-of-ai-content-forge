@@ -2,7 +2,7 @@ import { useState } from 'react';
 import gemzLogo from '@/assets/gemz-logo.png';
 import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
-import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon, Home, Boxes, ClipboardCheck } from 'lucide-react';
+import { PanelLeft, Pencil, Search, Image, AppWindow, BookOpen, MessageSquare, X, FlaskConical, Sun, Moon, Home, Boxes, ClipboardCheck, GraduationCap } from 'lucide-react';
 import { useTheme } from '@/hooks/useTheme';
 import SearchModal from '@/components/modals/SearchModal';
 import ImagesModal from '@/components/modals/ImagesModal';
@@ -71,6 +71,7 @@ export default function Sidebar() {
         <NavItem icon={<Search className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Buscar" onClick={() => setSearchOpen(true)} />
         <NavItem icon={<Image className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Imagens" onClick={() => setImagesOpen(true)} />
         <NavItem icon={<AppWindow className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aplicativos" onClick={() => setAppsOpen(true)} />
+        <NavItem icon={<GraduationCap className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aulas" active={activePage === 'aulas'} onClick={() => { setActivePage('aulas'); if (isMobile) setSidebarOpen(false); }} />
         <NavItem icon={<BookOpen className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Documentos" onClick={() => setDocsOpen(true)} />
         <NavItem icon={<ClipboardCheck className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Implementação" active={activePage === 'implementation'} onClick={() => { setActivePage('implementation'); if (isMobile) setSidebarOpen(false); }} />
       </div>
