@@ -29,6 +29,8 @@ export default function Index() {
         return <AulasPage />;
       case 'metrics':
         return <MetricsDashboard />;
+      case 'calendario':
+        return <CalendarPage />;
       default:
         return <ChatArea />;
     }
