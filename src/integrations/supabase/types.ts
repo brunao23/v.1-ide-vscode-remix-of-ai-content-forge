@@ -52,9 +52,17 @@ export type Database = {
       }
       client_metrics: {
         Row: {
+          active_clients: number | null
           ad_spend: number | null
           advertising_impressions_ig: number | null
           advertising_reach_ig: number | null
+          avg_client_tenure_months: number | null
+          churned_cancellation: number | null
+          churned_end_of_contract: number | null
+          clients_3_to_6_months: number | null
+          clients_at_risk: number | null
+          clients_over_6_months: number | null
+          clients_under_3_months: number | null
           cpm: number | null
           created_at: string | null
           daily_ad_spend: number | null
@@ -78,14 +86,23 @@ export type Database = {
           total_reach_ig_impressions_li: number | null
           total_videos_podcasts_made: number | null
           updated_at: string | null
+          upsells_expansions: number | null
           user_id: string
           youtube_total_hours: number | null
           youtube_total_views: number | null
         }
         Insert: {
+          active_clients?: number | null
           ad_spend?: number | null
           advertising_impressions_ig?: number | null
           advertising_reach_ig?: number | null
+          avg_client_tenure_months?: number | null
+          churned_cancellation?: number | null
+          churned_end_of_contract?: number | null
+          clients_3_to_6_months?: number | null
+          clients_at_risk?: number | null
+          clients_over_6_months?: number | null
+          clients_under_3_months?: number | null
           cpm?: number | null
           created_at?: string | null
           daily_ad_spend?: number | null
@@ -109,14 +126,23 @@ export type Database = {
           total_reach_ig_impressions_li?: number | null
           total_videos_podcasts_made?: number | null
           updated_at?: string | null
+          upsells_expansions?: number | null
           user_id: string
           youtube_total_hours?: number | null
           youtube_total_views?: number | null
         }
         Update: {
+          active_clients?: number | null
           ad_spend?: number | null
           advertising_impressions_ig?: number | null
           advertising_reach_ig?: number | null
+          avg_client_tenure_months?: number | null
+          churned_cancellation?: number | null
+          churned_end_of_contract?: number | null
+          clients_3_to_6_months?: number | null
+          clients_at_risk?: number | null
+          clients_over_6_months?: number | null
+          clients_under_3_months?: number | null
           cpm?: number | null
           created_at?: string | null
           daily_ad_spend?: number | null
@@ -140,6 +166,7 @@ export type Database = {
           total_reach_ig_impressions_li?: number | null
           total_videos_podcasts_made?: number | null
           updated_at?: string | null
+          upsells_expansions?: number | null
           user_id?: string
           youtube_total_hours?: number | null
           youtube_total_views?: number | null
