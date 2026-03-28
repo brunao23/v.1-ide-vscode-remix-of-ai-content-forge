@@ -66,7 +66,10 @@ export function useLessons() {
 
   const toggleCompleted = useCallback(
     async (lessonId: string) => {
-      if (!user) return;
+      if (!user) {
+        console.warn("User not authenticated – cannot track progress");
+        return;
+      }
       const isCompleted = completedLessons.has(lessonId);
 
       // Optimistic update

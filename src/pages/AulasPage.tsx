@@ -3,10 +3,13 @@ import { Play, Clock, CheckCircle, Lock, ChevronRight, ChevronDown, GraduationCa
 import { LoomEmbed } from "@/components/video/LoomEmbed";
 import { useLessons } from "@/hooks/useLessons";
 import { useIsAdmin } from "@/hooks/useIsAdmin";
+import { useAuth } from "@/contexts/AuthContext";
 import AulasAdminPanel from "@/components/aulas/AulasAdminPanel";
+import { toast } from "sonner";
 
 export default function AulasPage() {
   const { modules, completedLessons, loading, getLessonsByModule, toggleCompleted, refetch } = useLessons();
+  const { user } = useAuth();
   const isAdmin = useIsAdmin();
   const [selectedLesson, setSelectedLesson] = useState<{ id: string; title: string; description: string | null; loom_id: string; duration: string | null; module_id: string; order_index: number } | null>(null);
   const [expandedModules, setExpandedModules] = useState<string[]>([]);
@@ -140,7 +143,13 @@ export default function AulasPage() {
 
               <div className="mt-6 flex items-center gap-4">
                 <button
-                  onClick={() => toggleCompleted(selectedLesson.id)}
+                  onClick={() => {
+                    if (!user) {
+                      toast.error("Faça login para marcar aulas como concluídas");
+                      return;
+                    }
+                    toggleCompleted(selectedLesson.id);
+                  }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                     completedLessons.has(selectedLesson.id)
                       ? "bg-primary/10 text-primary-foreground"
