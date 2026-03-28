@@ -38,6 +38,8 @@ export function useLessons() {
       supabase.from("lessons").select("*").order("order_index"),
     ]);
 
+    if (modulesRes.error) console.error("Error fetching modules:", modulesRes.error);
+    if (lessonsRes.error) console.error("Error fetching lessons:", lessonsRes.error);
     if (modulesRes.data) setModules(modulesRes.data);
     if (lessonsRes.data) setLessons(lessonsRes.data);
 
