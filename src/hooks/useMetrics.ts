@@ -119,18 +119,21 @@ export function useMetrics(period: string, targetUserId?: string) {
 
   const fetchMetrics = useCallback(async () => {
     const uid = targetUserId || user?.id;
-    if (!uid) { setLoading(false); return; }
 
     setLoading(true);
     const range = parsePeriod(period);
 
-    // Build query — need to filter by year/month range
+    // Build query
     let query = supabase
       .from('client_metrics')
       .select('*')
-      .eq('user_id', uid)
       .order('period_year', { ascending: true })
       .order('period_month', { ascending: true });
+
+    // Filter by user if available
+    if (uid) {
+      query = query.eq('user_id', uid);
+    }
 
     // Filter: rows where (year > startYear) OR (year == startYear AND month >= startMonth)
     // AND (year < endYear) OR (year == endYear AND month <= endMonth)
