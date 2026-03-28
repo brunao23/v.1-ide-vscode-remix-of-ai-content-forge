@@ -118,9 +118,11 @@ export default function AulasPage() {
         </div>
       </div>
 
-      {/* Player de vídeo */}
+      {/* Admin panel or Video player */}
       <div className="flex-1 flex flex-col overflow-y-auto bg-background">
-        {selectedLesson ? (
+        {showAdmin ? (
+          <AulasAdminPanel modules={modules} getLessonsByModule={getLessonsByModule} onDataChanged={refetch} />
+        ) : selectedLesson ? (
           <>
             <div className="p-6">
               <LoomEmbed videoId={selectedLesson.loom_id} title={selectedLesson.title} />
