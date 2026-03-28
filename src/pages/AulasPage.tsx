@@ -143,7 +143,13 @@ export default function AulasPage() {
 
               <div className="mt-6 flex items-center gap-4">
                 <button
-                  onClick={() => toggleCompleted(selectedLesson.id)}
+                  onClick={() => {
+                    if (!user) {
+                      toast.error("Faça login para marcar aulas como concluídas");
+                      return;
+                    }
+                    toggleCompleted(selectedLesson.id);
+                  }}
                   className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-colors ${
                     completedLessons.has(selectedLesson.id)
                       ? "bg-primary/10 text-primary-foreground"
