@@ -525,7 +525,7 @@ export default function MarketResearchPage({ onBack }: Props) {
 
               <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}`}>
                 {posts.map(post => (
-                  <PostCard key={post.id} post={post} onClick={() => setSelectedPost(post)} />
+                  <PostCard key={post.id} post={post} onClick={() => window.open(post.post_url, '_blank', 'noopener,noreferrer')} />
                 ))}
               </div>
 
