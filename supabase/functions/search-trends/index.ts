@@ -62,26 +62,46 @@ Retorne APENAS o JSON válido, sem markdown.`;
       },
       body: JSON.stringify({
         model: "perplexity/sonar",
+        max_tokens: 2200,
+        temperature: 0.3,
+        response_format: { type: "json_object" },
         messages: [{ role: "user", content: prompt }],
       }),
     });
 
+    const rawBody = await response.text();
+
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("OpenRouter error:", response.status, errText);
-      return new Response(JSON.stringify({ error: "Erro na API de busca" }), {
+      console.error("OpenRouter error:", response.status, rawBody);
+
+      let apiMessage = "Erro na API de busca";
+      try {
+        const parsedError = JSON.parse(rawBody);
+        apiMessage = parsedError?.error?.message || apiMessage;
+      } catch {
+        if (rawBody) apiMessage = rawBody;
+      }
+
+      return new Response(JSON.stringify({ error: apiMessage }), {
+        status: response.status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    let data: any;
+    try {
+      data = JSON.parse(rawBody);
+    } catch {
+      return new Response(JSON.stringify({ error: "Resposta inválida da API de busca" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "";
 
-    // Try to parse JSON from the response
     let parsed;
     try {
-      // Remove possible markdown code fences
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(cleaned);
     } catch {
@@ -93,11 +113,13 @@ Retorne APENAS o JSON válido, sem markdown.`;
     }
 
     return new Response(JSON.stringify(parsed), {
+      status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     console.error("search-trends error:", error);
-    return new Response(JSON.stringify({ error: "Erro interno" }), {
+    const message = error instanceof Error ? error.message : "Erro interno";
+    return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
