@@ -136,6 +136,7 @@ export default function AdminPage({ tab = "insights" }: Props) {
   const [mktResearchCount, setMktResearchCount] = useState(0);
   const [showImplDetail, setShowImplDetail] = useState(false);
   const [showHealthDetail, setShowHealthDetail] = useState(false);
+  const [tokenUsageRows, setTokenUsageRows] = useState<any[]>([]);
   const [selectedUserKey, setSelectedUserKey] = useState("");
   const [insightWindow, setInsightWindow] = useState<InsightWindow>(30);
   const [taskCount, setTaskCount] = useState(0);
@@ -167,6 +168,41 @@ export default function AdminPage({ tab = "insights" }: Props) {
     }
     return Array.from(map.values()).sort((a, b) => (b.docs + b.chats) - (a.docs + a.chats));
   }, [userDocuments, eventsByUser]);
+
+  // ── Token aggregation ────────────────────────────────────────────────────
+  const tokenSummary = useMemo(() => {
+    const totalIn = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.input_tokens || 0), 0);
+    const totalOut = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.output_tokens || 0), 0);
+    const totalCost = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.cost_usd || 0), 0);
+
+    const byModel = new Map<string, { input: number; output: number; cost: number; calls: number }>();
+    for (const r of tokenUsageRows) {
+      const key = String(r.model_id || "unknown");
+      const e = byModel.get(key) || { input: 0, output: 0, cost: 0, calls: 0 };
+      e.input += Number(r.input_tokens || 0);
+      e.output += Number(r.output_tokens || 0);
+      e.cost += Number(r.cost_usd || 0);
+      e.calls++;
+      byModel.set(key, e);
+    }
+
+    const byAgent = new Map<string, { input: number; output: number; cost: number; calls: number }>();
+    for (const r of tokenUsageRows) {
+      const key = String(r.agent_id || "(sem agente)");
+      const e = byAgent.get(key) || { input: 0, output: 0, cost: 0, calls: 0 };
+      e.input += Number(r.input_tokens || 0);
+      e.output += Number(r.output_tokens || 0);
+      e.cost += Number(r.cost_usd || 0);
+      e.calls++;
+      byAgent.set(key, e);
+    }
+
+    return {
+      totalIn, totalOut, totalCost, calls: tokenUsageRows.length,
+      byModel: Array.from(byModel.entries()).map(([model, v]) => ({ model, ...v })).sort((a, b) => b.cost - a.cost),
+      byAgent: Array.from(byAgent.entries()).map(([agent, v]) => ({ agent, ...v })).sort((a, b) => b.cost - a.cost),
+    };
+  }, [tokenUsageRows]);
 
   const loadOverview = async () => {
     setLoadingOverview(true);
@@ -252,6 +288,7 @@ export default function AdminPage({ tab = "insights" }: Props) {
       setWeeklyHistory([]);
       setMonthlyHistory([]);
       setMktResearchCount(0);
+      setTokenUsageRows([]);
       return;
     }
     setLoadingMetrics(true);
@@ -260,7 +297,7 @@ export default function AdminPage({ tab = "insights" }: Props) {
       const minIso90 = daysAgoIso(90);
       const [
         weeklyRes, monthlyRes, dealsRes, checksRes, chatsRes, lessonsRes,
-        allTasksRes, taskChecksRes, docsRes, weeklyHistRes, monthlyHistRes, mktRes,
+        allTasksRes, taskChecksRes, docsRes, weeklyHistRes, monthlyHistRes, mktRes, tokenRes,
       ] = await Promise.all([
         // Métricas de janela (90 dias)
         db.from("weekly_wins_submissions").select("tenant_id,user_id,reference_date,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).gte("reference_date", minDate90),
@@ -276,6 +313,8 @@ export default function AdminPage({ tab = "insights" }: Props) {
         db.from("weekly_wins_submissions").select("*").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("reference_date", { ascending: false }).limit(8),
         db.from("monthly_data_submissions").select("*").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("created_at", { ascending: false }).limit(6),
         db.from("market_research_saved_posts").select("id", { count: "exact", head: true }).eq("user_id", targetUser.userId),
+        // Token usage (todos os registros do usuário neste tenant)
+        db.from("token_usage").select("model_id,provider,agent_id,input_tokens,output_tokens,cost_usd,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("created_at", { ascending: false }).limit(2000),
       ]);
 
       const checksIgnorable = checksRes.error && String(checksRes.error.message || "").toLowerCase().includes("implementation_task_checks");
@@ -291,6 +330,7 @@ export default function AdminPage({ tab = "insights" }: Props) {
       setWeeklyHistory(weeklyHistRes.data || []);
       setMonthlyHistory(monthlyHistRes.data || []);
       setMktResearchCount(Number(mktRes.count || 0));
+      setTokenUsageRows(tokenRes.data || []);
     } catch (error: any) {
       toast.error(error?.message || "Erro ao carregar metricas do usuario");
     } finally {
@@ -484,7 +524,87 @@ export default function AdminPage({ tab = "insights" }: Props) {
                 </div>
               )}
 
-              {/* Uso por agente */}
+              {/* ── Consumo de Tokens & Custo ───────────────────────────── */}
+              <div className="rounded-xl border border-border p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <BarChart3 className="w-4 h-4 text-violet-400" /> Consumo de Tokens & Custo Estimado
+                  </h3>
+                  {tokenUsageRows.length === 0 && (
+                    <span className="text-xs text-muted-foreground italic">Nenhum registro ainda (dados aparecem a partir da próxima conversa)</span>
+                  )}
+                </div>
+
+                {tokenUsageRows.length > 0 && (
+                  <>
+                    {/* Totais */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <MetricMini title="Chamadas de IA" value={tokenSummary.calls} />
+                      <MetricMini title="Tokens de entrada" value={tokenSummary.totalIn.toLocaleString("pt-BR")} />
+                      <MetricMini title="Tokens de saída" value={tokenSummary.totalOut.toLocaleString("pt-BR")} />
+                      <MetricMini title="Custo total (USD)" value={`$${tokenSummary.totalCost.toFixed(4)}`} />
+                    </div>
+
+                    {/* Por modelo */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Por Modelo</p>
+                      <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-xs">
+                          <thead className="bg-secondary/40">
+                            <tr className="text-muted-foreground">
+                              <th className="text-left px-3 py-2 font-medium">Modelo</th>
+                              <th className="text-right px-3 py-2 font-medium">Chamadas</th>
+                              <th className="text-right px-3 py-2 font-medium">Tokens entrada</th>
+                              <th className="text-right px-3 py-2 font-medium">Tokens saída</th>
+                              <th className="text-right px-3 py-2 font-medium">Custo (USD)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {tokenSummary.byModel.map((row) => (
+                              <tr key={row.model} className="hover:bg-secondary/20">
+                                <td className="px-3 py-2 font-mono text-foreground max-w-[200px] truncate">{row.model}</td>
+                                <td className="px-3 py-2 text-right">{row.calls}</td>
+                                <td className="px-3 py-2 text-right">{row.input.toLocaleString("pt-BR")}</td>
+                                <td className="px-3 py-2 text-right">{row.output.toLocaleString("pt-BR")}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-violet-400">${row.cost.toFixed(4)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Por agente/contexto */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Por Agente / Contexto</p>
+                      <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-xs">
+                          <thead className="bg-secondary/40">
+                            <tr className="text-muted-foreground">
+                              <th className="text-left px-3 py-2 font-medium">Agente</th>
+                              <th className="text-right px-3 py-2 font-medium">Chamadas</th>
+                              <th className="text-right px-3 py-2 font-medium">Total tokens</th>
+                              <th className="text-right px-3 py-2 font-medium">Custo (USD)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {tokenSummary.byAgent.map((row) => (
+                              <tr key={row.agent} className="hover:bg-secondary/20">
+                                <td className="px-3 py-2 font-mono text-foreground">{row.agent}</td>
+                                <td className="px-3 py-2 text-right">{row.calls}</td>
+                                <td className="px-3 py-2 text-right">{(row.input + row.output).toLocaleString("pt-BR")}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-violet-400">${row.cost.toFixed(4)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+
+              {/* Uso por agente (documentos + chats) */}
               {agentUsage.length > 0 && (
                 <div className="rounded-xl border border-border p-4 space-y-3">
                   <h3 className="text-sm font-semibold flex items-center gap-2">

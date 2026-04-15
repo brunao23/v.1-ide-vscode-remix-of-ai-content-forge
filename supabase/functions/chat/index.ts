@@ -338,6 +338,21 @@ function extractPromptTokenLimitFromOpenRouterError(
   };
 }
 
+// ─── Model pricing (USD per million tokens) ──────────────────────────────────
+
+function getModelPricing(modelId: string): { inputPerM: number; outputPerM: number } {
+  const id = (modelId || "").toLowerCase();
+  if (id.includes("opus-4") || id.includes("claude-opus-4")) return { inputPerM: 15, outputPerM: 75 };
+  if (id.includes("sonnet-4") || id.includes("claude-sonnet-4")) return { inputPerM: 3, outputPerM: 15 };
+  if (id.includes("haiku-4") || id.includes("claude-haiku-4")) return { inputPerM: 0.80, outputPerM: 4 };
+  if (id.includes("3-5-sonnet") || id.includes("3.5-sonnet")) return { inputPerM: 3, outputPerM: 15 };
+  if (id.includes("3-5-haiku") || id.includes("3.5-haiku")) return { inputPerM: 0.80, outputPerM: 4 };
+  if (id.includes("claude-3-opus")) return { inputPerM: 15, outputPerM: 75 };
+  if (id.includes("gpt-4o-mini")) return { inputPerM: 0.15, outputPerM: 0.60 };
+  if (id.includes("gpt-4o")) return { inputPerM: 2.50, outputPerM: 10 };
+  return { inputPerM: 3, outputPerM: 15 }; // default: sonnet pricing
+}
+
 function sanitizeLeakedToolCalls(text: string): string {
   let cleaned = String(text || "");
   // Remove full <function_calls>...</function_calls> blocks (multiline)
@@ -2071,6 +2086,23 @@ Texto aqui...
     }
 
     const sanitizedContent = sanitizeLeakedToolCalls(result.content);
+
+    // ── Record token usage (fire-and-forget — does not block response) ────────
+    if (supabase && result.usage && effectiveUserId && tenantId) {
+      const { inputPerM, outputPerM } = getModelPricing(selectedModelId);
+      const costUsd = (result.usage.inputTokens / 1_000_000) * inputPerM
+                    + (result.usage.outputTokens / 1_000_000) * outputPerM;
+      void supabase.from("token_usage").insert({
+        tenant_id: tenantId,
+        user_id: effectiveUserId,
+        model_id: selectedModelId,
+        provider: result.provider || "unknown",
+        agent_id: agentId || null,
+        input_tokens: result.usage.inputTokens,
+        output_tokens: result.usage.outputTokens,
+        cost_usd: Number(costUsd.toFixed(6)),
+      });
+    }
 
     return new Response(
       JSON.stringify({
