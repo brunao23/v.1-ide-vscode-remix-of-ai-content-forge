@@ -1,4 +1,4 @@
-interface MetricCardProps {
+﻿interface MetricCardProps {
   title: string;
   value: string | number;
   change?: number;
@@ -48,7 +48,6 @@ export function MetricCard({
   const resolvedVariant = variant || (highlight ? 'highlight' : 'default');
   const styles = variantStyles[resolvedVariant];
   const formattedValue = formatValue(value, format);
-
   const isPositive = change !== undefined && change >= 0;
 
   const getChangeColor = () => {
@@ -57,14 +56,6 @@ export function MetricCard({
       return isPositive ? { color: '#dc2626' } : { color: '#5a6b2a' };
     }
     return isPositive ? { color: '#5a6b2a' } : undefined;
-  };
-
-  const getChangeClass = () => {
-    if (changeLabel) return '';
-    if (invertColors) {
-      return isPositive ? '' : '';
-    }
-    return isPositive ? '' : 'text-destructive';
   };
 
   return (
@@ -87,13 +78,11 @@ export function MetricCard({
       </p>
 
       {(change !== undefined || changeLabel) && (
-        <p
-          className={`text-xs mt-1 ${getChangeClass()}`}
-          style={getChangeColor()}
-        >
+        <p className="text-xs mt-1" style={getChangeColor()}>
           {changeLabel || (
             <>
-              {isPositive ? '▲' : '▼'} {Math.abs(change!)}{changeSuffix}
+              {isPositive ? '+' : '-'} {Math.abs(change!)}
+              {changeSuffix}
             </>
           )}
         </p>
@@ -104,6 +93,7 @@ export function MetricCard({
 
 function formatValue(value: string | number, format: string): string {
   if (typeof value === 'string') return value;
+
   switch (format) {
     case 'currency':
       return new Intl.NumberFormat('pt-BR', {
@@ -115,6 +105,6 @@ function formatValue(value: string | number, format: string): string {
     case 'percent':
       return `${value}%`;
     default:
-      return new Intl.NumberFormat('en-US').format(value);
+      return new Intl.NumberFormat('pt-BR').format(value);
   }
 }

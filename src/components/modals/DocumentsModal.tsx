@@ -1,8 +1,14 @@
-import { X, MoreHorizontal, FileText, Download, Pencil, Trash2, Eye, BookOpen, BarChart3, Target } from 'lucide-react';
+import { X, MoreHorizontal, FileText, Download, Pencil, Trash2, Eye, BookOpen, BarChart3, Target, Loader2 } from 'lucide-react';
 import { AGENTS } from '@/types';
-import { useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { ReactNode } from 'react';
 import NewDocumentModal from '@/components/documents/NewDocumentModal';
+import type { NewDocumentPayload } from '@/components/documents/NewDocumentModal';
 import DocumentViewerModal from '@/components/documents/DocumentViewerModal';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
+import { invokeSupabaseFunctionWithRetry } from '@/services/supabaseFunctionClient';
 
 interface DocItem {
   id: string;
@@ -12,21 +18,48 @@ interface DocItem {
   type: string;
   icon: string;
   content: string;
+  processingStatus: 'pending' | 'processing' | 'ready' | 'error';
+  processingError: string | null;
 }
 
-const DOC_ICONS: Record<string, React.ReactNode> = {
+const DOC_ICONS: Record<string, ReactNode> = {
   'brand-book': <BookOpen className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />,
   'market-research': <BarChart3 className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />,
   'icp-architect': <Target className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />,
+  'voz-de-marca': <FileText className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />,
+};
+
+const DB_TYPE_LABELS: Record<string, string> = {
+  'brand-book': 'Brand Book',
+  'pesquisa': 'Pesquisa',
+  'icp': 'ICP',
+  'pilares': 'Pilares',
+  'matriz': 'Matriz',
+  'calendario': 'Calendário',
+  'roteiro': 'Roteiro',
+  'outro': 'Outro',
+};
+
+const UI_TO_DB_TYPE: Record<string, string> = {
+  'brand-book': 'brand-book',
+  'market-research': 'pesquisa',
+  'icp-architect': 'icp',
+  'pillar-strategist': 'pilares',
+  'matrix-generator': 'matriz',
+  'marketing-manager': 'calendario',
+  'scriptwriter': 'roteiro',
+  'voz-de-marca': 'outro',
+  'other': 'outro',
+};
+
+const STATUS_LABELS: Record<DocItem['processingStatus'], string> = {
+  pending: 'Pendente',
+  processing: 'Processando',
+  ready: 'Pronto',
+  error: 'Erro',
 };
 
 const fallbackIcon = <FileText className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />;
-
-const INITIAL_DOCS: DocItem[] = [
-  { id: '1', title: 'Brand Book - Minha Empresa', agentId: 'brand-book', createdAt: '09/02/2026', type: 'Brand Book', icon: 'brand-book', content: 'Conteúdo do Brand Book...' },
-  { id: '2', title: 'Highcharts - Minha Empresa', agentId: 'market-research', createdAt: '09/02/2026', type: 'Pesquisa', icon: 'market-research', content: 'Conteúdo da pesquisa de mercado...' },
-  { id: '3', title: 'ICP Map - Minha Empresa', agentId: 'icp-architect', createdAt: '09/02/2026', type: 'ICP', icon: 'icp-architect', content: 'Conteúdo do mapa do ICP...' },
-];
 
 interface Props {
   open: boolean;
@@ -34,41 +67,240 @@ interface Props {
 }
 
 export default function DocumentsModal({ open, onClose }: Props) {
+  const { user, activeTenant } = useAuth();
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
-  const [docs, setDocs] = useState<DocItem[]>(INITIAL_DOCS);
+  const [docs, setDocs] = useState<DocItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const [newDocOpen, setNewDocOpen] = useState(false);
   const [viewerDoc, setViewerDoc] = useState<DocItem | null>(null);
   const [viewerMode, setViewerMode] = useState<'view' | 'edit'>('view');
 
+  const getAgentName = (agentId: string) => AGENTS.find(a => a.id === agentId)?.name || agentId || 'Documento';
+
+  const grouped = useMemo(
+    () =>
+      docs.reduce<Record<string, DocItem[]>>((acc, doc) => {
+        (acc[doc.type] = acc[doc.type] || []).push(doc);
+        return acc;
+      }, {}),
+    [docs]
+  );
+
+  const fetchDocuments = useCallback(async () => {
+    if (!user || !activeTenant?.id) return;
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('documents')
+      .select('id, name, type, agent_id, created_at, content, processing_status, processing_error')
+      .eq('user_id', user.id)
+      .eq('tenant_id', activeTenant.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast.error('Erro ao carregar documentos');
+      setLoading(false);
+      return;
+    }
+
+    const mapped: DocItem[] = (data || []).map((row) => ({
+      id: row.id,
+      title: row.name,
+      agentId: row.agent_id || 'other',
+      createdAt: new Date(row.created_at).toLocaleDateString('pt-BR'),
+      type: DB_TYPE_LABELS[row.type] || row.type,
+      icon: row.agent_id || row.type || 'other',
+      content: row.content || '',
+      processingStatus: (row.processing_status as DocItem['processingStatus']) || 'ready',
+      processingError: row.processing_error || null,
+    }));
+
+    setDocs(mapped);
+    setLoading(false);
+  }, [user, activeTenant?.id]);
+
+  useEffect(() => {
+    if (!open) return;
+    if (!user || !activeTenant?.id) {
+      setDocs([]);
+      return;
+    }
+    void fetchDocuments();
+  }, [open, user, activeTenant?.id, fetchDocuments]);
+
   if (!open) return null;
 
-  const getAgentName = (agentId: string) => AGENTS.find(a => a.id === agentId)?.name || agentId;
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result || ''));
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
 
-  const grouped = docs.reduce<Record<string, DocItem[]>>((acc, doc) => {
-    (acc[doc.type] = acc[doc.type] || []).push(doc);
-    return acc;
-  }, {});
+  const extractDocumentContent = async (file: File): Promise<string> => {
+    const fileBase64 = await fileToBase64(file);
+    const data = await invokeSupabaseFunctionWithRetry<any>('extract-document-content', {
+      fileName: file.name,
+      mimeType: file.type || 'application/octet-stream',
+      fileBase64,
+      tenantId: activeTenant.id,
+    });
+    if (!data?.success || !data?.content) {
+      throw new Error(data?.error || 'Não foi possível extrair conteúdo do arquivo');
+    }
 
-  const handleNewDocument = (doc: { name: string; type: string; content: string }) => {
-    const typeLabel = AGENTS.find(a => a.id === doc.type)?.outputDocument || doc.type;
-    const newDoc: DocItem = {
-      id: crypto.randomUUID(),
-      title: doc.name,
-      agentId: doc.type,
-      createdAt: new Date().toLocaleDateString('pt-BR'),
-      type: typeLabel,
-      icon: doc.type,
-      content: doc.content,
-    };
-    setDocs(prev => [newDoc, ...prev]);
+    return String(data.content);
   };
 
-  const handleDelete = (id: string) => {
+  const indexDocument = async (params: {
+    documentId: string;
+    content: string;
+    userId: string;
+    tenantId: string;
+    documentType: string;
+    agentDocument: boolean;
+    agentId: string | null;
+  }) => {
+    await invokeSupabaseFunctionWithRetry('process-document', {
+      documentId: params.documentId,
+      content: params.content,
+      userId: params.userId,
+      tenantId: params.tenantId,
+      documentType: params.documentType,
+      agentDocument: params.agentDocument,
+      agentId: params.agentId,
+    });
+  };
+
+  const handleNewDocument = async (doc: NewDocumentPayload) => {
+    if (!user || !activeTenant?.id) {
+      toast.error('Faça login e selecione um tenant para enviar documentos');
+      return;
+    }
+
+    const dbType = UI_TO_DB_TYPE[doc.type] || 'outro';
+    const agentId = doc.type === 'other' ? null : doc.type;
+    const agentDocument = Boolean(agentId);
+
+    const { data, error } = await supabase
+      .from('documents')
+      .insert({
+        user_id: user.id,
+        tenant_id: activeTenant.id,
+        name: doc.name,
+        type: dbType,
+        agent_id: agentId,
+        content: doc.mode === 'paste' ? doc.content : null,
+        processing_status: 'processing',
+      })
+      .select('id')
+      .single();
+
+    if (error || !data?.id) {
+      toast.error(`Falha ao salvar documento: ${error?.message || 'erro desconhecido'}`);
+      return;
+    }
+
+    try {
+      const content = doc.mode === 'paste'
+        ? doc.content
+        : await extractDocumentContent(doc.file);
+
+      const { error: updateError } = await supabase
+        .from('documents')
+        .update({
+          content,
+          file_type: doc.mode === 'upload' ? doc.file.type || null : null,
+          file_size: doc.mode === 'upload' ? doc.file.size : null,
+        })
+        .eq('id', data.id)
+        .eq('user_id', user.id)
+        .eq('tenant_id', activeTenant.id);
+
+      if (updateError) {
+        throw new Error(updateError.message);
+      }
+
+      await indexDocument({
+        documentId: data.id,
+        content,
+        userId: user.id,
+        tenantId: activeTenant.id,
+        documentType: dbType,
+        agentDocument,
+        agentId,
+      });
+
+      toast.success('Documento salvo e indexado');
+    } catch (e: any) {
+      const message = e?.message || 'erro desconhecido';
+      await supabase
+        .from('documents')
+        .update({
+          processing_status: 'error',
+          processing_error: message,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', data.id)
+        .eq('user_id', user.id)
+        .eq('tenant_id', activeTenant.id);
+      toast.error(`Documento salvo, mas houve falha no processamento: ${message}`);
+    }
+
+    await fetchDocuments();
+  };
+
+  const handleDelete = async (id: string) => {
+    if (!user || !activeTenant?.id) {
+      toast.error('Faça login e selecione um tenant para excluir documentos');
+      return;
+    }
+
     const doc = docs.find(d => d.id === id);
-    if (doc && confirm(`Tem certeza que deseja excluir "${doc.title}"?`)) {
-      setDocs(prev => prev.filter(d => d.id !== id));
+    if (!doc || !confirm(`Tem certeza que deseja excluir "${doc.title}"?`)) {
+      setMenuOpen(null);
+      return;
+    }
+
+    let vectorData: any = null;
+    let vectorDeleteWarning: string | null = null;
+    try {
+      vectorData = await invokeSupabaseFunctionWithRetry<any>('delete-document-vectors', {
+        documentId: id,
+        userId: user.id,
+        tenantId: activeTenant.id,
+      });
+    } catch (error: any) {
+      vectorDeleteWarning = error?.message || 'falha desconhecida';
+      console.warn('Falha ao remover vetores do Pinecone:', error);
+    }
+
+    if ((vectorData as any)?.skipped) {
+      vectorDeleteWarning =
+        (vectorData as any)?.warning || 'remocao vetorial nao executada';
+    }
+
+    const { error } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('tenant_id', activeTenant.id);
+    if (error) {
+      toast.error(`Erro ao excluir documento: ${error.message}`);
+      setMenuOpen(null);
+      return;
+    }
+
+    if (vectorDeleteWarning) {
+      toast.warning(
+        `Documento removido, mas os vetores não foram removidos agora: ${vectorDeleteWarning}`,
+      );
+    } else {
+      toast.success('Documento e vetores removidos');
     }
     setMenuOpen(null);
+    await fetchDocuments();
   };
 
   const handleDownloadPDF = async (doc: DocItem) => {
@@ -77,7 +309,7 @@ export default function DocumentsModal({ open, onClose }: Props) {
     pdf.setFontSize(16);
     pdf.text(doc.title, 20, 20);
     pdf.setFontSize(12);
-    const lines = pdf.splitTextToSize(doc.content, 170);
+    const lines = pdf.splitTextToSize(doc.content || '', 170);
     pdf.text(lines, 20, 35);
     pdf.save(`${doc.title}.pdf`);
     setMenuOpen(null);
@@ -90,7 +322,7 @@ export default function DocumentsModal({ open, onClose }: Props) {
         properties: {},
         children: [
           new Paragraph({ children: [new TextRun({ text: doc.title, bold: true, size: 32 })] }),
-          new Paragraph({ children: [new TextRun({ text: doc.content, size: 24 })] }),
+          new Paragraph({ children: [new TextRun({ text: doc.content || '', size: 24 })] }),
         ],
       }],
     });
@@ -104,20 +336,76 @@ export default function DocumentsModal({ open, onClose }: Props) {
     setMenuOpen(null);
   };
 
-  const handleSaveContent = (id: string, content: string) => {
-    setDocs(prev => prev.map(d => d.id === id ? { ...d, content } : d));
+  const handleSaveContent = async (id: string, content: string) => {
+    if (!user || !activeTenant?.id) {
+      toast.error('Faça login e selecione um tenant para editar documentos');
+      return;
+    }
+
+    const { error } = await supabase
+      .from('documents')
+      .update({
+        content,
+        processing_status: 'processing',
+        processing_error: null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id)
+      .eq('user_id', user.id)
+      .eq('tenant_id', activeTenant.id);
+
+    if (error) {
+      toast.error(`Erro ao salvar edição: ${error.message}`);
+      return;
+    }
+
+    const docData = docs.find((d) => d.id === id);
+    const typeLabel = docData?.type || 'outro';
+    const dbType =
+      Object.entries(DB_TYPE_LABELS).find(([, label]) => label === typeLabel)?.[0] || 'outro';
+    const agentDocument = Boolean(docData?.agentId && docData.agentId !== 'other');
+    const agentId = agentDocument ? docData?.agentId : null;
+
+    try {
+      await indexDocument({
+        documentId: id,
+        content,
+        userId: user.id,
+        tenantId: activeTenant.id,
+        documentType: dbType,
+        agentDocument,
+        agentId,
+      });
+      toast.success('Documento atualizado e reindexado');
+    } catch (e: any) {
+      const message = e?.message || 'erro desconhecido';
+      await supabase
+        .from('documents')
+        .update({
+          processing_status: 'error',
+          processing_error: message,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('user_id', user.id)
+        .eq('tenant_id', activeTenant.id);
+      toast.error(`Documento atualizado, mas falhou ao reindexar: ${message}`);
+    }
+
+    await fetchDocuments();
   };
 
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={onClose} />
       <div className="fixed inset-4 md:inset-12 z-50 bg-background rounded-xl border border-border/40 shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="px-6 py-5 border-b border-border/40 shrink-0">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold text-foreground">Documentos</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">Gerencie os documentos criados pelos agentes</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Gerencie os documentos criados pelos agentes
+              </p>
             </div>
             <div className="flex items-center gap-2">
               <button
@@ -133,10 +421,21 @@ export default function DocumentsModal({ open, onClose }: Props) {
           </div>
         </div>
 
-        {/* Content */}
         <div className="flex-1 overflow-y-auto">
           <div className="max-w-[640px] mx-auto px-6 py-8 space-y-8">
-            {Object.entries(grouped).map(([type, typeDocs]) => (
+            {(!user || !activeTenant?.id) && (
+              <div className="rounded-lg border border-border/50 bg-secondary/30 p-4 text-sm text-muted-foreground">
+                Faça login e selecione um tenant para visualizar e gerenciar documentos.
+              </div>
+            )}
+
+            {loading && (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            )}
+
+            {!loading && Object.entries(grouped).map(([type, typeDocs]) => (
               <div key={type}>
                 <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-2">{type}</p>
                 <div className="space-y-0">
@@ -149,8 +448,11 @@ export default function DocumentsModal({ open, onClose }: Props) {
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground">{doc.title}</p>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Criado em {doc.createdAt} • {getAgentName(doc.agentId)}
+                            Criado em {doc.createdAt} - {getAgentName(doc.agentId)} - {STATUS_LABELS[doc.processingStatus]}
                           </p>
+                          {doc.processingStatus === 'error' && doc.processingError && (
+                            <p className="text-[11px] text-destructive mt-1 truncate">{doc.processingError}</p>
+                          )}
                         </div>
                         <div className="relative shrink-0">
                           <button
@@ -181,13 +483,13 @@ export default function DocumentsModal({ open, onClose }: Props) {
               </div>
             ))}
 
-            {docs.length === 0 && (
+            {!loading && docs.length === 0 && user && (
               <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
                 <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
                   <FileText className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
                 </div>
                 <p className="text-sm text-muted-foreground">Nenhum documento ainda</p>
-                <p className="text-xs text-muted-foreground">Complete as etapas dos agentes para gerar documentos</p>
+                <p className="text-xs text-muted-foreground">Crie o primeiro documento</p>
               </div>
             )}
           </div>
@@ -209,7 +511,7 @@ export default function DocumentsModal({ open, onClose }: Props) {
   );
 }
 
-function MenuItem({ icon, label, destructive, onClick }: { icon: React.ReactNode; label: string; destructive?: boolean; onClick?: () => void }) {
+function MenuItem({ icon, label, destructive, onClick }: { icon: ReactNode; label: string; destructive?: boolean; onClick?: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -220,3 +522,6 @@ function MenuItem({ icon, label, destructive, onClick }: { icon: React.ReactNode
     </button>
   );
 }
+
+
+

@@ -1,12 +1,14 @@
-import { useState, useRef, useEffect, KeyboardEvent, useCallback } from 'react';
+import { useState, useRef, useEffect, KeyboardEvent, useCallback, useMemo } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { sendChatMessage } from '@/services/chatService';
-import { AI_MODELS, Message } from '@/types';
+import { AI_MODELS, Message, AGENTS, AGENT_AVATARS } from '@/types';
 import { Plus, ArrowUp, Square, Paperclip, ImagePlus, Search, Globe, Mic, AudioLines, ChevronDown, ChevronRight, Check, PanelLeft, Menu } from 'lucide-react';
 import gemzLogo from '@/assets/gemz-logo.png';
 import { AttachedFiles, UploadedFile } from '@/components/chat/FileUploadButton';
 import MessageBubble from '@/components/chat/MessageBubble';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
+import { getMentionContext, resolveMentionedAgent } from '@/lib/agentMentions';
 
 const PLUS_MENU_ITEMS = [
   { id: 'files', label: 'Adicionar fotos e arquivos', icon: Paperclip },
@@ -15,16 +17,33 @@ const PLUS_MENU_ITEMS = [
   { id: 'web', label: 'Busca na web', icon: Globe },
 ];
 
+type MentionState = {
+  start: number;
+  end: number;
+  query: string;
+};
+
+function normalizeSearch(text: string): string {
+  return text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
 
 export default function HomePage() {
   const { selectedModel, setSelectedModel, thinkingMode, sidebarOpen, setSidebarOpen } = useChatStore();
+  const { user, activeTenant } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [inputValue, setInputValue] = useState('');
+  const [mention, setMention] = useState<MentionState | null>(null);
+  const [selectedMentionIndex, setSelectedMentionIndex] = useState(0);
   const [attachedFiles, setAttachedFiles] = useState<UploadedFile[]>([]);
   const [showPlusMenu, setShowPlusMenu] = useState(false);
   const [modelDropdown, setModelDropdown] = useState(false);
   const [showMoreModels, setShowMoreModels] = useState(false);
+  const [marketingMode, setMarketingMode] = useState<'calendar' | 'idea'>('calendar');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -32,8 +51,23 @@ export default function HomePage() {
 
   const currentModel = AI_MODELS.find(m => m.id === selectedModel);
 
-  const firstName = 'Usuário';
+  const firstName = user?.name?.split(' ')[0] || 'Usuário';
   const hasMessages = messages.length > 0;
+
+  const mentionCandidates = useMemo(() => {
+    if (!mention) return [];
+    const q = normalizeSearch(mention.query.trim());
+    if (!q) return AGENTS;
+
+    const filtered = AGENTS.filter((agent) => {
+      const id = normalizeSearch(agent.id);
+      const name = normalizeSearch(agent.name);
+      const description = normalizeSearch(agent.description);
+      return id.includes(q) || name.includes(q) || description.includes(q);
+    });
+
+    return filtered.length > 0 ? filtered : AGENTS;
+  }, [mention]);
 
   useEffect(() => {
     if (textareaRef.current) {
@@ -50,18 +84,86 @@ export default function HomePage() {
     scrollToBottom();
   }, [messages.length, scrollToBottom]);
 
-  const handleSend = useCallback(async () => {
-    const text = inputValue.trim();
-    if (!text || isStreaming) return;
+  useEffect(() => {
+    setSelectedMentionIndex(0);
+  }, [mention?.query]);
 
-    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content: text, timestamp: new Date() };
+  const updateMentionContext = (nextValue: string) => {
+    const cursor = textareaRef.current?.selectionStart ?? nextValue.length;
+    const ctx = getMentionContext(nextValue, cursor);
+    setMention(ctx);
+  };
+
+  const selectMention = (agentId: string) => {
+    if (!mention) return;
+    const insertion = `@${agentId} `;
+    const nextValue = `${inputValue.slice(0, mention.start)}${insertion}${inputValue.slice(mention.end)}`;
+    setInputValue(nextValue);
+    setMention(null);
+
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        const nextCursor = mention.start + insertion.length;
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(nextCursor, nextCursor);
+      }
+    });
+  };
+
+  const handleSend = useCallback(async () => {
+    const { targetAgentId: mentionedAgentId, cleanedText } = resolveMentionedAgent(inputValue);
+    const targetAgentId = mentionedAgentId || 'brand-book';
+    const promptText = cleanedText.trim();
+    if (!promptText || isStreaming) return;
+
+    const userMsg: Message = {
+      id: crypto.randomUUID(),
+      role: 'user',
+      content: promptText,
+      timestamp: new Date(),
+      agentId: targetAgentId,
+    };
     const assistantId = crypto.randomUUID();
-    const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', timestamp: new Date(), isStreaming: true };
+    const assistantMsg: Message = {
+      id: assistantId,
+      role: 'assistant',
+      content: 'Pensando...',
+      timestamp: new Date(),
+      isStreaming: true,
+      agentId: targetAgentId,
+    };
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
     setInputValue('');
+    setMention(null);
     setAttachedFiles([]);
     setIsStreaming(true);
+
+    const stages =
+      targetAgentId === 'marketing-manager'
+        ? [
+            'Analisando contexto...',
+            marketingMode === 'calendar'
+              ? 'Montando calend\u00e1rio editorial...'
+              : 'Estruturando ideia estrat\u00e9gica...',
+          ]
+        : ['Analisando contexto...', 'Pensando...', 'Gerando resposta...'];
+    let stageIndex = 0;
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === assistantId ? { ...m, content: stages[0], isStreaming: true } : m,
+      ),
+    );
+    const stageTimer = window.setInterval(() => {
+      if (stageIndex < stages.length - 1) {
+        stageIndex += 1;
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: stages[stageIndex], isStreaming: true } : m,
+          ),
+        );
+      }
+    }, 2400);
 
     try {
       const historyMessages = [...messages, userMsg]
@@ -70,15 +172,42 @@ export default function HomePage() {
 
       const response = await sendChatMessage({
         messages: historyMessages,
-        agentId: 'brand-book',
+        agentId: targetAgentId,
         modelId: selectedModel,
         extendedThinking: thinkingMode,
+        marketingMode: targetAgentId === 'marketing-manager' ? marketingMode : undefined,
+        userId: user?.id,
+        tenantId: activeTenant?.id,
       });
+
+      window.clearInterval(stageTimer);
+
+      if (response.webContext?.searched && response.webContext?.used) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: 'Buscando na web...', isStreaming: true } : m,
+          ),
+        );
+        await new Promise((r) => setTimeout(r, 900));
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantId ? { ...m, content: 'Gerando resposta...', isStreaming: true } : m,
+          ),
+        );
+        await new Promise((r) => setTimeout(r, 600));
+      }
 
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantId
-            ? { ...m, content: response.content, isStreaming: false, thinking: response.thinking, thinkingDuration: response.thinkingDuration }
+            ? {
+                ...m,
+                content: response.content,
+                isStreaming: false,
+                thinking: response.thinking,
+                thinkingDuration: response.thinkingDuration,
+                webSources: response.webContext?.sources?.length ? response.webContext.sources : undefined,
+              }
             : m
         )
       );
@@ -86,16 +215,41 @@ export default function HomePage() {
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantId
-            ? { ...m, content: `❌ Erro: ${err.message || 'Falha ao obter resposta.'}`, isStreaming: false }
+            ? { ...m, content: `Erro: ${err.message || 'Falha ao obter resposta.'}`, isStreaming: false }
             : m
         )
       );
     } finally {
+      window.clearInterval(stageTimer);
       setIsStreaming(false);
     }
-  }, [inputValue, isStreaming, messages, selectedModel, thinkingMode]);
+  }, [inputValue, isStreaming, messages, selectedModel, thinkingMode, marketingMode, user?.id, activeTenant?.id]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mention && mentionCandidates.length > 0) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+        return;
+      }
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        e.preventDefault();
+        const selected = mentionCandidates[selectedMentionIndex] || mentionCandidates[0];
+        if (selected) selectMention(selected.id);
+        return;
+      }
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setMention(null);
+        return;
+      }
+    }
+
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSend();
@@ -125,15 +279,27 @@ export default function HomePage() {
         fileInputRef.current?.click();
         break;
       case 'image':
-        setInputValue(prev => prev + (prev ? ' ' : '') + 'Crie uma imagem: ');
+        setInputValue((prev) => {
+          const nextValue = prev + (prev ? ' ' : '') + 'Crie uma imagem: ';
+          updateMentionContext(nextValue);
+          return nextValue;
+        });
         textareaRef.current?.focus();
         break;
       case 'deep-search':
-        setInputValue(prev => prev + (prev ? ' ' : '') + 'Faça uma pesquisa aprofundada sobre: ');
+        setInputValue((prev) => {
+          const nextValue = prev + (prev ? ' ' : '') + 'Faça uma pesquisa aprofundada sobre: ';
+          updateMentionContext(nextValue);
+          return nextValue;
+        });
         textareaRef.current?.focus();
         break;
       case 'web':
-        setInputValue(prev => prev + (prev ? ' ' : '') + 'Busque na web: ');
+        setInputValue((prev) => {
+          const nextValue = prev + (prev ? ' ' : '') + 'Busque na web: ';
+          updateMentionContext(nextValue);
+          return nextValue;
+        });
         textareaRef.current?.focus();
         break;
     }
@@ -144,6 +310,8 @@ export default function HomePage() {
     if (file?.preview) URL.revokeObjectURL(file.preview);
     setAttachedFiles(prev => prev.filter(f => f.id !== id));
   };
+
+  const showMentionList = Boolean(mention);
 
   return (
     <div className="flex-1 flex flex-col min-w-0 h-screen">
@@ -217,7 +385,7 @@ export default function HomePage() {
                     );
                   })}
 
-                  {/* Mais modelos → Gemini flyout */}
+                  {/* Mais modelos -> Gemini flyout */}
                   <div className="my-1.5 mx-3 border-t border-border" />
                   <div
                     className="relative"
@@ -271,7 +439,7 @@ export default function HomePage() {
       />
 
       {!hasMessages ? (
-        /* Empty state — centered greeting + input */
+        /* Empty state - centered greeting + input */
         <div className="flex-1 flex flex-col items-center justify-center px-4">
           <h1 className="text-[32px] text-foreground mb-6">
             <span className="greeting-prompt">Como posso ajudar,</span>
@@ -314,16 +482,58 @@ export default function HomePage() {
                   )}
                 </div>
 
-                <textarea
-                  ref={textareaRef}
-                  value={inputValue}
-                  onChange={(e) => setInputValue(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Pergunte alguma coisa"
-                  rows={1}
-                  className="flex-1 bg-transparent border-none outline-none text-foreground text-base resize-none placeholder:text-muted-foreground leading-normal py-1"
-                  aria-label="Mensagem"
-                />
+                <div className="flex-1 relative">
+                  {showMentionList && (
+                    <div className="absolute bottom-full left-0 mb-2 w-full z-30 bg-popover border border-border rounded-xl shadow-xl overflow-hidden">
+                      <div className="px-3 py-2 text-[11px] text-muted-foreground border-b border-border/50">
+                        Mencione um agente com @
+                      </div>
+                      <div className="max-h-56 overflow-y-auto">
+                        {mentionCandidates.map((candidate, idx) => (
+                          <button
+                            key={candidate.id}
+                            onMouseDown={(ev) => {
+                              ev.preventDefault();
+                              selectMention(candidate.id);
+                            }}
+                            className={`w-full text-left px-3 py-2.5 transition-colors ${
+                              idx === selectedMentionIndex ? 'bg-secondary' : 'hover:bg-secondary/60'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <img
+                                src={AGENT_AVATARS[candidate.id]}
+                                alt={candidate.name}
+                                className="w-7 h-7 rounded-full object-cover shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="text-sm text-foreground font-medium truncate">@{candidate.id}</div>
+                                <div className="text-xs text-muted-foreground truncate">{candidate.name}</div>
+                              </div>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <textarea
+                    ref={textareaRef}
+                    value={inputValue}
+                    onChange={(e) => {
+                      const nextValue = e.target.value;
+                      setInputValue(nextValue);
+                      updateMentionContext(nextValue);
+                    }}
+                    onKeyDown={handleKeyDown}
+                    onClick={() => updateMentionContext(inputValue)}
+                    onKeyUp={() => updateMentionContext(inputValue)}
+                    placeholder="Pergunte alguma coisa"
+                    rows={1}
+                    className="w-full bg-transparent border-none outline-none text-foreground text-base resize-none placeholder:text-muted-foreground leading-normal py-1"
+                    aria-label="Mensagem"
+                  />
+                </div>
 
                 <div className="flex items-center gap-1 shrink-0">
                   {isStreaming ? (
@@ -344,7 +554,7 @@ export default function HomePage() {
                     </button>
                   ) : (
                     <>
-                      <button className="p-2 rounded-full hover:bg-accent transition-colors" aria-label="Entrada por voz">
+                    <button className="p-2 rounded-full hover:bg-accent transition-colors" aria-label="Entrada por voz">
                         <Mic className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
                       </button>
                       <button className="w-9 h-9 rounded-full bg-foreground flex items-center justify-center hover:opacity-80 transition-opacity" aria-label="Áudio">
@@ -367,7 +577,7 @@ export default function HomePage() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-6 py-4">
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} agentId="brand-book" />
+                <MessageBubble key={msg.id} message={msg} agentId={msg.agentId || 'brand-book'} />
               ))}
             </div>
           </div>
@@ -406,16 +616,58 @@ export default function HomePage() {
                     )}
                   </div>
 
-                  <textarea
-                    ref={textareaRef}
-                    value={inputValue}
-                    onChange={(e) => setInputValue(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Pergunte alguma coisa"
-                    rows={1}
-                    className="flex-1 bg-transparent border-none outline-none text-foreground text-base resize-none placeholder:text-muted-foreground leading-normal py-1"
-                    aria-label="Mensagem"
-                  />
+                  <div className="flex-1 relative">
+                    {showMentionList && (
+                      <div className="absolute bottom-full left-0 mb-2 w-full z-30 bg-popover border border-border rounded-xl shadow-xl overflow-hidden">
+                        <div className="px-3 py-2 text-[11px] text-muted-foreground border-b border-border/50">
+                          Mencione um agente com @
+                        </div>
+                        <div className="max-h-56 overflow-y-auto">
+                          {mentionCandidates.map((candidate, idx) => (
+                            <button
+                              key={candidate.id}
+                              onMouseDown={(ev) => {
+                                ev.preventDefault();
+                                selectMention(candidate.id);
+                              }}
+                              className={`w-full text-left px-3 py-2.5 transition-colors ${
+                                idx === selectedMentionIndex ? 'bg-secondary' : 'hover:bg-secondary/60'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <img
+                                  src={AGENT_AVATARS[candidate.id]}
+                                  alt={candidate.name}
+                                  className="w-7 h-7 rounded-full object-cover shrink-0"
+                                />
+                                <div className="min-w-0">
+                                  <div className="text-sm text-foreground font-medium truncate">@{candidate.id}</div>
+                                  <div className="text-xs text-muted-foreground truncate">{candidate.name}</div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <textarea
+                      ref={textareaRef}
+                      value={inputValue}
+                      onChange={(e) => {
+                        const nextValue = e.target.value;
+                        setInputValue(nextValue);
+                        updateMentionContext(nextValue);
+                      }}
+                      onKeyDown={handleKeyDown}
+                      onClick={() => updateMentionContext(inputValue)}
+                      onKeyUp={() => updateMentionContext(inputValue)}
+                      placeholder="Pergunte alguma coisa"
+                      rows={1}
+                      className="w-full bg-transparent border-none outline-none text-foreground text-base resize-none placeholder:text-muted-foreground leading-normal py-1"
+                      aria-label="Mensagem"
+                    />
+                  </div>
 
                   <div className="flex items-center gap-1 shrink-0 mb-0.5">
                     {isStreaming ? (
@@ -457,3 +709,4 @@ export default function HomePage() {
     </div>
   );
 }
+

@@ -8,15 +8,29 @@ import AulasPage from '@/pages/AulasPage';
 import MetricsDashboard from '@/pages/MetricsDashboard';
 import CalendarPage from '@/pages/CalendarPage';
 import NewsFeedPage from '@/pages/NewsFeedPage';
+import AdminPage from '@/pages/AdminPage';
 import { useChatStore } from '@/stores/chatStore';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useAuth } from '@/contexts/AuthContext';
 import { Menu } from 'lucide-react';
+import { useEffect } from 'react';
 
 export default function Index() {
   const { sidebarOpen, setSidebarOpen, activePage, setActivePage } = useChatStore();
+  const { isAdmin } = useAuth();
   const isMobile = useIsMobile();
 
+  useEffect(() => {
+    if (!isAdmin) return;
+    if (activePage === 'admin' || activePage === 'admin-insights' || activePage === 'admin-global' || activePage === 'admin-access') return;
+    setActivePage('admin-insights');
+  }, [isAdmin, activePage, setActivePage]);
+
   const renderPage = () => {
+    if (isAdmin && activePage !== 'admin' && activePage !== 'admin-insights' && activePage !== 'admin-global' && activePage !== 'admin-access') {
+      return <AdminPage tab="insights" />;
+    }
+
     switch (activePage) {
       case 'home':
         return <HomePage />;
@@ -34,6 +48,13 @@ export default function Index() {
         return <CalendarPage />;
       case 'news-feed':
         return <NewsFeedPage />;
+      case 'admin':
+      case 'admin-insights':
+        return <AdminPage tab="insights" />;
+      case 'admin-global':
+        return <AdminPage tab="global" />;
+      case 'admin-access':
+        return <AdminPage tab="access" />;
       default:
         return <ChatArea />;
     }

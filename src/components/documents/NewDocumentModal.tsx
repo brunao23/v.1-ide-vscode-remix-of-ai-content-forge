@@ -1,10 +1,24 @@
 import { Upload, FileText, X } from 'lucide-react';
-import { useState, useRef } from 'react';
+import { useRef, useState, type ChangeEvent } from 'react';
+
+export type NewDocumentPayload =
+  | {
+      mode: 'upload';
+      name: string;
+      type: string;
+      file: File;
+    }
+  | {
+      mode: 'paste';
+      name: string;
+      type: string;
+      content: string;
+    };
 
 interface NewDocumentModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onDocumentCreated: (doc: { name: string; type: string; content: string }) => void;
+  onDocumentCreated: (doc: NewDocumentPayload) => void;
 }
 
 const DOC_TYPES = [
@@ -13,6 +27,7 @@ const DOC_TYPES = [
   { value: 'icp-architect', label: 'Mapa do ICP' },
   { value: 'pillar-strategist', label: 'Pilares de Conteúdo' },
   { value: 'matrix-generator', label: 'Matriz de Conteúdo' },
+  { value: 'voz-de-marca', label: 'Voz de Marca' },
   { value: 'other', label: 'Outro' },
 ];
 
@@ -35,29 +50,40 @@ export default function NewDocumentModal({ isOpen, onClose, onDocumentCreated }:
     onClose();
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setSelectedFile(file);
-      setDocumentName(file.name.replace(/\.[^/.]+$/, ''));
-    }
+    if (!file) return;
+    setSelectedFile(file);
+    setDocumentName(file.name.replace(/\.[^/.]+$/, ''));
   };
 
-  const handleSave = async () => {
-    if (mode === 'upload' && selectedFile) {
-      const text = await selectedFile.text();
-      onDocumentCreated({ name: documentName, type: documentType, content: text });
-    } else if (mode === 'paste' && pastedText) {
-      onDocumentCreated({ name: documentName, type: documentType, content: pastedText });
+  const handleSave = () => {
+    if (mode === 'upload' && selectedFile && documentName.trim()) {
+      onDocumentCreated({
+        mode: 'upload',
+        name: documentName.trim(),
+        type: documentType,
+        file: selectedFile,
+      });
+      resetAndClose();
+      return;
     }
-    resetAndClose();
+
+    if (mode === 'paste' && pastedText.trim() && documentName.trim()) {
+      onDocumentCreated({
+        mode: 'paste',
+        name: documentName.trim(),
+        type: documentType,
+        content: pastedText.trim(),
+      });
+      resetAndClose();
+    }
   };
 
   return (
     <>
       <div className="fixed inset-0 bg-black/60 z-50" onClick={resetAndClose} />
       <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-lg bg-card rounded-2xl border border-border shadow-2xl flex flex-col overflow-hidden">
-        {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-border">
           <h2 className="text-lg font-semibold text-foreground">
             {mode === 'select' ? 'Novo documento' : mode === 'upload' ? 'Upload de arquivo' : 'Colar texto'}
@@ -67,7 +93,6 @@ export default function NewDocumentModal({ isOpen, onClose, onDocumentCreated }:
           </button>
         </div>
 
-        {/* Content */}
         <div className="p-6">
           {mode === 'select' && (
             <div className="grid grid-cols-2 gap-4">
@@ -80,7 +105,7 @@ export default function NewDocumentModal({ isOpen, onClose, onDocumentCreated }:
                 </div>
                 <div className="text-center">
                   <p className="font-medium text-foreground">Upload de arquivo</p>
-                  <p className="text-xs text-muted-foreground mt-1">.doc, .docx, .pdf, .md</p>
+                  <p className="text-xs text-muted-foreground mt-1">.pdf, .docx, .md, .txt</p>
                 </div>
               </button>
 
@@ -114,7 +139,13 @@ export default function NewDocumentModal({ isOpen, onClose, onDocumentCreated }:
                 </select>
               </div>
 
-              <input ref={fileInputRef} type="file" accept=".doc,.docx,.pdf,.md,.txt" className="hidden" onChange={handleFileChange} />
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.docx,.md,.txt"
+                className="hidden"
+                onChange={handleFileChange}
+              />
               <div
                 onClick={() => fileInputRef.current?.click()}
                 className="border-2 border-dashed border-border rounded-xl p-8 text-center cursor-pointer hover:border-primary hover:bg-primary/5 transition-all"
@@ -129,7 +160,7 @@ export default function NewDocumentModal({ isOpen, onClose, onDocumentCreated }:
                   <div className="flex flex-col items-center gap-2">
                     <Upload className="w-8 h-8 text-muted-foreground" />
                     <p className="text-sm text-muted-foreground">Arraste um arquivo ou clique para selecionar</p>
-                    <p className="text-xs text-muted-foreground">.doc, .docx, .pdf, .md</p>
+                    <p className="text-xs text-muted-foreground">.pdf, .docx, .md, .txt</p>
                   </div>
                 )}
               </div>
@@ -188,15 +219,14 @@ export default function NewDocumentModal({ isOpen, onClose, onDocumentCreated }:
           )}
         </div>
 
-        {/* Footer */}
         {mode !== 'select' && (
           <div className="flex items-center justify-between px-6 py-4 border-t border-border">
             <button onClick={() => setMode('select')} className="px-4 py-2 text-sm text-muted-foreground hover:text-foreground transition-colors">
-              ← Voltar
+              {'<- Voltar'}
             </button>
             <button
               onClick={handleSave}
-              disabled={mode === 'upload' ? !selectedFile : !pastedText || !documentName}
+              disabled={mode === 'upload' ? !selectedFile || !documentName.trim() : !pastedText.trim() || !documentName.trim()}
               className="px-6 py-2 bg-primary hover:bg-primary/90 disabled:bg-muted disabled:text-muted-foreground text-primary-foreground rounded-lg font-medium transition-colors"
             >
               Salvar documento
@@ -207,3 +237,4 @@ export default function NewDocumentModal({ isOpen, onClose, onDocumentCreated }:
     </>
   );
 }
+

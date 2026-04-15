@@ -18,15 +18,36 @@ serve(async (req) => {
     );
 
     const payload = await req.json();
+    const legacyTenantId = "00000000-0000-4000-8000-000000000001";
 
     // Support both single record and array
     const records = Array.isArray(payload) ? payload : [payload];
 
     for (const record of records) {
       const fields = record.fields || record;
+      const userId = String(fields["user_id"] || fields["Client ID"] || "").trim();
+      if (!userId) {
+        return new Response(JSON.stringify({ error: "user_id is required" }), {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+
+      let tenantId = String(fields["tenant_id"] || fields["Tenant ID"] || "").trim();
+      if (!tenantId) {
+        const { data: defaultTenantId, error: defaultTenantError } = await supabase.rpc(
+          "get_default_tenant_id",
+          { _user_id: userId },
+        );
+        if (defaultTenantError) {
+          console.error("Default tenant resolution error:", defaultTenantError);
+        }
+        tenantId = String(defaultTenantId || legacyTenantId);
+      }
 
       const metrics = {
-        user_id: fields["user_id"] || fields["Client ID"],
+        tenant_id: tenantId,
+        user_id: userId,
         period_month: parseInt(fields["period_month"] || fields["Month"]),
         period_year: parseInt(fields["period_year"] || fields["Year"]),
         total_new_revenue: fields["total_new_revenue"] ?? fields["Total NEW Revenue"] ?? null,
@@ -56,7 +77,7 @@ serve(async (req) => {
 
       const { error } = await supabase
         .from("client_metrics")
-        .upsert(metrics, { onConflict: "user_id,period_month,period_year" });
+        .upsert(metrics, { onConflict: "tenant_id,user_id,period_month,period_year" });
 
       if (error) {
         console.error("Upsert error:", error);

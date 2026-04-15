@@ -1,6 +1,5 @@
-import { useState, useRef, useCallback } from 'react';
-import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered, Check } from 'lucide-react';
-import { toast } from 'sonner';
+import { useState, type ReactNode } from 'react';
+import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered, Bookmark, Clock, Trash2 } from 'lucide-react';
 import { PlatformIcon, PLATFORM_LIST } from '@/components/market-research/PlatformIcons';
 import { useMarketResearch } from '@/hooks/useMarketResearch';
 import { SearchFilters, SearchType, Platform, PostType, SortBy, SortOrder, Post } from '@/types/marketResearch';
@@ -10,21 +9,23 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ResearchProgressBar from '@/components/market-research/ResearchProgressBar';
 
+type PageView = 'search' | 'favorites';
+
 const PERIOD_OPTIONS = [
-  { value: '1', label: 'Último dia' },
-  { value: '7', label: 'Últimos 7 dias' },
-  { value: '30', label: 'Últimos 30 dias' },
-  { value: '60', label: 'Últimos 60 dias' },
-  { value: '90', label: 'Últimos 90 dias' },
-  { value: '365', label: 'Últimos 365 dias' },
+  { value: '1', label: 'Ultimo dia' },
+  { value: '7', label: 'Ultimos 7 dias' },
+  { value: '30', label: 'Ultimos 30 dias' },
+  { value: '60', label: 'Ultimos 60 dias' },
+  { value: '90', label: 'Ultimos 90 dias' },
+  { value: '365', label: 'Ultimos 365 dias' },
 ];
 
 const SORT_OPTIONS: { value: SortBy; label: string }[] = [
   { value: 'engagement', label: 'Mais engajamento' },
   { value: 'likes', label: 'Mais curtidas' },
-  { value: 'comments', label: 'Mais comentários' },
+  { value: 'comments', label: 'Mais comentarios' },
   { value: 'shares', label: 'Mais compartilhamentos' },
-  { value: 'views', label: 'Mais visualizações' },
+  { value: 'views', label: 'Mais visualizacoes' },
   { value: 'recent', label: 'Mais recentes' },
 ];
 
@@ -32,14 +33,35 @@ interface Props {
   onBack: () => void;
 }
 
+function daysRemaining(savedAt: string): number {
+  const saved = new Date(savedAt).getTime();
+  const expires = saved + 7 * 86_400_000;
+  const remaining = Math.ceil((expires - Date.now()) / 86_400_000);
+  return Math.max(0, remaining);
+}
+
 export default function MarketResearchPage({ onBack }: Props) {
   const isMobile = useIsMobile();
   const {
-    posts, response, loading, loadingMore, error,
-    sortBy, sortOrder, setSortBy, setSortOrder,
-    search, loadMore, savePost, hasMore,
+    posts,
+    response,
+    loading,
+    loadingMore,
+    error,
+    sortBy,
+    sortOrder,
+    setSortBy,
+    setSortOrder,
+    search,
+    loadMore,
+    savePost,
+    isPostSaved,
+    savedPosts,
+    savedPostsLoading,
+    hasMore,
   } = useMarketResearch();
 
+  const [pageView, setPageView] = useState<PageView>('search');
   const [tab, setTab] = useState<SearchType>('profile');
   const [platform, setPlatform] = useState<Platform>('instagram');
   const [username, setUsername] = useState('');
@@ -48,192 +70,61 @@ export default function MarketResearchPage({ onBack }: Props) {
   const [periodDays, setPeriodDays] = useState(30);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [resultsLimit, setResultsLimit] = useState<string>('');
-  const [webhookSent, setWebhookSent] = useState(false);
-  const [webhookError, setWebhookError] = useState(false);
-  const [webhookStatus, setWebhookStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [isSearching, setIsSearching] = useState(false);
-  const [verifyingConnection, setVerifyingConnection] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
-  const stopPolling = useCallback(() => {
-    if (pollingRef.current) {
-      clearInterval(pollingRef.current);
-      pollingRef.current = null;
-    }
-  }, []);
-
-  const pollForCallback = useCallback((requestId: string) => {
-    const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-    const url = `https://${projectId}.supabase.co/functions/v1/pesquisa-status?requestId=${requestId}`;
-    
-    setVerifyingConnection(true);
-    let elapsed = 0;
-    const POLL_INTERVAL = 1000;
-    const TIMEOUT = 10000;
-
-    pollingRef.current = setInterval(async () => {
-      elapsed += POLL_INTERVAL;
-
-      try {
-        const res = await fetch(url);
-        const data = await res.json();
-
-        if (data.confirmed) {
-          stopPolling();
-          setVerifyingConnection(false);
-          setWebhookStatus('success');
-          setWebhookSent(true);
-          setTimeout(() => setWebhookStatus('idle'), 4000);
-          return;
-        }
-      } catch {
-        // Network error — continue polling
-      }
-
-      if (elapsed >= TIMEOUT) {
-        stopPolling();
-        setVerifyingConnection(false);
-        setWebhookStatus('error');
-        setWebhookError(true);
-        setIsSearching(false);
-      }
-    }, POLL_INTERVAL);
-  }, [stopPolling]);
 
   const postTypeOptions = platform === 'instagram'
     ? [
         { value: 'all', label: 'Todos' },
-        { value: 'posts', label: 'Posts' },
+        { value: 'carousel', label: 'Carrossel' },
         { value: 'reels', label: 'Reels' },
-        { value: 'comments', label: 'Comentários' },
-        { value: 'details', label: 'Detalhes' },
-        { value: 'mentions', label: 'Menções' },
+        { value: 'image', label: 'Imagem' },
+        { value: 'video', label: 'Video' },
       ]
-    : platform === 'youtube'
-    ? [{ value: 'all', label: 'Todos' }]
-    : [{ value: 'all', label: 'Todos' }];
+    : platform === 'tiktok'
+    ? [
+        { value: 'all', label: 'Todos' },
+        { value: 'video', label: 'Video' },
+      ]
+    : [{ value: 'video', label: 'Video' }];
+
+  const isYouTube = platform === 'youtube';
+  const isTikTok = platform === 'tiktok';
+  const profileLabel = isYouTube ? 'Pesquisa Canal' : 'Pesquisa Perfil';
+  const keywordLabel = isYouTube ? 'Pesquisa Videos' : 'Pesquisa Palavra-chave';
+  const userFieldLabel = isYouTube ? 'Canal' : 'Usuario';
+  const userFieldDesc = isYouTube ? 'Handle ou nome do canal' : isTikTok ? 'Nome de usuario do TikTok' : 'Nome de usuario ou URL do perfil';
+  const userFieldPlaceholder = isYouTube ? '@canal ou nome' : isTikTok ? '@username' : '@username';
+  const contentLabel = isYouTube ? 'videos' : 'posts';
+  const limitLabel = isYouTube ? 'Limite de videos' : 'Limite de posts';
+  const limitDesc = isYouTube ? 'Maximo de resultados (1-50)' : 'Maximo de resultados (1-20)';
+  const limitMax = isYouTube ? 50 : 20;
 
   const handleSearch = async () => {
-    if (isSearching) return;
+    if (isSearching || loading) return;
     const inputValue = tab === 'profile' ? username.trim() : keyword.trim();
     if (!inputValue) return;
 
     setIsSearching(true);
-    setWebhookStatus('idle');
-    setWebhookError(false);
-
-    const limitNum = resultsLimit ? Math.min(20, Math.max(1, parseInt(resultsLimit, 10) || 20)) : 20;
-
-    const cleanUsername = (u: string) => u.trim().replace(/^@/, '');
-
-    const calcDate = (days: number): string => {
-      const d = new Date();
-      d.setDate(d.getDate() - days);
-      return d.toISOString().split('T')[0];
-    };
-
-    // Generate unique request ID for this search
-    const requestId = crypto.randomUUID();
-
-    let payload: Record<string, any>;
-
-    if (platform === 'instagram') {
-      const user = cleanUsername(inputValue);
-      const directUrl = user.includes('instagram.com')
-        ? (user.endsWith('/') ? user : user + '/')
-        : `https://www.instagram.com/${user}/`;
-
-      const resultsTypeMap: Record<string, string> = {
-        all: 'posts', posts: 'posts', reels: 'reels',
-        comments: 'comments', details: 'details', mentions: 'mentions',
-      };
-
-      payload = {
-        requestId,
-        plataforma: 'instagram',
-        addParentData: false,
-        directUrls: [directUrl],
-        onlyPostsNewerThan: calcDate(periodDays),
-        resultsLimit: limitNum,
-        resultsType: resultsTypeMap[postType] || 'posts',
-        searchLimit: limitNum,
-        searchType: 'hashtag',
-      };
-    } else if (platform === 'tiktok') {
-      payload = {
-        requestId,
-        plataforma: 'tiktok',
-        commentsPerPost: 0,
-        excludePinnedPosts: false,
-        hashtags: [],
-        maxFollowersPerProfile: 0,
-        maxFollowingPerProfile: 0,
-        maxRepliesPerComment: 0,
-        profiles: [cleanUsername(inputValue)],
-        proxyCountryCode: 'None',
-        resultsPerPage: limitNum,
-        scrapeRelatedVideos: false,
-        shouldDownloadAvatars: false,
-        shouldDownloadCovers: false,
-        shouldDownloadMusicCovers: false,
-        shouldDownloadSlideshowImages: false,
-        shouldDownloadVideos: false,
-      };
-    } else {
-      // YouTube
-      const isUrl = inputValue.includes('youtube.com') || inputValue.includes('youtu.be');
-      payload = {
-        requestId,
-        plataforma: 'youtube',
-        downloadSubtitles: false,
-        hasCC: false,
-        hasLocation: false,
-        hasSubtitles: false,
-        is360: false,
-        is3D: false,
-        is4K: false,
-        isBought: false,
-        isHD: false,
-        isHDR: false,
-        isLive: false,
-        isVR180: false,
-        maxResultStreams: 0,
-        maxResults: limitNum,
-        maxResultsShorts: 0,
-        preferAutoGeneratedSubtitles: false,
-        saveSubsToKVS: false,
-        searchQueries: isUrl ? [] : [inputValue],
-        startUrls: isUrl ? [{ url: inputValue }] : [],
-      };
-    }
-
-    try {
-      const res = await fetch('https://hook.us1.make.com/rgp4sp2c0xxuv9hq3fft1my1jqxxytsg', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error('Webhook error');
-
-      // Start polling for Make.com callback confirmation
-      pollForCallback(requestId);
-    } catch (err) {
-      setWebhookStatus('error');
-      setWebhookError(true);
-      setIsSearching(false);
-      return;
-    }
+    const limitNum = resultsLimit ? Math.min(limitMax, Math.max(1, parseInt(resultsLimit, 10) || 20)) : 20;
 
     const filters: SearchFilters = {
-      searchType: tab, platform, username, keyword, postType, periodDays,
+      searchType: tab,
+      platform,
+      username,
+      keyword,
+      postType,
+      periodDays,
       resultsLimit: limitNum,
     };
-    search(filters);
-    setIsSearching(false);
+
+    try {
+      await search(filters);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
-  const searched = posts.length > 0 || error || loading;
+  const searched = posts.length > 0 || Boolean(error) || loading || isSearching;
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-background overflow-hidden">
@@ -243,315 +134,100 @@ export default function MarketResearchPage({ onBack }: Props) {
           <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors" aria-label="Voltar">
             <ArrowLeft className="w-5 h-5 text-foreground" strokeWidth={1.5} />
           </button>
-          <div>
+          <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold text-foreground">Pesquisa de Mercado</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Analise posts de concorrentes e tendências do seu nicho</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Analise de posts de concorrentes e tendencias do seu nicho</p>
           </div>
+        </div>
+
+        {/* Page tabs: Pesquisa | Favoritos */}
+        <div className="flex items-center gap-1 mt-4">
+          <button
+            onClick={() => setPageView('search')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+              pageView === 'search'
+                ? 'bg-secondary text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-secondary/50'
+            }`}
+          >
+            <Search className="w-4 h-4" strokeWidth={1.5} />
+            Pesquisa
+          </button>
+          <button
+            onClick={() => setPageView('favorites')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+              pageView === 'favorites'
+                ? 'bg-secondary text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-secondary/50'
+            }`}
+          >
+            <Bookmark className="w-4 h-4" strokeWidth={1.5} />
+            Favoritos
+            {savedPosts.length > 0 && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
+                {savedPosts.length}
+              </span>
+            )}
+          </button>
         </div>
       </div>
 
+      {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        <div className="max-w-[640px] mx-auto px-6 py-8 space-y-8">
-          {/* Intro section */}
-          <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-            <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
-              Análise de Competidores
-            </h2>
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                Envie as URLs dos perfis dos seus concorrentes e receba uma planilha completa com todas as transcrições e análises de conteúdo.
-              </p>
-              <ul className="space-y-1.5 text-sm text-muted-foreground">
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-0.5">•</span>
-                  <span>Acesso 24/7, use o quanto quiser</span>
-                </li>
-                <li className="flex items-start gap-2">
-                  <span className="text-amber-400 mt-0.5">•</span>
-                  <span>Funciona para YouTube, Instagram e LinkedIn</span>
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          {/* Tabs */}
-          <div className="flex items-center gap-6">
-            <button
-              onClick={() => setTab('profile')}
-              className={`text-sm pb-1.5 transition-colors border-b-2 ${
-                tab === 'profile'
-                  ? 'text-foreground font-medium border-foreground'
-                  : 'text-muted-foreground border-transparent hover:text-foreground/70'
-              }`}
-            >
-              Pesquisa Perfil
-            </button>
-            <button
-              onClick={() => setTab('keyword')}
-              className={`text-sm pb-1.5 transition-colors border-b-2 ${
-                tab === 'keyword'
-                  ? 'text-foreground font-medium border-foreground'
-                  : 'text-muted-foreground border-transparent hover:text-foreground/70'
-              }`}
-            >
-              Pesquisa Palavra-chave
-            </button>
-          </div>
-
-          {/* Filter rows — Claude connector list style */}
-          <div className="space-y-0">
-            {/* Plataforma */}
-            <ConnectorRow
-              icon={<PlatformIcon platform={platform} size={36} />}
-              label="Plataforma"
-              description="Rede social para pesquisa"
-            >
-              <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
-                <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent className="min-w-[220px]">
-                  {PLATFORM_LIST.map(p => (
-                    <SelectItem key={p.value} value={p.value}>
-                      <div className="flex items-center gap-2.5">
-                        <PlatformIcon platform={p.value} size={24} />
-                        <span>{p.label}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </ConnectorRow>
-
-            <RowDivider />
-
-            {/* Usuário / Palavra-chave */}
-            {tab === 'profile' ? (
-              <ConnectorRow
-                icon={<IconCircle><User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-                label="Usuário"
-                description="Nome de usuário ou URL do perfil"
-              >
-                <input
-                  type="text"
-                  value={username}
-                  onChange={e => setUsername(e.target.value)}
-                  placeholder="@username"
-                  className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                />
-              </ConnectorRow>
-            ) : (
-              <ConnectorRow
-                icon={<IconCircle><Search className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-                label="Palavra-chave"
-                description="Termo para buscar conteúdo"
-              >
-                <input
-                  type="text"
-                  value={keyword}
-                  onChange={e => setKeyword(e.target.value)}
-                  placeholder="Ex: marketing digital"
-                  className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
-                  onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                />
-              </ConnectorRow>
-            )}
-
-            <RowDivider />
-
-            {/* Tipo de Post */}
-            <ConnectorRow
-              icon={<IconCircle><Image className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-              label="Tipo de Post"
-              description="Filtrar por formato de conteúdo"
-            >
-              <Select value={postType} onValueChange={(v) => setPostType(v as PostType)}>
-                <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {postTypeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </ConnectorRow>
-
-            <RowDivider />
-
-            {/* Período */}
-            <ConnectorRow
-              icon={<IconCircle><Calendar className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-              label="Período"
-              description="Intervalo de tempo da pesquisa"
-            >
-              <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
-                <SelectTrigger className="h-9 w-auto min-w-[160px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERIOD_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </ConnectorRow>
-
-            <RowDivider />
-
-            {/* Limite */}
-            <ConnectorRow
-              icon={<IconCircle><ListOrdered className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-              label="Limite de posts"
-              description="Máximo de resultados (1-20)"
-            >
-              <input
-                type="number"
-                min={1}
-                max={20}
-                value={resultsLimit}
-                onChange={e => setResultsLimit(e.target.value)}
-                placeholder="20"
-                className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground text-center placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[72px]"
-              />
-            </ConnectorRow>
-          </div>
-
-          {/* Search Button */}
-          <div className="flex justify-end">
-            <button
-              onClick={handleSearch}
-              disabled={isSearching || loading || verifyingConnection}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {(isSearching || loading || verifyingConnection) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
-              {verifyingConnection ? 'Verificando...' : (isSearching || loading) ? 'Processando...' : 'Pesquisar'}
-            </button>
-          </div>
-
-          {/* Verifying connection status */}
-          {verifyingConnection && (
-            <div className="rounded-lg border border-border/40 bg-secondary/30 px-4 py-3 animate-in fade-in duration-300">
-              <p className="text-sm text-muted-foreground flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                Verificando conexão...
-              </p>
-            </div>
-          )}
-
-          {/* Confirmed — success feedback */}
-          {webhookStatus === 'success' && !verifyingConnection && (
-            <div className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 animate-in fade-in duration-300">
-              <p className="text-sm text-primary flex items-center gap-2">
-                <Check className="w-4 h-4" strokeWidth={2} />
-                Conexão confirmada! Coletando dados...
-              </p>
-            </div>
-          )}
-
-          {webhookStatus === 'error' && !verifyingConnection && (
-            <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3 animate-in fade-in duration-300">
-              <p className="text-sm text-destructive flex items-center gap-2">
-                <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
-                Ops! Houve um erro. Tente novamente ou verifique com o administrador.
-              </p>
-            </div>
-          )}
-
-          {/* Progress Bar — only after confirmed */}
-          <ResearchProgressBar
-            active={webhookSent}
-            onComplete={() => setWebhookSent(false)}
+        {pageView === 'search' ? (
+          <SearchView
+            isMobile={isMobile}
+            posts={posts}
+            response={response}
+            loading={loading}
+            loadingMore={loadingMore}
+            error={error}
+            sortBy={sortBy}
+            sortOrder={sortOrder}
+            setSortBy={setSortBy}
+            setSortOrder={setSortOrder}
+            loadMore={loadMore}
+            hasMore={hasMore}
+            searched={searched}
+            isSearching={isSearching}
+            tab={tab}
+            setTab={setTab}
+            platform={platform}
+            setPlatform={(p) => { setPlatform(p); setPostType(p === 'youtube' ? 'video' : 'all'); }}
+            username={username}
+            setUsername={setUsername}
+            keyword={keyword}
+            setKeyword={setKeyword}
+            postType={postType}
+            setPostType={setPostType}
+            periodDays={periodDays}
+            setPeriodDays={setPeriodDays}
+            resultsLimit={resultsLimit}
+            setResultsLimit={setResultsLimit}
+            handleSearch={handleSearch}
+            setSelectedPost={setSelectedPost}
+            postTypeOptions={postTypeOptions}
+            isYouTube={isYouTube}
+            isTikTok={isTikTok}
+            profileLabel={profileLabel}
+            keywordLabel={keywordLabel}
+            userFieldLabel={userFieldLabel}
+            userFieldDesc={userFieldDesc}
+            userFieldPlaceholder={userFieldPlaceholder}
+            contentLabel={contentLabel}
+            limitLabel={limitLabel}
+            limitDesc={limitDesc}
+            limitMax={limitMax}
           />
-
-          {/* Loading — only show if no webhook status visible */}
-          {loading && !webhookSent && webhookStatus === 'idle' && (
-            <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-              <Loader2 className="w-8 h-8 text-muted-foreground animate-spin" />
-              <p className="text-sm text-muted-foreground">
-                Raspando dados{tab === 'profile' ? ` de @${username}` : ''}...
-              </p>
-            </div>
-          )}
-
-          {/* Error — only show webhook errors when no status banner is visible */}
-          {webhookError && webhookStatus !== 'error' && !webhookSent && (
-            <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
-              <AlertTriangle className="w-8 h-8 text-destructive/70" strokeWidth={1.5} />
-              <p className="text-sm text-foreground">Não foi possível completar a pesquisa</p>
-              <p className="text-xs text-muted-foreground">O sistema pode estar fora do ar. Tente novamente ou acione o administrador.</p>
-              <button onClick={() => { setWebhookError(false); setWebhookStatus('idle'); }} className="px-4 py-1.5 rounded-lg border border-border/50 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground">
-                Tentar novamente
-              </button>
-            </div>
-          )}
-
-          {/* Empty */}
-          {!searched && webhookStatus === 'idle' && (
-            <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
-              <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
-                <Search className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Pesquise perfis ou palavras-chave para analisar conteúdo
-              </p>
-            </div>
-          )}
-
-          {/* Results */}
-          {posts.length > 0 && !loading && (
-            <>
-              <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
-                <p className="text-xs text-muted-foreground">
-                  {response?.pagination?.total || posts.length} posts encontrados
-                </p>
-                <div className="flex items-center gap-2">
-                  <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
-                    <SelectTrigger className="w-auto min-w-[160px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {SORT_OPTIONS.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                  <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
-                    <SelectTrigger className="w-auto min-w-[80px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="desc">↓ Desc</SelectItem>
-                      <SelectItem value="asc">↑ Asc</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-
-              <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}`}>
-                {posts.map(post => (
-                  <PostCard key={post.id} post={post} onClick={() => window.open(post.post_url, '_blank', 'noopener,noreferrer')} />
-                ))}
-              </div>
-
-              {hasMore && (
-                <div className="flex justify-center pt-4">
-                  <button
-                    onClick={loadMore}
-                    disabled={loadingMore}
-                    className="flex items-center gap-2 px-5 py-2 rounded-lg border border-border/40 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground disabled:opacity-50"
-                  >
-                    {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                    {loadingMore ? 'Carregando...' : 'Carregar mais'}
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-
-          {/* No results */}
-          {!loading && !error && searched && posts.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-              <p className="text-sm text-foreground">Nenhum post encontrado</p>
-              <p className="text-xs text-muted-foreground">Tente ajustar os filtros ou pesquisar outro perfil.</p>
-            </div>
-          )}
-        </div>
+        ) : (
+          <FavoritesView
+            isMobile={isMobile}
+            savedPosts={savedPosts}
+            savedPostsLoading={savedPostsLoading}
+            setSelectedPost={setSelectedPost}
+            savePost={savePost}
+          />
+        )}
       </div>
 
       <PostDetailModal
@@ -559,14 +235,474 @@ export default function MarketResearchPage({ onBack }: Props) {
         open={!!selectedPost}
         onClose={() => setSelectedPost(null)}
         onSave={savePost}
+        isSaved={selectedPost ? isPostSaved(selectedPost.id) : false}
       />
     </div>
   );
 }
 
-/* Connector-style row: large icon, label+description, action on right */
-function ConnectorRow({ icon, label, description, children }: { 
-  icon: React.ReactNode; label: string; description?: string; children: React.ReactNode 
+/* ─── Favorites View ─── */
+function FavoritesView({
+  isMobile,
+  savedPosts,
+  savedPostsLoading,
+  setSelectedPost,
+  savePost,
+}: {
+  isMobile: boolean;
+  savedPosts: (Post & { saved_at: string })[];
+  savedPostsLoading: boolean;
+  setSelectedPost: (p: Post) => void;
+  savePost: (p: Post) => void;
+}) {
+  return (
+    <div className="max-w-[640px] mx-auto px-6 py-8 space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-base font-medium text-foreground">Posts Salvos</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Posts ficam salvos por 7 dias e depois sao removidos automaticamente
+          </p>
+        </div>
+        {savedPosts.length > 0 && (
+          <span className="text-xs text-muted-foreground">{savedPosts.length} salvo{savedPosts.length !== 1 ? 's' : ''}</span>
+        )}
+      </div>
+
+      {savedPostsLoading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {!savedPostsLoading && savedPosts.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-16 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
+            <Bookmark className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+          </div>
+          <p className="text-sm text-muted-foreground">Nenhum post salvo ainda</p>
+          <p className="text-xs text-muted-foreground max-w-[280px]">
+            Pesquise conteudo e clique em "Salvar" para guardar posts de referencia aqui por ate 7 dias
+          </p>
+        </div>
+      )}
+
+      {!savedPostsLoading && savedPosts.length > 0 && (
+        <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}`}>
+          {savedPosts.map((post) => {
+            const days = daysRemaining(post.saved_at);
+            return (
+              <div key={post.id} className="relative group">
+                <PostCard
+                  post={post}
+                  onClick={() => setSelectedPost(post)}
+                />
+                {/* Expiry badge + remove button */}
+                <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none">
+                  <span className={`pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium backdrop-blur-sm ${
+                    days <= 1 ? 'bg-destructive/80 text-white' : 'bg-background/80 text-muted-foreground'
+                  }`}>
+                    <Clock className="w-3 h-3" />
+                    {days <= 0 ? 'Expirando' : days === 1 ? '1 dia' : `${days} dias`}
+                  </span>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      void savePost(post);
+                    }}
+                    className="pointer-events-auto p-1 rounded bg-background/80 backdrop-blur-sm hover:bg-destructive/80 hover:text-white text-muted-foreground transition-colors opacity-0 group-hover:opacity-100"
+                    title="Remover dos salvos"
+                    aria-label="Remover dos salvos"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Search View ─── */
+function SearchView({
+  isMobile,
+  posts,
+  response,
+  loading,
+  loadingMore,
+  error,
+  sortBy,
+  sortOrder,
+  setSortBy,
+  setSortOrder,
+  loadMore,
+  hasMore,
+  searched,
+  isSearching,
+  tab,
+  setTab,
+  platform,
+  setPlatform,
+  username,
+  setUsername,
+  keyword,
+  setKeyword,
+  postType,
+  setPostType,
+  periodDays,
+  setPeriodDays,
+  resultsLimit,
+  setResultsLimit,
+  handleSearch,
+  setSelectedPost,
+  postTypeOptions,
+  isYouTube,
+  isTikTok,
+  profileLabel,
+  keywordLabel,
+  userFieldLabel,
+  userFieldDesc,
+  userFieldPlaceholder,
+  contentLabel,
+  limitLabel,
+  limitDesc,
+  limitMax,
+}: {
+  isMobile: boolean;
+  posts: Post[];
+  response: any;
+  loading: boolean;
+  loadingMore: boolean;
+  error: string | null;
+  sortBy: SortBy;
+  sortOrder: SortOrder;
+  setSortBy: (v: SortBy) => void;
+  setSortOrder: (v: SortOrder) => void;
+  loadMore: () => void;
+  hasMore: boolean;
+  searched: boolean;
+  isSearching: boolean;
+  tab: SearchType;
+  setTab: (v: SearchType) => void;
+  platform: Platform;
+  setPlatform: (v: Platform) => void;
+  username: string;
+  setUsername: (v: string) => void;
+  keyword: string;
+  setKeyword: (v: string) => void;
+  postType: PostType;
+  setPostType: (v: PostType) => void;
+  periodDays: number;
+  setPeriodDays: (v: number) => void;
+  resultsLimit: string;
+  setResultsLimit: (v: string) => void;
+  handleSearch: () => void;
+  setSelectedPost: (p: Post) => void;
+  postTypeOptions: { value: string; label: string }[];
+  isYouTube: boolean;
+  isTikTok: boolean;
+  profileLabel: string;
+  keywordLabel: string;
+  userFieldLabel: string;
+  userFieldDesc: string;
+  userFieldPlaceholder: string;
+  contentLabel: string;
+  limitLabel: string;
+  limitDesc: string;
+  limitMax: number;
+}) {
+  return (
+    <div className="max-w-[640px] mx-auto px-6 py-8 space-y-8">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
+        <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
+          Analise de Competidores
+        </h2>
+        <div className="space-y-3">
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Envie perfis ou palavras-chave e receba analise estruturada com dados raspados via Apify.
+          </p>
+          <ul className="space-y-1.5 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <span className="text-amber-400 mt-0.5">•</span>
+              <span>Processo automatico sem dependencias de webhook externo</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-amber-400 mt-0.5">•</span>
+              <span>Suporte para YouTube, Instagram e TikTok</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-6">
+        <button
+          onClick={() => setTab('profile')}
+          className={`text-sm pb-1.5 transition-colors border-b-2 ${
+            tab === 'profile'
+              ? 'text-foreground font-medium border-foreground'
+              : 'text-muted-foreground border-transparent hover:text-foreground/70'
+          }`}
+        >
+          {profileLabel}
+        </button>
+        <button
+          onClick={() => setTab('keyword')}
+          className={`text-sm pb-1.5 transition-colors border-b-2 ${
+            tab === 'keyword'
+              ? 'text-foreground font-medium border-foreground'
+              : 'text-muted-foreground border-transparent hover:text-foreground/70'
+          }`}
+        >
+          {keywordLabel}
+        </button>
+      </div>
+
+      <div className="space-y-0">
+        <ConnectorRow
+          icon={<PlatformIcon platform={platform} size={36} />}
+          label="Plataforma"
+          description="Rede social para pesquisa"
+        >
+          <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+            <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="min-w-[220px]">
+              {PLATFORM_LIST.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  <div className="flex items-center gap-2.5">
+                    <PlatformIcon platform={p.value} size={24} />
+                    <span>{p.label}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </ConnectorRow>
+
+        <RowDivider />
+
+        {tab === 'profile' ? (
+          <ConnectorRow
+            icon={<IconCircle><User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
+            label={userFieldLabel}
+            description={userFieldDesc}
+          >
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder={userFieldPlaceholder}
+              className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
+              onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
+            />
+          </ConnectorRow>
+        ) : (
+          <ConnectorRow
+            icon={<IconCircle><Search className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
+            label="Palavra-chave"
+            description="Termo para buscar conteudo"
+          >
+            <input
+              type="text"
+              value={keyword}
+              onChange={(e) => setKeyword(e.target.value)}
+              placeholder="Ex: marketing digital"
+              className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
+              onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
+            />
+          </ConnectorRow>
+        )}
+
+        <RowDivider />
+
+        <ConnectorRow
+          icon={<IconCircle><Image className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
+          label={isYouTube ? 'Tipo de Conteudo' : 'Tipo de Post'}
+          description={isYouTube ? 'Formato do conteudo' : 'Filtrar por formato de conteudo'}
+        >
+          <Select value={postType} onValueChange={(v) => setPostType(v as PostType)}>
+            <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {postTypeOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </ConnectorRow>
+
+        <RowDivider />
+
+        <ConnectorRow
+          icon={<IconCircle><Calendar className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
+          label="Periodo"
+          description="Intervalo de tempo da pesquisa"
+        >
+          <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
+            <SelectTrigger className="h-9 w-auto min-w-[160px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </ConnectorRow>
+
+        <RowDivider />
+
+        <ConnectorRow
+          icon={<IconCircle><ListOrdered className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
+          label={limitLabel}
+          description={limitDesc}
+        >
+          <input
+            type="number"
+            min={1}
+            max={limitMax}
+            value={resultsLimit}
+            onChange={(e) => setResultsLimit(e.target.value)}
+            placeholder="20"
+            className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground text-center placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[72px]"
+          />
+        </ConnectorRow>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={() => void handleSearch()}
+          disabled={isSearching || loading}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {(isSearching || loading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
+          {(isSearching || loading) ? 'Processando...' : 'Pesquisar'}
+        </button>
+      </div>
+
+      <ResearchProgressBar active={isSearching || loading} />
+
+      {error && (
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <p className="text-sm text-destructive flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
+            {error}
+          </p>
+        </div>
+      )}
+
+      {!searched && (
+        <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
+            <Search className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Pesquise perfis ou palavras-chave para analisar conteudo
+          </p>
+        </div>
+      )}
+
+      {posts.length > 0 && !loading && (
+        <>
+          {response?.metadata && (
+            <div className="rounded-xl border border-border/50 bg-card/80 px-4 py-3">
+              <div className="flex items-center gap-3">
+                {response.metadata.profile_picture ? (
+                  <img
+                    src={response.metadata.profile_picture}
+                    alt={response.metadata.username}
+                    className="w-10 h-10 rounded-full object-cover"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+                    <User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">@{response.metadata.username}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {response.metadata.followers.toLocaleString('pt-BR')} {isYouTube ? 'inscritos' : 'seguidores'} • {response.metadata.total_posts.toLocaleString('pt-BR')} {contentLabel}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
+            <p className="text-xs text-muted-foreground">
+              {response?.pagination?.total || posts.length} {contentLabel} encontrados
+            </p>
+            <div className="flex items-center gap-2">
+              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+                <SelectTrigger className="w-auto min-w-[160px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+                <SelectTrigger className="w-auto min-w-[80px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="desc">Desc</SelectItem>
+                  <SelectItem value="asc">Asc</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}`}>
+            {posts.map((post) => (
+              <PostCard
+                key={post.id}
+                post={post}
+                onClick={() => setSelectedPost(post)}
+              />
+            ))}
+          </div>
+
+          {hasMore && (
+            <div className="flex justify-center pt-4">
+              <button
+                onClick={loadMore}
+                disabled={loadingMore}
+                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-border/40 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground disabled:opacity-50"
+              >
+                {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                {loadingMore ? 'Carregando...' : 'Carregar mais'}
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {!loading && !error && searched && posts.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+          <p className="text-sm text-foreground">Nenhum {isYouTube ? 'video' : 'post'} encontrado</p>
+          <p className="text-xs text-muted-foreground">
+            Tente aumentar o periodo da busca (ex.: 365 dias), ajustar os filtros ou pesquisar outro perfil.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Shared UI Components ─── */
+function ConnectorRow({
+  icon,
+  label,
+  description,
+  children,
+}: {
+  icon: ReactNode;
+  label: string;
+  description?: string;
+  children: ReactNode;
 }) {
   return (
     <div className="flex items-center gap-4 py-5">
@@ -580,8 +716,7 @@ function ConnectorRow({ icon, label, description, children }: {
   );
 }
 
-/* Circular icon wrapper to match PlatformIcon size */
-function IconCircle({ children }: { children: React.ReactNode }) {
+function IconCircle({ children }: { children: ReactNode }) {
   return (
     <div className="w-9 h-9 rounded-[8px] bg-secondary/60 flex items-center justify-center shrink-0">
       {children}
@@ -589,7 +724,6 @@ function IconCircle({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* Subtle divider */
 function RowDivider() {
   return <div className="border-t border-border/30" />;
 }

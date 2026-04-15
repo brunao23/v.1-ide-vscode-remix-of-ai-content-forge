@@ -11,14 +11,22 @@ export interface Agent {
   order: number;
 }
 
+export interface WebSource {
+  title: string;
+  url: string;
+  summary: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  agentId?: string;
   thinking?: string;
   thinkingDuration?: number;
   isStreaming?: boolean;
+  webSources?: WebSource[];
 }
 
 export interface Conversation {
@@ -57,6 +65,7 @@ export const AGENT_AVATARS: Record<string, string> = {
   'feedback-conteudo': '/assets/agents/gerente-marketing.png',
   'copywriter-campanhas': '/assets/agents/brand-book.png',
   'vsl-invisivel': '/assets/agents/roteirista.png',
+  'voz-de-marca': '/assets/agents/brand-book.png',
 };
 
 export const AGENTS: Agent[] = [
@@ -298,6 +307,23 @@ export const AGENTS: Agent[] = [
     outputDocument: 'VSL Script',
     starters: ['Criar minha VSL invisível', 'Montar roteiro de VSL'],
     order: 17,
+  },
+  {
+    id: 'voz-de-marca',
+    name: 'Voz de Marca',
+    description: 'Extrai seu estilo de comunicacao a partir de transcricoes e textos autorais para treinar seu Clone AI',
+    emoji: 'V',
+    color: '#22C55E',
+    recommendedModel: 'Claude Opus 4.5',
+    requires: ['brand-book'],
+    outputDocument: 'Guia de Voz de Marca',
+    starters: [
+      'Extrair minha voz de marca dos documentos',
+      'Criar meu guia de estilo de comunicacao',
+      'Quero treinar meu Clone AI com meu estilo',
+      'Analisar meu tom, personalidade e vicios de linguagem',
+    ],
+    order: 18,
   },
 ];
 

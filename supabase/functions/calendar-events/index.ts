@@ -1,4 +1,6 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+﻿import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { resolveRuntimeSecrets } from "../_shared/runtime-secrets.ts";
+import { HttpError, resolveTenantForRequest } from "../_shared/auth-tenant.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,13 +13,23 @@ serve(async (req) => {
   }
 
   try {
-    const API_KEY = Deno.env.get("ADDEVENT_API_KEY");
-    const CALENDAR_ID = Deno.env.get("ADDEVENT_CALENDAR_ID");
+    await resolveTenantForRequest({
+      req,
+      body: {},
+      allowImplicitDefault: true,
+    });
+
+    const runtimeSecrets = await resolveRuntimeSecrets([
+      "ADDEVENT_API_KEY",
+      "ADDEVENT_CALENDAR_ID",
+    ]);
+    const API_KEY = runtimeSecrets.ADDEVENT_API_KEY || null;
+    const CALENDAR_ID = runtimeSecrets.ADDEVENT_CALENDAR_ID || null;
 
     if (!API_KEY || !CALENDAR_ID) {
       return new Response(
-        JSON.stringify({ error: "ADDEVENT_API_KEY ou ADDEVENT_CALENDAR_ID não configurado" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify([]),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -39,7 +51,7 @@ serve(async (req) => {
         if (errJson.error_message) {
           errMsg = errJson.error_message;
           if (errMsg.includes("plan does not allow")) {
-            errMsg = "O plano da sua conta AddEvent não permite acesso à API. Faça upgrade do plano no dashboard do AddEvent ou torne o calendário público para usar o feed iCal.";
+            errMsg = "O plano da sua conta AddEvent nÃ£o permite acesso Ã  API. FaÃ§a upgrade do plano no dashboard do AddEvent ou torne o calendÃ¡rio pÃºblico para usar o feed iCal.";
           }
         }
       } catch {}
@@ -91,7 +103,12 @@ serve(async (req) => {
     console.error("Error:", error);
     return new Response(
       JSON.stringify({ error: String(error) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      {
+        status: error instanceof HttpError
+          ? error.status
+          : 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
     );
   }
 });
@@ -133,3 +150,4 @@ function parseICalToJSON(icalText: string) {
   }
   return events;
 }
+

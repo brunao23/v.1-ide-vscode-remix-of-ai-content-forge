@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+﻿import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -20,17 +20,13 @@ interface Lesson {
 }
 
 export function useLessons() {
-  const { user } = useAuth();
+  const { user, activeTenant } = useAuth();
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchData();
-  }, [user]);
-
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
 
     const [modulesRes, lessonsRes] = await Promise.all([
@@ -43,36 +39,43 @@ export function useLessons() {
     if (modulesRes.data) setModules(modulesRes.data);
     if (lessonsRes.data) setLessons(lessonsRes.data);
 
-    if (user) {
+    if (user && activeTenant?.id) {
       const { data: progress } = await supabase
         .from("user_lesson_progress")
         .select("lesson_id")
         .eq("user_id", user.id)
+        .eq("tenant_id", activeTenant.id)
         .eq("completed", true);
 
       if (progress) {
         setCompletedLessons(new Set(progress.map((p) => p.lesson_id)));
       }
+    } else {
+      setCompletedLessons(new Set());
     }
 
     setLoading(false);
-  };
+  }, [user, activeTenant?.id]);
+
+  useEffect(() => {
+    void fetchData();
+  }, [fetchData]);
 
   const getLessonsByModule = useCallback(
     (moduleId: string) =>
       lessons.filter((l) => l.module_id === moduleId).sort((a, b) => a.order_index - b.order_index),
-    [lessons]
+    [lessons],
   );
 
   const toggleCompleted = useCallback(
     async (lessonId: string) => {
-      if (!user) {
-        console.warn("User not authenticated – cannot track progress");
+      if (!user || !activeTenant?.id) {
+        console.warn("User or tenant not available - cannot track progress");
         return;
       }
+
       const isCompleted = completedLessons.has(lessonId);
 
-      // Optimistic update
       setCompletedLessons((prev) => {
         const next = new Set(prev);
         if (isCompleted) next.delete(lessonId);
@@ -85,18 +88,33 @@ export function useLessons() {
           .from("user_lesson_progress")
           .update({ completed: false, completed_at: null })
           .eq("user_id", user.id)
+          .eq("tenant_id", activeTenant.id)
           .eq("lesson_id", lessonId);
-      } else {
-        await supabase.from("user_lesson_progress").upsert({
+        return;
+      }
+
+      await supabase.from("user_lesson_progress").upsert(
+        {
           user_id: user.id,
+          tenant_id: activeTenant.id,
           lesson_id: lessonId,
           completed: true,
           completed_at: new Date().toISOString(),
-        });
-      }
+        },
+        { onConflict: "tenant_id,user_id,lesson_id" },
+      );
     },
-    [user, completedLessons]
+    [user, activeTenant?.id, completedLessons],
   );
 
-  return { modules, lessons, completedLessons, loading, getLessonsByModule, toggleCompleted, refetch: fetchData };
+  return {
+    modules,
+    lessons,
+    completedLessons,
+    loading,
+    getLessonsByModule,
+    toggleCompleted,
+    refetch: fetchData,
+  };
 }
+

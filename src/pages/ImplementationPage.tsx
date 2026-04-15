@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { ChevronDown, ChevronRight, Circle, CheckCircle2, RefreshCw, ExternalLink, AlertCircle } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 
 interface ImplementationTask {
@@ -36,9 +37,12 @@ function getTagColor(color: string): string {
 const SHEET_URL_KEY = 'implementation_sheet_url';
 
 export default function ImplementationPage() {
+  const { user, activeTenant } = useAuth();
   const [tasks, setTasks] = useState<ImplementationTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [checksLoading, setChecksLoading] = useState(false);
+  const [checkedTaskIds, setCheckedTaskIds] = useState<Set<string>>(new Set());
   const [sheetUrl, setSheetUrl] = useState(() => localStorage.getItem(SHEET_URL_KEY) || '');
   const [showSettings, setShowSettings] = useState(false);
   const [openMonths, setOpenMonths] = useState<Record<string, boolean>>({});
@@ -66,6 +70,74 @@ export default function ImplementationPage() {
   useEffect(() => {
     fetchTasks();
   }, []);
+
+  const fetchTaskChecks = async () => {
+    if (!user?.id || !activeTenant?.id) {
+      setCheckedTaskIds(new Set());
+      return;
+    }
+
+    setChecksLoading(true);
+    const { data, error } = await (supabase as any)
+      .from('implementation_task_checks')
+      .select('task_id, is_checked')
+      .eq('tenant_id', activeTenant.id)
+      .eq('user_id', user.id)
+      .eq('is_checked', true);
+
+    if (error) {
+      console.error('Erro ao carregar checks de implementação:', error);
+      toast.error('Não foi possível carregar seus checks de implementação');
+      setChecksLoading(false);
+      return;
+    }
+
+    const checkedIds = new Set<string>((data || []).map((row: any) => String(row.task_id)));
+    setCheckedTaskIds(checkedIds);
+    setChecksLoading(false);
+  };
+
+  useEffect(() => {
+    void fetchTaskChecks();
+  }, [user?.id, activeTenant?.id]);
+
+  const toggleTaskCheck = async (taskId: string) => {
+    if (!user?.id || !activeTenant?.id) {
+      toast.error('Faça login e selecione um tenant para marcar tarefas');
+      return;
+    }
+
+    const wasChecked = checkedTaskIds.has(taskId);
+    setCheckedTaskIds((prev) => {
+      const next = new Set(prev);
+      if (wasChecked) next.delete(taskId);
+      else next.add(taskId);
+      return next;
+    });
+
+    const payload = {
+      tenant_id: activeTenant.id,
+      user_id: user.id,
+      task_id: taskId,
+      is_checked: !wasChecked,
+      checked_at: !wasChecked ? new Date().toISOString() : null,
+    };
+
+    const { error } = await (supabase as any)
+      .from('implementation_task_checks')
+      .upsert(payload, { onConflict: 'tenant_id,user_id,task_id' });
+
+    if (error) {
+      console.error('Erro ao atualizar check da tarefa:', error);
+      toast.error('Falha ao atualizar checklist');
+      setCheckedTaskIds((prev) => {
+        const next = new Set(prev);
+        if (wasChecked) next.add(taskId);
+        else next.delete(taskId);
+        return next;
+      });
+    }
+  };
 
   // Sync from Google Sheet
   const handleSync = async () => {
@@ -117,7 +189,7 @@ export default function ImplementationPage() {
   }, [tasks]);
 
   const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => t.status === 'completed').length;
+  const completedTasks = tasks.filter((task) => checkedTaskIds.has(task.id)).length;
   const progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
   const toggleMonth = (title: string) => setOpenMonths(prev => ({ ...prev, [title]: !prev[title] }));
@@ -186,8 +258,8 @@ export default function ImplementationPage() {
           {/* Overall Progress */}
           <div className="rounded-xl border border-border bg-card p-5 mb-8">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-sm font-medium text-foreground">Overall Progress</span>
-              <span className="text-xs text-muted-foreground">{completedTasks} of {totalTasks} tasks completed</span>
+              <span className="text-sm font-medium text-foreground">Meu progresso no checklist</span>
+              <span className="text-xs text-muted-foreground">{completedTasks} de {totalTasks} tarefas concluídas</span>
             </div>
             <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
               <div
@@ -195,7 +267,9 @@ export default function ImplementationPage() {
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
-            <p className="text-xs text-muted-foreground mt-2 text-right">{progressPercent}%</p>
+            <p className="text-xs text-muted-foreground mt-2 text-right">
+              {checksLoading ? 'Atualizando checks...' : `${progressPercent}%`}
+            </p>
           </div>
 
           {/* Empty state */}
@@ -277,17 +351,26 @@ export default function ImplementationPage() {
                                       key={task.id}
                                       className="flex items-center gap-3 px-12 py-3 border-b border-border last:border-b-0 hover:bg-secondary/20 transition-colors"
                                     >
-                                      <div className="shrink-0">
-                                        {task.status === 'completed' ? (
+                                      <button
+                                        type="button"
+                                        className="shrink-0"
+                                        onClick={() => void toggleTaskCheck(task.id)}
+                                        title={checkedTaskIds.has(task.id) ? 'Desmarcar tarefa' : 'Marcar tarefa como concluída'}
+                                      >
+                                        {checkedTaskIds.has(task.id) ? (
                                           <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                                         ) : (
                                           <Circle className={`w-4 h-4 ${task.status === 'in-progress' ? 'text-amber-400' : 'text-muted-foreground/40'}`} />
                                         )}
-                                      </div>
-                                      <span className="text-xs text-muted-foreground w-[70px] shrink-0">
-                                        {task.status === 'completed' ? 'Completed' : task.status === 'in-progress' ? 'In progress' : 'Not started'}
+                                      </button>
+                                      <span className="text-xs text-muted-foreground w-[108px] shrink-0">
+                                        {checkedTaskIds.has(task.id)
+                                          ? 'Concluída'
+                                          : task.status === 'in-progress'
+                                            ? 'Em progresso'
+                                            : 'Não iniciada'}
                                       </span>
-                                      <span className={`text-sm flex-1 ${task.status === 'completed' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
+                                      <span className={`text-sm flex-1 ${checkedTaskIds.has(task.id) ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                                         {task.task_title}
                                       </span>
                                       <div className="hidden sm:flex items-center gap-1.5 shrink-0">

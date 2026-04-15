@@ -120,7 +120,7 @@ function aggregateMetrics(data: ClientMetrics[]): ClientMetrics | null {
 }
 
 export function useMetrics(period: string, targetUserId?: string) {
-  const { user } = useAuth();
+  const { user, activeTenant } = useAuth();
   const [metrics, setMetrics] = useState<ClientMetrics | null>(null);
   const [previousMetrics, setPreviousMetrics] = useState<ClientMetrics | null>(null);
   const [history, setHistory] = useState<ClientMetrics[]>([]);
@@ -138,6 +138,10 @@ export function useMetrics(period: string, targetUserId?: string) {
       .select('*')
       .order('period_year', { ascending: true })
       .order('period_month', { ascending: true });
+
+    if (activeTenant?.id) {
+      query = query.eq('tenant_id', activeTenant.id);
+    }
 
     // Filter by user if available
     if (uid) {
@@ -185,7 +189,7 @@ export function useMetrics(period: string, targetUserId?: string) {
     // History for charts (last 12 entries)
     setHistory(allData.slice(-12));
     setLoading(false);
-  }, [period, user?.id, targetUserId]);
+  }, [period, user?.id, targetUserId, activeTenant?.id]);
 
   useEffect(() => {
     fetchMetrics();

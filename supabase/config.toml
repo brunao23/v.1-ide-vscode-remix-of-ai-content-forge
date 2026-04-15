@@ -1,1 +1,31 @@
-project_id = "wsybajljuhcvvehnxads"
+project_id = "vlwvmcbsrjlpvaniqpkr"
+
+[functions.calendar-events]
+verify_jwt = false
+
+[functions.chat]
+verify_jwt = false
+
+[functions.process-document]
+verify_jwt = false
+
+[functions.delete-document-vectors]
+verify_jwt = false
+
+[functions.extract-document-content]
+verify_jwt = false
+
+[functions.market-research-apify-start]
+verify_jwt = false
+
+[functions.market-research-apify-status]
+verify_jwt = false
+
+[functions.search-trends]
+verify_jwt = false
+
+[functions.admin-tenants-users]
+verify_jwt = false
+
+[functions.public-signup]
+verify_jwt = false

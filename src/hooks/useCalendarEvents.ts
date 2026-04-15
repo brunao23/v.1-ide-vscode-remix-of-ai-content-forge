@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 export interface CalendarEvent {
   id: string;
@@ -12,6 +13,7 @@ export interface CalendarEvent {
 }
 
 export function useCalendarEvents() {
+  const { activeTenant } = useAuth();
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,9 @@ export function useCalendarEvents() {
     setLoading(true);
     setError(null);
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('calendar-events');
+      const { data, error: fnError } = await supabase.functions.invoke('calendar-events', {
+        body: { tenantId: activeTenant?.id },
+      });
       if (fnError) throw fnError;
       if (data?.error) throw new Error(data.error);
       setEvents(Array.isArray(data) ? data : []);
@@ -30,7 +34,7 @@ export function useCalendarEvents() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [activeTenant?.id]);
 
   useEffect(() => {
     fetchEvents();

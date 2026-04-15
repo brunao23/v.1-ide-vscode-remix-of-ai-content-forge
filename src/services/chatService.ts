@@ -3,18 +3,46 @@ import { AGENTS, Agent } from '@/types';
 import { getModelById } from '@/config/models';
 
 export function getAgentById(id: string): Agent | undefined {
-  return AGENTS.find(a => a.id === id);
+  return AGENTS.find((agent) => agent.id === id);
 }
 
-// System prompts per agent
 const AGENT_SYSTEM_PROMPTS: Record<string, string> = {
-  'brand-book': `Você é o Construtor de Brand Book, um especialista em branding e identidade de marca. Seu papel é guiar o usuário através de um processo estratégico de perguntas para criar um Brand Book completo. Faça uma pergunta por vez, seja detalhado nas explicações e use formatação markdown.`,
-  'market-research': `Você é o Pesquisador de Mercado, especialista em análise de mercado e concorrência. Analise tendências, concorrentes e oportunidades com base nas informações fornecidas. Use dados e insights acionáveis.`,
-  'icp-architect': `Você é o Arquiteto do ICP, especialista em definir o perfil do cliente ideal. Construa personas detalhadas com dores, desejos, linguagem e comportamentos do público-alvo.`,
-  'pillar-strategist': `Você é o Estrategista de Pilares de Conteúdo. Defina pilares e subpilares estratégicos de conteúdo alinhados à marca, mercado e público-alvo.`,
-  'matrix-generator': `Você é o Gerador de Matriz de Conteúdo. Crie combinações criativas de Big Ideas de conteúdo cruzando pilares, subpilares, formatos e ângulos.`,
-  'marketing-manager': `Você é o Gerente de Marketing. Crie calendários mensais de conteúdo organizados e estratégicos, com datas, formatos e objetivos claros.`,
-  'scriptwriter': `Você é o Roteirista de Infotainment. Escreva roteiros de vídeo prontos para gravação no estilo infotainment - educativo e entretenimento ao mesmo tempo. Use ganchos, storytelling e CTAs.`,
+  'brand-book':
+    'Voce e o Construtor de Brand Book. Conduza o usuario com perguntas estrategicas e organizacao clara em markdown.',
+  'market-research':
+    'Voce e o Pesquisador de Mercado. Traga insights de tendencias, concorrencia e oportunidades com foco pratico.',
+  'icp-architect':
+    'Voce e o Arquiteto do ICP. Construa personas detalhadas com dores, desejos, linguagem e comportamentos.',
+  'pillar-strategist':
+    'Voce e o Estrategista de Pilares. Defina pilares e subpilares de conteudo alinhados a marca e ao publico.',
+  'matrix-generator':
+    'Voce e o Gerador de Matriz. Crie combinacoes de big ideas cruzando pilares, formatos e angulos.',
+  'marketing-manager':
+    'Voce e o Gerente de Marketing. Monte calendario de conteudo com objetivos, formatos e cadencia claros.',
+  'scriptwriter':
+    'Voce e o Roteirista de Infotainment. Escreva roteiros curtos, longos e newsletter com ganchos, narrativa e CTA.',
+  'expert-social-selling':
+    'Voce e o Expert Social Selling. Monte estrategias praticas para gerar relacionamento, autoridade e conversao nas redes sociais.',
+  'criador-documento-oferta':
+    'Voce e o Criador de Documento da Oferta. Estruture proposta de valor, oferta, prova, objecoes e CTA com clareza.',
+  'amanda-ai':
+    'Voce e Amanda AI. Atue como assistente estrategica geral com foco em prioridades praticas e resultado.',
+  'arquiteta-perfil-icp':
+    'Voce e a Arquiteta de Perfil do Cliente Ideal. Crie perfis comportamentais profundos com motivacoes e friccoes de compra.',
+  'programa-rivotril':
+    'Voce e o Programa Rivotril. Ajude a organizar rotina, reduzir sobrecarga e transformar caos em plano executavel.',
+  'estrategias-sprint-20k':
+    'Voce e o Estrategista Sprint 20k. Monte plano acelerado de crescimento e faturamento com metas e acoes semanais.',
+  'arquiteta-workshops':
+    'Voce e a Arquiteta de Workshops e Webinars. Planeje estrutura, roteiro, interacao e oferta para alta conversao.',
+  'feedback-conteudo':
+    'Voce e o Revisor de Conteudo. Entregue analise critica com melhorias objetivas de clareza, narrativa, retencao e CTA.',
+  'copywriter-campanhas':
+    'Voce e o Copywriter de Campanhas. Escreva copys persuasivas com promessa, provas, oferta, objecoes e CTA.',
+  'vsl-invisivel':
+    'Voce e o especialista em VSL Invisivel. Crie roteiro de vendas com narrativa estrategica, prova, quebra de objecoes e fechamento forte.',
+  'voz-de-marca':
+    'Voce e o Especialista em Voz de Marca. Analise transcricoes e textos autorais para extrair tom, proposito, valores, vicios de linguagem, personalidade, consistencia e adaptabilidade em formato aplicavel para chatbot.',
 };
 
 export function getSystemPrompt(agentId: string): string {
@@ -26,34 +54,168 @@ interface SendMessageParams {
   agentId: string;
   modelId: string;
   extendedThinking: boolean;
+  marketingMode?: 'calendar' | 'idea';
   contextDocuments?: Record<string, string>;
   userId?: string;
+  tenantId?: string;
+  webSearchApproved?: boolean;
 }
 
-export async function sendChatMessage(params: SendMessageParams): Promise<{
+type ChatApiResponse = {
   content: string;
   thinking?: string;
   thinkingDuration?: number;
   usage?: { inputTokens: number; outputTokens: number };
-}> {
+  provider?: string;
+  webContext?: {
+    enabled: boolean;
+    mode: 'calendar' | 'idea' | null;
+    searched: boolean;
+    used: boolean;
+    queryCount: number;
+    resultCount: number;
+    skippedReason?: string;
+    error?: string;
+    sources?: Array<{ title: string; url: string; summary: string }>;
+  };
+  error?: string;
+};
+
+async function isAccessTokenValid(accessToken: string): Promise<boolean> {
+  const { data, error } = await supabase.auth.getUser(accessToken);
+  return Boolean(!error && data?.user?.id);
+}
+
+async function getValidAccessToken(): Promise<string> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) {
+    throw new Error(`Falha ao validar sessao: ${error.message}`);
+  }
+  if (data.session?.access_token) {
+    const valid = await isAccessTokenValid(data.session.access_token);
+    if (valid) {
+      return data.session.access_token;
+    }
+  }
+
+  const { data: refreshed, error: refreshError } = await supabase.auth.refreshSession();
+  const refreshedToken = refreshed.session?.access_token;
+  if (refreshError || !refreshedToken) {
+    throw new Error('Sessao expirada. Faca login novamente.');
+  }
+
+  const refreshedValid = await isAccessTokenValid(refreshedToken);
+  if (!refreshedValid) {
+    throw new Error('Sessao invalida. Faca logout e login novamente.');
+  }
+
+  return refreshedToken;
+}
+
+async function callChatFunction(accessToken: string, payload: Record<string, unknown>) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 300_000);
+
+  try {
+    const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    const raw = await response.text();
+    let parsed: any = null;
+    try {
+      parsed = raw ? JSON.parse(raw) : null;
+    } catch {
+      parsed = null;
+    }
+
+    return { response, parsed, raw };
+  } catch (err: any) {
+    if (err?.name === 'AbortError') {
+      throw new Error('A resposta demorou mais que o esperado. Tente novamente com uma pergunta mais curta.');
+    }
+    if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError') || err?.message?.includes('fetch')) {
+      throw new Error('Falha na conexao. Verifique sua internet e tente novamente.');
+    }
+    throw new Error('Erro de comunicacao com o servidor. Tente novamente.');
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export async function sendChatMessage(params: SendMessageParams): Promise<ChatApiResponse> {
   const model = getModelById(params.modelId);
-  const actualThinking = model?.supportsExtendedThinking && params.extendedThinking;
+  const actualThinking = Boolean(model?.supportsExtendedThinking && params.extendedThinking);
+  const modelProvider =
+    model?.runtimeProvider ||
+    (model?.provider === 'google' ? 'openrouter' : model?.provider) ||
+    'anthropic';
 
-  const { data, error } = await supabase.functions.invoke('chat', {
-    body: {
-      messages: params.messages,
-      systemPrompt: getSystemPrompt(params.agentId),
-      agentId: params.agentId,
-      userId: params.userId,
-      modelId: model?.apiModelId || 'claude-sonnet-4-5-20250514',
-      extendedThinking: actualThinking,
-      maxTokens: model?.maxTokens || 8000,
-      contextDocuments: params.contextDocuments,
-    },
-  });
+  const payload = {
+    messages: params.messages,
+    systemPrompt: getSystemPrompt(params.agentId),
+    agentId: params.agentId,
+    marketingMode: params.marketingMode || null,
+    userId: params.userId,
+    targetUserId: params.userId,
+    tenantId: params.tenantId,
+    modelId: model?.apiModelId || 'claude-sonnet-4-20250514',
+    modelProvider,
+    extendedThinking: actualThinking,
+    maxTokens: model?.maxTokens || 8000,
+    contextDocuments: params.contextDocuments,
+    webSearchApproved: params.webSearchApproved || false,
+  };
 
-  if (error) throw new Error(error.message || 'Erro ao chamar a API');
-  if (data?.error) throw new Error(data.error);
+  let accessToken: string;
+  try {
+    accessToken = await getValidAccessToken();
+  } catch {
+    throw new Error('Sua sessao expirou. Faca login novamente.');
+  }
 
-  return data;
+  let response: Response;
+  let parsed: any;
+
+  try {
+    ({ response, parsed } = await callChatFunction(accessToken, payload));
+  } catch (err: any) {
+    // Network/timeout errors from callChatFunction
+    throw err;
+  }
+
+  // Auto-refresh on auth errors
+  if (response.status === 401 || response.status === 403) {
+    try {
+      const refreshed = await supabase.auth.refreshSession();
+      if (refreshed.data.session?.access_token) {
+        accessToken = refreshed.data.session.access_token;
+        ({ response, parsed } = await callChatFunction(accessToken, payload));
+      }
+    } catch {
+      throw new Error('Sua sessao expirou. Faca login novamente.');
+    }
+  }
+
+  // Backend returned an error field (even with 200 status)
+  if (parsed?.error && !parsed?.content) {
+    throw new Error(String(parsed.error));
+  }
+
+  // HTTP error without parsed body
+  if (!response.ok && !parsed?.content) {
+    const status = response.status;
+    if (status === 429) throw new Error('Muitas requisicoes. Aguarde alguns segundos e tente novamente.');
+    if (status >= 500) throw new Error('Erro temporario no servidor. Tente novamente em alguns instantes.');
+    throw new Error(parsed?.error || 'Falha ao processar sua mensagem. Tente novamente.');
+  }
+
+  return parsed as ChatApiResponse;
 }

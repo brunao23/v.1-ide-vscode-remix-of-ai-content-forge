@@ -25,6 +25,7 @@ export type Database = {
           requires_documents: string[] | null
           system_prompt: string
           updated_at: string
+          uses_documents_context: boolean
         }
         Insert: {
           agent_id: string
@@ -36,6 +37,7 @@ export type Database = {
           requires_documents?: string[] | null
           system_prompt: string
           updated_at?: string
+          uses_documents_context?: boolean
         }
         Update: {
           agent_id?: string
@@ -47,6 +49,7 @@ export type Database = {
           requires_documents?: string[] | null
           system_prompt?: string
           updated_at?: string
+          uses_documents_context?: boolean
         }
         Relationships: []
       }
@@ -272,6 +275,8 @@ export type Database = {
           file_type: string | null
           id: string
           name: string
+          processing_error: string | null
+          processing_status: string
           type: string
           updated_at: string
           user_id: string
@@ -286,6 +291,8 @@ export type Database = {
           file_type?: string | null
           id?: string
           name: string
+          processing_error?: string | null
+          processing_status?: string
           type: string
           updated_at?: string
           user_id: string
@@ -300,9 +307,44 @@ export type Database = {
           file_type?: string | null
           id?: string
           name?: string
+          processing_error?: string | null
+          processing_status?: string
           type?: string
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      system_documents: {
+        Row: {
+          applies_to_agents: string[]
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean
+          is_mandatory: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          applies_to_agents?: string[]
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          applies_to_agents?: string[]
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_mandatory?: boolean
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }

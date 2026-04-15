@@ -1,4 +1,4 @@
-import {
+﻿import {
   ResponsiveContainer,
   AreaChart,
   Area,
@@ -16,7 +16,7 @@ interface Props {
 }
 
 export function RevenueChart({ history }: Props) {
-  const data = history.map(h => ({
+  const data = history.map((h) => ({
     label: `${MONTH_LABELS[h.period_month - 1]} ${h.period_year}`,
     revenue: h.total_new_revenue || 0,
   }));
@@ -24,7 +24,7 @@ export function RevenueChart({ history }: Props) {
   if (!data.length) {
     return (
       <div className="rounded-[10px] bg-secondary border border-border p-6">
-        <h3 className="text-sm font-semibold text-muted-foreground mb-4">📈 Evolução de receita</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-4">Evolução de receita</h3>
         <p className="text-sm text-muted-foreground">Sem dados suficientes para exibir o gráfico.</p>
       </div>
     );
@@ -32,7 +32,7 @@ export function RevenueChart({ history }: Props) {
 
   return (
     <div className="rounded-[10px] bg-secondary border border-border p-6">
-      <h3 className="text-sm font-semibold text-muted-foreground mb-4">📈 Evolução de receita (últimos 12 meses)</h3>
+      <h3 className="text-sm font-semibold text-muted-foreground mb-4">Evolução de receita (últimos 12 meses)</h3>
       <div className="h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data}>
@@ -45,12 +45,19 @@ export function RevenueChart({ history }: Props) {
             <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
             <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
             <YAxis
-              tickFormatter={(v: number) => `$${v >= 1000 ? `${v / 1000}k` : v}`}
+              tickFormatter={(v: number) => `R$${v >= 1000 ? `${Math.round(v / 100) / 10}k` : v}`}
               tick={{ fontSize: 10 }}
               stroke="hsl(var(--muted-foreground))"
             />
             <Tooltip
-              formatter={(value: number) => [`$${value.toLocaleString()}`, 'Revenue']}
+              formatter={(value: number) => [
+                new Intl.NumberFormat('pt-BR', {
+                  style: 'currency',
+                  currency: 'BRL',
+                  maximumFractionDigits: 0,
+                }).format(value),
+                'Receita',
+              ]}
               contentStyle={{
                 backgroundColor: 'hsl(var(--card))',
                 border: '1px solid hsl(var(--border))',

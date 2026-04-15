@@ -1,14 +1,101 @@
-import { useRef, useEffect, useCallback, useState } from 'react'; // cache-bust
-import { useChatStore } from '@/stores/chatStore';
-import { getAgentById, sendChatMessage } from '@/services/chatService';
-import { Message } from '@/types';
+﻿import { useRef, useEffect, useCallback, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import Header from '@/components/layout/Header';
 import ChatInput from '@/components/chat/ChatInput';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ConversationStarters from '@/components/chat/ConversationStarters';
-import { ChevronDown } from 'lucide-react';
+import { useChatStore } from '@/stores/chatStore';
+import { getAgentById, sendChatMessage } from '@/services/chatService';
+import { Message } from '@/types';
+import { useAuth } from '@/contexts/AuthContext';
+import { resolveMentionedAgent } from '@/lib/agentMentions';
+import { persistConversation, persistMessage } from '@/services/chatPersistenceService';
+import { toast } from 'sonner';
+
+type OutgoingMessage = { role: string; content: string };
+
+function normalizeIntentText(text: string): string {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '');
+}
+
+function containsResearchSignals(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  return (
+    /https?:\/\/|www\./i.test(String(text || '')) ||
+    /\b[a-z0-9-]+\.[a-z]{2,}\b/i.test(String(text || '')) ||
+    normalized.includes('fonte:') ||
+    normalized.includes('fontes:') ||
+    normalized.includes('referencia')
+  );
+}
+
+function requestsWebSearch(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  return (
+    normalized.includes('busque na web') ||
+    normalized.includes('buscar na web') ||
+    normalized.includes('pesquise na web') ||
+    normalized.includes('pesquisar na web') ||
+    normalized.includes('pesquise') ||
+    normalized.includes('buscar') ||
+    normalized.includes('noticias recentes') ||
+    normalized.includes('dados recentes') ||
+    normalized.includes('tendencias')
+  );
+}
+
+function disablesWebSearch(text: string): boolean {
+  const normalized = normalizeIntentText(text);
+  return (
+    normalized.includes('sem busca na web') ||
+    normalized.includes('sem pesquisar na web') ||
+    normalized.includes('nao busque na web') ||
+    normalized.includes('nao pesquisar na web')
+  );
+}
+
+function shouldSearchWebPreview(
+  targetAgentId: string,
+  historyMessages: OutgoingMessage[],
+  latestUserText: string,
+): boolean {
+  if (targetAgentId !== 'marketing-manager') return false;
+  if (!latestUserText.trim()) return false;
+  if (disablesWebSearch(latestUserText)) return false;
+  if (containsResearchSignals(latestUserText)) return false;
+
+  const explicitRequest = requestsWebSearch(latestUserText);
+  const hasResearchInConversation = historyMessages
+    .slice(-8)
+    .some((message) => containsResearchSignals(message.content));
+
+  return explicitRequest || !hasResearchInConversation;
+}
+
+function buildAssistantStages(params: {
+  targetAgentId: string;
+  mode?: 'calendar' | 'idea';
+  willSearchWeb: boolean;
+}): string[] {
+  if (params.targetAgentId !== 'marketing-manager') {
+    return ['Analisando contexto...', 'Pensando...', 'Gerando resposta...'];
+  }
+
+  const mode = params.mode || 'calendar';
+  const buildStage = mode === 'calendar'
+    ? 'Montando calend\u00e1rio editorial...'
+    : 'Estruturando ideia estrat\u00e9gica...';
+
+  return params.willSearchWeb
+    ? ['Buscando na web...', 'Analisando contexto...', buildStage]
+    : ['Analisando contexto...', buildStage];
+}
 
 export default function ChatArea() {
+  const { user, activeTenant } = useAuth();
   const {
     activeAgentId,
     activeConversationId,
@@ -17,16 +104,67 @@ export default function ChatArea() {
     addMessage,
     updateMessage,
     finishStreaming,
+    setActiveAgentContext,
     selectedModel,
     thinkingMode,
   } = useChatStore();
 
   const [isStreaming, setIsStreaming] = useState(false);
+  const [marketingMode, setMarketingMode] = useState<'calendar' | 'idea' | null>('calendar');
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const agent = getAgentById(activeAgentId);
-  const conversation = conversations.find(c => c.id === activeConversationId);
+  const conversation = conversations.find((item) => item.id === activeConversationId);
+
+  const persistConversationSnapshot = useCallback(
+    async (conversationId: string) => {
+      if (!user?.id || !activeTenant?.id) return;
+      const conv = useChatStore.getState().conversations.find((item) => item.id === conversationId);
+      if (!conv) return;
+
+      await persistConversation({
+        conversation: conv,
+        userId: user.id,
+        tenantId: activeTenant.id,
+      });
+    },
+    [user?.id, activeTenant?.id],
+  );
+
+  const persistMessageSnapshot = useCallback(
+    async (conversationId: string, messageId: string) => {
+      if (!user?.id || !activeTenant?.id) return;
+      const conv = useChatStore.getState().conversations.find((item) => item.id === conversationId);
+      const msg = conv?.messages.find((item) => item.id === messageId);
+      if (!msg) return;
+
+      await persistMessage({
+        conversationId,
+        message: msg,
+        userId: user.id,
+        tenantId: activeTenant.id,
+      });
+    },
+    [user?.id, activeTenant?.id],
+  );
+
+  const persistMessageSnapshotWithRetry = useCallback(
+    async (conversationId: string, messageId: string) => {
+      try {
+        await persistMessageSnapshot(conversationId, messageId);
+      } catch (error: any) {
+        const message = String(error?.message || '');
+        if (!message.includes('Conversa nao encontrada')) {
+          throw error;
+        }
+
+        await persistConversationSnapshot(conversationId);
+        await persistMessageSnapshot(conversationId, messageId);
+      }
+    },
+    [persistConversationSnapshot, persistMessageSnapshot],
+  );
 
   const scrollToBottom = useCallback(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
@@ -42,89 +180,210 @@ export default function ChatArea() {
     setShowScrollBtn(scrollHeight - scrollTop - clientHeight > 100);
   };
 
-  const handleSend = useCallback(async (text: string) => {
-    if (!agent) return;
+  const handleSend = useCallback(
+    async (text: string, options?: { marketingMode?: 'calendar' | 'idea'; webSearchApproved?: boolean }) => {
+      const { targetAgentId: mentionedAgentId, cleanedText } = resolveMentionedAgent(text);
+      const targetAgentId = mentionedAgentId || activeAgentId;
+      const targetAgent = getAgentById(targetAgentId);
+      const promptText = cleanedText.trim();
 
-    let convId = activeConversationId;
-    if (!convId) {
-      convId = createConversation(activeAgentId);
-    }
+      if (!targetAgent || !promptText) return;
 
-    // Add user message
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content: text,
-      timestamp: new Date(),
-    };
-    addMessage(convId, userMsg);
-
-    // Add placeholder assistant message
-    const assistantId = crypto.randomUUID();
-    const assistantMsg: Message = {
-      id: assistantId,
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      isStreaming: true,
-    };
-    addMessage(convId, assistantMsg);
-    setIsStreaming(true);
-
-    try {
-      // Get all messages for context
-      const conv = useChatStore.getState().conversations.find(c => c.id === convId);
-      const historyMessages = (conv?.messages || [])
-        .filter(m => m.role === 'user' || (m.role === 'assistant' && m.content))
-        .map(m => ({ role: m.role, content: m.content }));
-
-      const response = await sendChatMessage({
-        messages: historyMessages,
-        agentId: activeAgentId,
-        modelId: selectedModel,
-        extendedThinking: thinkingMode,
-      });
-
-      updateMessage(convId!, assistantId, response.content);
-      
-      // Update with thinking data if available
-      if (response.thinking) {
-        const store = useChatStore.getState();
-        const updatedConv = store.conversations.find(c => c.id === convId);
-        if (updatedConv) {
-          const msgIndex = updatedConv.messages.findIndex(m => m.id === assistantId);
-          if (msgIndex !== -1) {
-            const updatedMessages = [...updatedConv.messages];
-            updatedMessages[msgIndex] = {
-              ...updatedMessages[msgIndex],
-              thinking: response.thinking,
-              thinkingDuration: response.thinkingDuration,
-            };
-            useChatStore.setState({
-              conversations: store.conversations.map(c =>
-                c.id === convId ? { ...c, messages: updatedMessages } : c
-              ),
-            });
-          }
-        }
+      if (targetAgentId !== activeAgentId) {
+        setActiveAgentContext(targetAgentId);
       }
 
-      finishStreaming(convId!, assistantId);
-    } catch (err: any) {
-      updateMessage(convId!, assistantId, `❌ Erro: ${err.message || 'Falha ao obter resposta da IA.'}`);
-      finishStreaming(convId!, assistantId);
-    } finally {
-      setIsStreaming(false);
-    }
-  }, [activeAgentId, activeConversationId, agent, addMessage, createConversation, updateMessage, finishStreaming, selectedModel, thinkingMode]);
+      let convId = activeConversationId;
+      if (!convId) {
+        convId = createConversation(targetAgentId);
+      }
+
+      await persistConversationSnapshot(convId).catch((error) => {
+        console.error('Falha ao salvar conversa inicial:', error);
+      });
+
+      const userMessage: Message = {
+        id: crypto.randomUUID(),
+        role: 'user',
+        content: promptText,
+        timestamp: new Date(),
+        agentId: targetAgentId,
+      };
+
+      addMessage(convId, userMessage);
+      await persistConversationSnapshot(convId).catch((error) => {
+        console.error('Falha ao salvar metadados da conversa:', error);
+      });
+      await persistMessageSnapshotWithRetry(convId, userMessage.id).catch((error) => {
+        console.error('Falha ao salvar mensagem do usuario:', error);
+      });
+
+      const currentMarketingMode =
+        targetAgentId === 'marketing-manager'
+          ? (options?.marketingMode || marketingMode || 'calendar')
+          : undefined;
+
+      const convoBeforeAssistant = useChatStore.getState().conversations.find((item) => item.id === convId);
+      const previewHistory = (convoBeforeAssistant?.messages || [])
+        .filter((item) => item.role === 'user' || (item.role === 'assistant' && item.content))
+        .map((item) => ({ role: item.role, content: item.content }));
+
+      const willSearchWeb = Boolean(options?.webSearchApproved);
+
+      const assistantId = crypto.randomUUID();
+      const assistantMessage: Message = {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        agentId: targetAgentId,
+        isStreaming: true,
+      };
+
+      addMessage(convId, assistantMessage);
+      setIsStreaming(true);
+
+      const stages = buildAssistantStages({
+        targetAgentId,
+        mode: currentMarketingMode,
+        willSearchWeb,
+      });
+
+      let stageIndex = 0;
+      updateMessage(convId, assistantId, stages[stageIndex]);
+      const stageTimer = window.setInterval(() => {
+        if (stageIndex < stages.length - 1) {
+          stageIndex += 1;
+          updateMessage(convId, assistantId, stages[stageIndex]);
+        }
+      }, 2400);
+
+      try {
+        const conv = useChatStore.getState().conversations.find((item) => item.id === convId);
+        const historyMessages = (conv?.messages || [])
+          .filter((item) => item.id !== assistantId)
+          .filter((item) => item.role === 'user' || (item.role === 'assistant' && item.content))
+          .map((item) => ({ role: item.role, content: item.content }));
+
+        const response = await sendChatMessage({
+          messages: historyMessages,
+          agentId: targetAgentId,
+          modelId: selectedModel,
+          extendedThinking: thinkingMode,
+          marketingMode: currentMarketingMode,
+          userId: user?.id,
+          tenantId: activeTenant?.id,
+          webSearchApproved: options?.webSearchApproved || false,
+        });
+
+        window.clearInterval(stageTimer);
+
+        if (response.webContext?.searched && response.webContext?.used) {
+          updateMessage(convId, assistantId, 'Buscando na web...');
+          await new Promise((r) => setTimeout(r, 900));
+          updateMessage(convId, assistantId, 'Gerando resposta...');
+          await new Promise((r) => setTimeout(r, 600));
+        }
+
+        updateMessage(convId, assistantId, response.content);
+
+        {
+          const store = useChatStore.getState();
+          const updatedConversation = store.conversations.find((item) => item.id === convId);
+          if (updatedConversation) {
+            const msgIndex = updatedConversation.messages.findIndex((item) => item.id === assistantId);
+            if (msgIndex !== -1) {
+              const updatedMessages = [...updatedConversation.messages];
+              const extras: Partial<Message> = {};
+              if (response.thinking) {
+                extras.thinking = response.thinking;
+                extras.thinkingDuration = response.thinkingDuration;
+              }
+              if (response.webContext?.sources?.length) {
+                extras.webSources = response.webContext.sources;
+              }
+              if (Object.keys(extras).length > 0) {
+                updatedMessages[msgIndex] = {
+                  ...updatedMessages[msgIndex],
+                  ...extras,
+                };
+                useChatStore.setState({
+                  conversations: store.conversations.map((item) =>
+                    item.id === convId ? { ...item, messages: updatedMessages } : item,
+                  ),
+                });
+              }
+            }
+          }
+        }
+
+        finishStreaming(convId, assistantId);
+        await persistConversationSnapshot(convId).catch((error) => {
+          console.error('Falha ao atualizar conversa apos resposta:', error);
+        });
+        await persistMessageSnapshotWithRetry(convId, assistantId).catch((error) => {
+          console.error('Falha ao salvar resposta do assistente:', error);
+        });
+      } catch (error: any) {
+        const errMsg = String(error?.message || '');
+        console.error('Chat error:', errMsg);
+
+        // Friendly message for the chat bubble
+        const friendlyMessage = errMsg.includes('sessao expirou') || errMsg.includes('login')
+          ? 'Sua sessao expirou. Faca login novamente para continuar.'
+          : 'Nao foi possivel gerar a resposta agora. Por favor, tente novamente.';
+
+        updateMessage(convId, assistantId, friendlyMessage);
+        finishStreaming(convId, assistantId);
+        toast.error(errMsg || 'Erro ao processar mensagem');
+        await persistConversationSnapshot(convId).catch((persistError) => {
+          console.error('Falha ao atualizar conversa apos erro:', persistError);
+        });
+        await persistMessageSnapshotWithRetry(convId, assistantId).catch((persistError) => {
+          console.error('Falha ao salvar mensagem de erro do assistente:', persistError);
+        });
+      } finally {
+        window.clearInterval(stageTimer);
+        setIsStreaming(false);
+      }
+    },
+    [
+      activeAgentId,
+      activeConversationId,
+      activeTenant?.id,
+      addMessage,
+      createConversation,
+      finishStreaming,
+      persistConversationSnapshot,
+      persistMessageSnapshotWithRetry,
+      selectedModel,
+      setActiveAgentContext,
+      thinkingMode,
+      marketingMode,
+      updateMessage,
+      user?.id,
+    ],
+  );
+
+  const handleWebSearchRequest = useCallback(
+    () => {
+      if (!activeConversationId || isStreaming) return;
+      const conv = conversations.find((item) => item.id === activeConversationId);
+      if (!conv) return;
+      const lastUserMsg = [...conv.messages].reverse().find((m) => m.role === 'user');
+      if (!lastUserMsg) return;
+      handleSend(lastUserMsg.content, { marketingMode: marketingMode || 'idea', webSearchApproved: true });
+    },
+    [activeConversationId, conversations, isStreaming, marketingMode, handleSend],
+  );
 
   const handleStop = () => {
     setIsStreaming(false);
-    if (conversation) {
-      const lastMsg = conversation.messages[conversation.messages.length - 1];
-      if (lastMsg?.isStreaming) {
-        finishStreaming(conversation.id, lastMsg.id);
-      }
+    if (!conversation) return;
+
+    const lastMessage = conversation.messages[conversation.messages.length - 1];
+    if (lastMessage?.isStreaming) {
+      finishStreaming(conversation.id, lastMessage.id);
     }
   };
 
@@ -139,21 +398,24 @@ export default function ChatArea() {
               <ConversationStarters
                 agent={agent}
                 onStarterClick={handleSend}
+                marketingMode={marketingMode}
+                onMarketingModeSelect={setMarketingMode}
               />
             )}
           </div>
         ) : (
-          <div
-            ref={scrollRef}
-            onScroll={handleScroll}
-            className="flex-1 overflow-y-auto"
-          >
+          <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-6 py-4">
-              {conversation.messages.map((msg) => (
+              {conversation.messages.map((message) => (
                 <MessageBubble
-                  key={msg.id}
-                  message={msg}
-                  agentId={activeAgentId}
+                  key={message.id}
+                  message={message}
+                  agentId={message.agentId || activeAgentId}
+                  onWebSearchRequest={
+                    message.role === 'assistant' && /SUGERIR_PESQUISA_WEB/i.test(message.content || '') && !isStreaming
+                      ? handleWebSearchRequest
+                      : undefined
+                  }
                 />
               ))}
             </div>
@@ -175,6 +437,8 @@ export default function ChatArea() {
             onSend={handleSend}
             isStreaming={isStreaming}
             onStop={handleStop}
+            marketingMode={marketingMode}
+            onMarketingModeChange={setMarketingMode}
             hideDisclaimer={!conversation || conversation.messages.length === 0}
           />
         </div>

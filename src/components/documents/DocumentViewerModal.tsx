@@ -6,7 +6,7 @@ interface DocumentViewerModalProps {
   onClose: () => void;
   document: { id: string; title: string; content: string; type: string };
   mode: 'view' | 'edit';
-  onSave: (id: string, content: string) => void;
+  onSave: (id: string, content: string) => void | Promise<void>;
 }
 
 export default function DocumentViewerModal({ isOpen, onClose, document, mode, onSave }: DocumentViewerModalProps) {
@@ -15,8 +15,8 @@ export default function DocumentViewerModal({ isOpen, onClose, document, mode, o
 
   if (!isOpen) return null;
 
-  const handleSave = () => {
-    onSave(document.id, content);
+  const handleSave = async () => {
+    await onSave(document.id, content);
     setIsEditing(false);
   };
 

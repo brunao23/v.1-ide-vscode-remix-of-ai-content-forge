@@ -1,4 +1,4 @@
-import { useState } from "react";
+﻿import { useState } from "react";
 import { Plus, Pencil, Trash2, Save, X, GripVertical, Settings, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -84,16 +84,18 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
 
   // Lesson CRUD
   const handleSaveLesson = async (moduleId: string, id?: string) => {
-    if (!lessonForm.title.trim() || !lessonForm.loom_id.trim()) {
-      toast.error("Título e Loom ID são obrigatórios");
+    if (!lessonForm.title.trim()) {
+      toast.error("Título é obrigatório");
       return;
     }
+
+    const normalizedVideoInput = lessonForm.loom_id.trim();
 
     if (id) {
       const { error } = await supabase.from("lessons").update({
         title: lessonForm.title,
         description: lessonForm.description || null,
-        loom_id: lessonForm.loom_id,
+        loom_id: normalizedVideoInput,
         duration: lessonForm.duration || null,
       }).eq("id", id);
       if (error) { console.error("Erro ao atualizar aula:", error); toast.error("Erro ao atualizar aula: " + error.message); return; }
@@ -105,7 +107,7 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
         module_id: moduleId,
         title: lessonForm.title,
         description: lessonForm.description || null,
-        loom_id: lessonForm.loom_id,
+        loom_id: normalizedVideoInput,
         duration: lessonForm.duration || null,
         order_index: maxOrder,
         is_active: true,
@@ -210,7 +212,7 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
                           <Input placeholder="Título da aula" value={lessonForm.title} onChange={e => setLessonForm(f => ({ ...f, title: e.target.value }))} />
                           <Textarea placeholder="Descrição" value={lessonForm.description} onChange={e => setLessonForm(f => ({ ...f, description: e.target.value }))} className="min-h-[60px]" />
                           <div className="grid grid-cols-2 gap-2">
-                            <Input placeholder="Loom ID ou URL" value={lessonForm.loom_id} onChange={e => setLessonForm(f => ({ ...f, loom_id: e.target.value }))} />
+                            <Input placeholder="Link Loom (ID ou URL) - opcional" value={lessonForm.loom_id} onChange={e => setLessonForm(f => ({ ...f, loom_id: e.target.value }))} />
                             <Input placeholder="Duração (ex: 5min)" value={lessonForm.duration} onChange={e => setLessonForm(f => ({ ...f, duration: e.target.value }))} />
                           </div>
                           <div className="flex gap-2">
@@ -222,7 +224,7 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
                         <div className="flex items-center justify-between p-3 hover:bg-secondary/20">
                           <div className="min-w-0">
                             <p className="text-sm truncate">{lesson.title}</p>
-                            <p className="text-xs text-muted-foreground">Loom: {lesson.loom_id.substring(0, 20)}... · {lesson.duration || "sem duração"}</p>
+                            <p className="text-xs text-muted-foreground">Loom: {lesson.loom_id ? `${lesson.loom_id.substring(0, 40)}...` : "sem link"} · {lesson.duration || "sem duração"}</p>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
                             <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => startEditLesson(lesson)}>
@@ -243,7 +245,7 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
                       <Input placeholder="Título da aula" value={lessonForm.title} onChange={e => setLessonForm(f => ({ ...f, title: e.target.value }))} />
                       <Textarea placeholder="Descrição" value={lessonForm.description} onChange={e => setLessonForm(f => ({ ...f, description: e.target.value }))} className="min-h-[60px]" />
                       <div className="grid grid-cols-2 gap-2">
-                        <Input placeholder="Loom ID ou URL" value={lessonForm.loom_id} onChange={e => setLessonForm(f => ({ ...f, loom_id: e.target.value }))} />
+                        <Input placeholder="Link Loom (ID ou URL) - opcional" value={lessonForm.loom_id} onChange={e => setLessonForm(f => ({ ...f, loom_id: e.target.value }))} />
                         <Input placeholder="Duração (ex: 5min)" value={lessonForm.duration} onChange={e => setLessonForm(f => ({ ...f, duration: e.target.value }))} />
                       </div>
                       <div className="flex gap-2">
@@ -268,3 +270,5 @@ export default function AulasAdminPanel({ modules, getLessonsByModule, onDataCha
     </div>
   );
 }
+
+

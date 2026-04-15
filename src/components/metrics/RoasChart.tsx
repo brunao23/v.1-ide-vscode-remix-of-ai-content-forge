@@ -1,4 +1,4 @@
-import {
+﻿import {
   ResponsiveContainer,
   ComposedChart,
   Bar,
@@ -17,7 +17,7 @@ interface Props {
 }
 
 export function RoasChart({ history }: Props) {
-  const data = history.map(h => ({
+  const data = history.map((h) => ({
     label: `${MONTH_LABELS[h.period_month - 1]} ${h.period_year}`,
     adSpend: h.ad_spend || 0,
     roas: h.roas || 0,
@@ -26,7 +26,7 @@ export function RoasChart({ history }: Props) {
   if (!data.length) {
     return (
       <div className="rounded-[10px] bg-secondary border border-border p-6">
-        <h3 className="text-sm font-semibold text-muted-foreground mb-4">📊 ROAS vs Ad Spend</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground mb-4">ROAS vs Investimento em anúncios</h3>
         <p className="text-sm text-muted-foreground">Sem dados suficientes.</p>
       </div>
     );
@@ -34,7 +34,7 @@ export function RoasChart({ history }: Props) {
 
   return (
     <div className="rounded-[10px] bg-secondary border border-border p-6">
-      <h3 className="text-sm font-semibold text-muted-foreground mb-4">📊 ROAS vs Ad Spend</h3>
+      <h3 className="text-sm font-semibold text-muted-foreground mb-4">ROAS vs Investimento em anúncios</h3>
       <div className="h-[250px]">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data}>
@@ -42,7 +42,7 @@ export function RoasChart({ history }: Props) {
             <XAxis dataKey="label" tick={{ fontSize: 10 }} stroke="hsl(var(--muted-foreground))" />
             <YAxis
               yAxisId="left"
-              tickFormatter={(v: number) => `$${v}`}
+              tickFormatter={(v: number) => `R$${v}`}
               tick={{ fontSize: 10 }}
               stroke="hsl(var(--muted-foreground))"
             />
@@ -61,8 +61,23 @@ export function RoasChart({ history }: Props) {
                 fontSize: 12,
               }}
             />
-            <Bar yAxisId="left" dataKey="adSpend" fill="hsl(var(--muted-foreground))" opacity={0.3} radius={[4, 4, 0, 0]} name="Ad Spend" />
-            <Line yAxisId="right" type="monotone" dataKey="roas" stroke="#5a6b2a" strokeWidth={2} dot={{ r: 3, fill: '#5a6b2a' }} name="ROAS" />
+            <Bar
+              yAxisId="left"
+              dataKey="adSpend"
+              fill="hsl(var(--muted-foreground))"
+              opacity={0.3}
+              radius={[4, 4, 0, 0]}
+              name="Investimento"
+            />
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="roas"
+              stroke="#5a6b2a"
+              strokeWidth={2}
+              dot={{ r: 3, fill: '#5a6b2a' }}
+              name="ROAS"
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>

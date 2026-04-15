@@ -45,6 +45,7 @@ export interface SearchRequest {
   period_days: number;
   results_limit?: number;
   user_id: string;
+  tenant_id?: string;
   request_id: string;
   cursor?: string;
 }
