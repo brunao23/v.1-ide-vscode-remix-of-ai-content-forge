@@ -35,7 +35,7 @@ export default function PostCard({ post, onClick }: PostCardProps) {
       className="w-full text-left rounded-xl bg-card border border-border overflow-hidden transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-black/20 focus:outline-none focus:ring-2 focus:ring-ring"
     >
       {/* Thumbnail */}
-      <div className="relative aspect-[4/5] bg-secondary overflow-hidden group">
+      <div className={`relative ${isYT ? 'aspect-video' : 'aspect-[4/5]'} bg-secondary overflow-hidden group`}>
         {!imgFailed && post.thumbnail_url ? (
           <img
             src={proxyImageUrl(post.thumbnail_url)}
