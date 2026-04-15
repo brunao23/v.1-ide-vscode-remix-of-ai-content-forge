@@ -1,7 +1,12 @@
 ﻿import { type ChangeEvent, useEffect, useMemo, useState } from "react";
 import {
+  BarChart3,
+  Bot,
   Building2,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  ClipboardList,
   FileText,
   Loader2,
   LogOut,
@@ -9,9 +14,11 @@ import {
   Plus,
   RefreshCw,
   Save,
+  Search,
   ShieldCheck,
   Sparkles,
   Trash2,
+  TrendingUp,
   Upload,
   Users,
 } from "lucide-react";
@@ -28,6 +35,7 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 
 type TenantOverview = { id: string; slug: string; name: string; is_active: boolean; active_users_count: number };
+type AgentUsageStat = { agent_id: string; docs: number; chats: number };
 type TenantUser = { user_id: string; email: string | null; full_name: string | null; role: "owner" | "admin" | "member" | "viewer"; is_active: boolean; default_tenant_id: string | null };
 type AdminUser = { key: string; tenantId: string; tenantName: string; tenantSlug: string; userId: string; fullName: string; email: string | null; role: TenantUser["role"]; isActive: boolean; defaultTenantId: string | null };
 type SystemDocumentRow = { id: string; name: string; content: string; applies_to_agents: string[]; is_mandatory: boolean; is_active: boolean };
@@ -118,6 +126,16 @@ export default function AdminPage({ tab = "insights" }: Props) {
 
   const [allUsers, setAllUsers] = useState<AdminUser[]>([]);
   const [scopeCurrentTenantOnly, setScopeCurrentTenantOnly] = useState(true);
+
+  // ── Detalhe expandido por usuário ──────────────────────────────────────────
+  const [allTasks, setAllTasks] = useState<any[]>([]);
+  const [userCheckedTaskIds, setUserCheckedTaskIds] = useState<Set<string>>(new Set());
+  const [userDocuments, setUserDocuments] = useState<any[]>([]);
+  const [weeklyHistory, setWeeklyHistory] = useState<any[]>([]);
+  const [monthlyHistory, setMonthlyHistory] = useState<any[]>([]);
+  const [mktResearchCount, setMktResearchCount] = useState(0);
+  const [showImplDetail, setShowImplDetail] = useState(false);
+  const [showHealthDetail, setShowHealthDetail] = useState(false);
   const [selectedUserKey, setSelectedUserKey] = useState("");
   const [insightWindow, setInsightWindow] = useState<InsightWindow>(30);
   const [taskCount, setTaskCount] = useState(0);
@@ -132,6 +150,23 @@ export default function AdminPage({ tab = "insights" }: Props) {
   const uniqueUsersCount = useMemo(() => new Set(allUsers.map((u) => u.userId)).size, [allUsers]);
   const byWindow = useMemo<Record<InsightWindow, UserMetrics>>(() => ({ 7: metrics(7, eventsByUser, taskCount), 15: metrics(15, eventsByUser, taskCount), 30: metrics(30, eventsByUser, taskCount) }), [eventsByUser, taskCount]);
   const currentMetrics = byWindow[insightWindow] || emptyMetrics;
+
+  const agentUsage = useMemo<AgentUsageStat[]>(() => {
+    const map = new Map<string, AgentUsageStat>();
+    for (const doc of userDocuments) {
+      if (!doc.agent_id) continue;
+      const e = map.get(doc.agent_id) || { agent_id: doc.agent_id, docs: 0, chats: 0 };
+      e.docs++;
+      map.set(doc.agent_id, e);
+    }
+    for (const msg of (eventsByUser.chats || [])) {
+      if (!msg.agent_id) continue;
+      const e = map.get(msg.agent_id) || { agent_id: msg.agent_id, docs: 0, chats: 0 };
+      e.chats++;
+      map.set(msg.agent_id, e);
+    }
+    return Array.from(map.values()).sort((a, b) => (b.docs + b.chats) - (a.docs + a.chats));
+  }, [userDocuments, eventsByUser]);
 
   const loadOverview = async () => {
     setLoadingOverview(true);
@@ -208,28 +243,54 @@ export default function AdminPage({ tab = "insights" }: Props) {
   };
 
   const loadUserMetrics = async (targetUser: AdminUser | null) => {
-    if (!targetUser) { setEventsByUser({}); setTaskCount(0); return; }
+    if (!targetUser) {
+      setEventsByUser({});
+      setTaskCount(0);
+      setAllTasks([]);
+      setUserCheckedTaskIds(new Set());
+      setUserDocuments([]);
+      setWeeklyHistory([]);
+      setMonthlyHistory([]);
+      setMktResearchCount(0);
+      return;
+    }
     setLoadingMetrics(true);
     try {
       const minDate90 = daysAgoDate(90);
       const minIso90 = daysAgoIso(90);
-      const [weeklyRes, monthlyRes, dealsRes, checksRes, chatsRes, lessonsRes, tasksRes] = await Promise.all([
+      const [
+        weeklyRes, monthlyRes, dealsRes, checksRes, chatsRes, lessonsRes,
+        allTasksRes, taskChecksRes, docsRes, weeklyHistRes, monthlyHistRes, mktRes,
+      ] = await Promise.all([
+        // Métricas de janela (90 dias)
         db.from("weekly_wins_submissions").select("tenant_id,user_id,reference_date,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).gte("reference_date", minDate90),
         db.from("monthly_data_submissions").select("tenant_id,user_id,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).gte("created_at", minIso90),
         db.from("new_deal_submissions").select("tenant_id,user_id,deal_date,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).gte("deal_date", minDate90),
         db.from("implementation_task_checks").select("tenant_id,user_id,checked_at,updated_at,is_checked").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).eq("is_checked", true).gte("updated_at", minIso90),
-        db.from("chat_messages").select("tenant_id,user_id,created_at,role").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).eq("role", "user").gte("created_at", minIso90),
+        db.from("chat_messages").select("tenant_id,user_id,created_at,role,agent_id").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).eq("role", "user").gte("created_at", minIso90),
         db.from("user_lesson_progress").select("tenant_id,user_id,completed,completed_at,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).eq("completed", true).gte("created_at", minIso90),
-        db.from("implementation_tasks").select("id", { count: "exact", head: true }),
+        // Detalhe completo
+        db.from("implementation_tasks").select("id,month_title,month_order,week_title,week_order,task_title,task_order").order("month_order", { ascending: true }).order("week_order", { ascending: true }).order("task_order", { ascending: true }),
+        db.from("implementation_task_checks").select("task_id").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).eq("is_checked", true),
+        db.from("documents").select("id,name,type,agent_id,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("created_at", { ascending: false }).limit(300),
+        db.from("weekly_wins_submissions").select("*").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("reference_date", { ascending: false }).limit(8),
+        db.from("monthly_data_submissions").select("*").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("created_at", { ascending: false }).limit(6),
+        db.from("market_research_saved_posts").select("id", { count: "exact", head: true }).eq("user_id", targetUser.userId),
       ]);
 
       const checksIgnorable = checksRes.error && String(checksRes.error.message || "").toLowerCase().includes("implementation_task_checks");
-      const tasksIgnorable = tasksRes.error && String(tasksRes.error.message || "").toLowerCase().includes("implementation_tasks");
-      const err = weeklyRes.error || monthlyRes.error || dealsRes.error || (checksIgnorable ? null : checksRes.error) || chatsRes.error || lessonsRes.error || (tasksIgnorable ? null : tasksRes.error);
+      const err = weeklyRes.error || monthlyRes.error || dealsRes.error || (checksIgnorable ? null : checksRes.error) || chatsRes.error || lessonsRes.error;
       if (err) throw new Error(err.message);
 
+      const tasks = allTasksRes.data || [];
       setEventsByUser({ weekly: weeklyRes.data || [], monthly: monthlyRes.data || [], deals: dealsRes.data || [], checks: checksIgnorable ? [] : (checksRes.data || []), chats: chatsRes.data || [], lessons: lessonsRes.data || [] });
-      setTaskCount(tasksIgnorable ? 0 : Number(tasksRes.count || 0));
+      setTaskCount(tasks.length);
+      setAllTasks(tasks);
+      setUserCheckedTaskIds(new Set<string>((taskChecksRes.data || []).map((r: any) => String(r.task_id))));
+      setUserDocuments(docsRes.data || []);
+      setWeeklyHistory(weeklyHistRes.data || []);
+      setMonthlyHistory(monthlyHistRes.data || []);
+      setMktResearchCount(Number(mktRes.count || 0));
     } catch (error: any) {
       toast.error(error?.message || "Erro ao carregar metricas do usuario");
     } finally {
@@ -383,26 +444,194 @@ export default function AdminPage({ tab = "insights" }: Props) {
                 <div className="lg:col-span-2"><Label className="text-xs text-muted-foreground">Usuario</Label><Select value={selectedUserKey} onValueChange={setSelectedUserKey}><SelectTrigger><SelectValue placeholder="Selecione o usuario" /></SelectTrigger><SelectContent>{allUsers.map((u) => <SelectItem key={u.key} value={u.key}>{u.fullName}</SelectItem>)}</SelectContent></Select><div className="flex items-center gap-2 mt-3"><Switch checked={scopeCurrentTenantOnly} onCheckedChange={setScopeCurrentTenantOnly} /><Label className="text-xs text-muted-foreground">Escopo: somente tenant atual</Label></div></div>
               </div>
               <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6"><MetricMini title="Submissoes" value={currentMetrics.submissions} /><MetricMini title="Checks" value={currentMetrics.checks} /><MetricMini title="Mensagens" value={currentMetrics.chats} /><MetricMini title="Aulas concluidas" value={currentMetrics.lessons} /><MetricMini title="Engajamento" value={pct(currentMetrics.engagement)} /><MetricMini title="Saude" value={pct(currentMetrics.health)} /></div>
-              {/* Implementação Progress */}
+              {/* Implementação Progress + detalhe por tarefa */}
               {taskCount > 0 && (
-                <div className="rounded-xl border border-border bg-secondary/20 p-4">
-                  <div className="flex items-center justify-between mb-2">
+                <div className="rounded-xl border border-border bg-secondary/20 p-4 space-y-3">
+                  <div className="flex items-center justify-between">
                     <span className="text-sm font-semibold text-foreground">Progresso de Implementação</span>
                     <span className="text-sm font-bold text-amber-400">
-                      {clamp(Math.round((currentMetrics.checks / taskCount) * 100))}%
+                      {clamp(Math.round((userCheckedTaskIds.size / taskCount) * 100))}%
                     </span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-background overflow-hidden mb-2">
+                  <div className="w-full h-2 rounded-full bg-background overflow-hidden">
                     <div
                       className="h-full rounded-full bg-amber-400 transition-all duration-500"
-                      style={{ width: `${clamp(Math.round((currentMetrics.checks / taskCount) * 100))}%` }}
+                      style={{ width: `${clamp(Math.round((userCheckedTaskIds.size / taskCount) * 100))}%` }}
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    {currentMetrics.checks} de {taskCount} tarefas concluídas na janela selecionada
+                    {userCheckedTaskIds.size} de {taskCount} tarefas concluídas (total acumulado)
                   </p>
+                  {/* Expansor de detalhe por tarefa */}
+                  {allTasks.length > 0 && (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setShowImplDetail((p) => !p)}
+                        className="flex items-center gap-1.5 text-xs text-amber-400 hover:text-amber-300 font-medium transition-colors"
+                      >
+                        {showImplDetail ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                        <ClipboardList className="w-3.5 h-3.5" />
+                        {showImplDetail ? "Ocultar detalhe por tarefa" : "Ver cada tarefa individualmente"}
+                      </button>
+                      {showImplDetail && (
+                        <div className="mt-3">
+                          <ImplDetailTable tasks={allTasks} checkedIds={userCheckedTaskIds} />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
+
+              {/* Uso por agente */}
+              {agentUsage.length > 0 && (
+                <div className="rounded-xl border border-border p-4 space-y-3">
+                  <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <Bot className="w-4 h-4 text-primary" /> Uso por Agente
+                    <span className="text-xs font-normal text-muted-foreground">(últimos 90 dias)</span>
+                  </h3>
+                  <div className="overflow-x-auto rounded-lg border border-border">
+                    <table className="w-full text-xs">
+                      <thead className="bg-secondary/40">
+                        <tr className="text-muted-foreground">
+                          <th className="text-left px-3 py-2 font-medium">Agente (agent_id)</th>
+                          <th className="text-right px-3 py-2 font-medium">Docs criados</th>
+                          <th className="text-right px-3 py-2 font-medium">Mensagens</th>
+                          <th className="text-right px-3 py-2 font-medium">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border">
+                        {agentUsage.map((a) => (
+                          <tr key={a.agent_id} className="hover:bg-secondary/20">
+                            <td className="px-3 py-2 font-mono text-foreground">{a.agent_id || "(sem agente)"}</td>
+                            <td className="px-3 py-2 text-right">{a.docs}</td>
+                            <td className="px-3 py-2 text-right">{a.chats}</td>
+                            <td className="px-3 py-2 text-right font-semibold text-amber-400">{a.docs + a.chats}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Saúde Detalhada */}
+              <div className="rounded-xl border border-border p-4 space-y-3">
+                <button
+                  type="button"
+                  onClick={() => setShowHealthDetail((p) => !p)}
+                  className="w-full flex items-center justify-between text-sm font-semibold hover:text-primary transition-colors"
+                >
+                  <span className="flex items-center gap-2">
+                    <TrendingUp className="w-4 h-4 text-emerald-400" />
+                    Saúde Detalhada — Dados Reais do Usuário
+                  </span>
+                  {showHealthDetail ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                </button>
+
+                {showHealthDetail && (
+                  <div className="space-y-5 pt-1">
+                    {/* Resumo rápido */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <MetricMini title="Posts salvos (Pesquisa)" value={mktResearchCount} />
+                      <MetricMini title="Documentos criados" value={userDocuments.length} />
+                      <MetricMini title="Tipos de documento" value={new Set(userDocuments.map((d: any) => d.type).filter(Boolean)).size} />
+                      <MetricMini title="Semanas reportadas" value={weeklyHistory.length} />
+                    </div>
+
+                    {/* Documentos por tipo */}
+                    {userDocuments.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                          <BarChart3 className="w-3.5 h-3.5" /> Documentos por Tipo
+                        </h4>
+                        <div className="flex flex-wrap gap-2">
+                          {Object.entries(
+                            userDocuments.reduce((acc: Record<string, number>, d: any) => {
+                              const t = d.type || "sem-tipo";
+                              acc[t] = (acc[t] || 0) + 1;
+                              return acc;
+                            }, {})
+                          ).sort((a, b) => b[1] - a[1]).map(([type, count]) => (
+                            <span key={type} className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary text-xs border border-border">
+                              <span className="font-mono text-foreground">{type}</span>
+                              <span className="font-bold text-amber-400">{count}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Pesquisa de mercado */}
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Search className="w-4 h-4" />
+                      <span>Posts salvos na Pesquisa de Mercado:</span>
+                      <span className="font-bold text-foreground">{mktResearchCount}</span>
+                    </div>
+
+                    {/* Últimas semanas reportadas */}
+                    {weeklyHistory.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                          Últimas Semanas Reportadas (Weekly Wins)
+                        </h4>
+                        <div className="space-y-2">
+                          {weeklyHistory.slice(0, 5).map((w: any) => (
+                            <div key={w.id} className="rounded-lg border border-border p-3 space-y-1.5 bg-secondary/10">
+                              <p className="text-xs font-bold text-amber-400">{w.reference_date}</p>
+                              {w.top_win_1 && <p className="text-xs text-foreground flex gap-1.5"><span className="text-emerald-400">✓</span>{w.top_win_1}</p>}
+                              {w.top_win_2 && <p className="text-xs text-foreground flex gap-1.5"><span className="text-emerald-400">✓</span>{w.top_win_2}</p>}
+                              {w.top_win_3 && <p className="text-xs text-foreground flex gap-1.5"><span className="text-emerald-400">✓</span>{w.top_win_3}</p>}
+                              {w.one_focus_this_week && <p className="text-xs text-muted-foreground">Foco: {w.one_focus_this_week}</p>}
+                              {w.blocker && <p className="text-xs text-rose-400">Bloqueio: {w.blocker}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Dados mensais */}
+                    {monthlyHistory.length > 0 && (
+                      <div>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">
+                          Dados Mensais (Business Health)
+                        </h4>
+                        <div className="space-y-3">
+                          {monthlyHistory.slice(0, 4).map((m: any) => (
+                            <div key={m.id} className="rounded-lg border border-border p-3 bg-secondary/10">
+                              <p className="text-xs font-bold text-amber-400 mb-2">{m.period_month}/{m.period_year}</p>
+                              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-1.5 text-xs">
+                                {m.total_cash_collected != null && <div><span className="text-muted-foreground">Cash coletado:</span> <span className="font-semibold ml-1">R$ {Number(m.total_cash_collected).toLocaleString("pt-BR")}</span></div>}
+                                {m.total_new_revenue != null && <div><span className="text-muted-foreground">Nova receita:</span> <span className="font-semibold ml-1">R$ {Number(m.total_new_revenue).toLocaleString("pt-BR")}</span></div>}
+                                {m.monthly_recurring_revenue != null && <div><span className="text-muted-foreground">MRR:</span> <span className="font-semibold ml-1">R$ {Number(m.monthly_recurring_revenue).toLocaleString("pt-BR")}</span></div>}
+                                {m.monthly_expenses != null && <div><span className="text-muted-foreground">Despesas:</span> <span className="font-semibold ml-1">R$ {Number(m.monthly_expenses).toLocaleString("pt-BR")}</span></div>}
+                                {m.ad_spend != null && <div><span className="text-muted-foreground">Anúncios:</span> <span className="font-semibold ml-1">R$ {Number(m.ad_spend).toLocaleString("pt-BR")}</span></div>}
+                                {m.new_clients_signed != null && <div><span className="text-muted-foreground">Clientes novos:</span> <span className="font-semibold ml-1">{m.new_clients_signed}</span></div>}
+                                {m.active_clients != null && <div><span className="text-muted-foreground">Clientes ativos:</span> <span className="font-semibold ml-1">{m.active_clients}</span></div>}
+                                {m.booked_calls != null && <div><span className="text-muted-foreground">Calls agendadas:</span> <span className="font-semibold ml-1">{m.booked_calls}</span></div>}
+                                {m.calls_showed != null && <div><span className="text-muted-foreground">Calls realizadas:</span> <span className="font-semibold ml-1">{m.calls_showed}</span></div>}
+                                {m.offers_made != null && <div><span className="text-muted-foreground">Ofertas feitas:</span> <span className="font-semibold ml-1">{m.offers_made}</span></div>}
+                                {m.total_followers != null && <div><span className="text-muted-foreground">Seguidores:</span> <span className="font-semibold ml-1">{Number(m.total_followers).toLocaleString("pt-BR")}</span></div>}
+                                {m.posts_made != null && <div><span className="text-muted-foreground">Posts:</span> <span className="font-semibold ml-1">{m.posts_made}</span></div>}
+                                {m.reach != null && <div><span className="text-muted-foreground">Alcance:</span> <span className="font-semibold ml-1">{Number(m.reach).toLocaleString("pt-BR")}</span></div>}
+                                {m.views != null && <div><span className="text-muted-foreground">Views:</span> <span className="font-semibold ml-1">{Number(m.views).toLocaleString("pt-BR")}</span></div>}
+                                {m.inbound_messages != null && <div><span className="text-muted-foreground">Mensagens inbound:</span> <span className="font-semibold ml-1">{m.inbound_messages}</span></div>}
+                                {m.confidence_score != null && <div><span className="text-muted-foreground">Confiança:</span> <span className="font-semibold ml-1">{m.confidence_score}/10</span></div>}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {weeklyHistory.length === 0 && monthlyHistory.length === 0 && (
+                      <p className="text-xs text-muted-foreground italic">Este usuário ainda não preencheu dados na aba Métricas.</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="grid gap-3 md:grid-cols-3">{WINDOWS.map((w) => <MetricMini key={w} title={`Submissoes em ${w} dias`} value={byWindow[w].submissions} />)}</div>
             </CardContent>
           </Card>
@@ -461,4 +690,72 @@ export default function AdminPage({ tab = "insights" }: Props) {
 
 function MetricMini({ title, value }: { title: string; value: string | number }) {
   return <Card className="bg-secondary/25"><CardHeader className="py-3"><CardDescription>{title}</CardDescription><CardTitle className="text-xl truncate">{value}</CardTitle></CardHeader></Card>;
+}
+
+function ImplDetailTable({ tasks, checkedIds }: { tasks: any[]; checkedIds: Set<string> }) {
+  const grouped = useMemo(() => {
+    const months: Record<string, { title: string; order: number; weeks: Record<string, { title: string; order: number; tasks: any[] }> }> = {};
+    for (const task of tasks) {
+      if (!months[task.month_title]) months[task.month_title] = { title: task.month_title, order: task.month_order, weeks: {} };
+      const wk = task.week_title || "__";
+      if (!months[task.month_title].weeks[wk]) months[task.month_title].weeks[wk] = { title: task.week_title || "", order: task.week_order, tasks: [] };
+      months[task.month_title].weeks[wk].tasks.push(task);
+    }
+    return Object.values(months).sort((a, b) => a.order - b.order).map((m) => ({ ...m, weeks: Object.values(m.weeks).sort((a, b) => a.order - b.order) }));
+  }, [tasks]);
+
+  return (
+    <div className="space-y-1.5 max-h-[600px] overflow-y-auto pr-1">
+      {grouped.map((month) => {
+        const monthTasks = month.weeks.flatMap((w) => w.tasks);
+        const done = monthTasks.filter((t) => checkedIds.has(t.id)).length;
+        const pct = monthTasks.length > 0 ? Math.round((done / monthTasks.length) * 100) : 0;
+        return (
+          <details key={month.title} className="rounded-lg border border-border group">
+            <summary className="flex items-center justify-between px-3 py-2.5 cursor-pointer hover:bg-secondary/30 rounded-lg list-none select-none">
+              <div className="flex items-center gap-2 min-w-0">
+                <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-open:hidden shrink-0" />
+                <ChevronDown className="w-3.5 h-3.5 text-amber-400 hidden group-open:block shrink-0" />
+                <span className="text-xs font-semibold truncate">{month.title}</span>
+              </div>
+              <div className="flex items-center gap-2 shrink-0 ml-2">
+                <div className="w-16 h-1.5 rounded-full bg-background overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
+                </div>
+                <span className="text-[11px] text-amber-400 font-bold w-8 text-right">{pct}%</span>
+                <span className="text-[11px] text-muted-foreground w-10 text-right">{done}/{monthTasks.length}</span>
+              </div>
+            </summary>
+            <div className="border-t border-border px-3 pb-3 pt-1">
+              {month.weeks.map((week) => (
+                <div key={week.title || "__"} className="mt-2">
+                  {week.title && (
+                    <p className="text-[11px] text-muted-foreground font-semibold uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                      <span className="w-0.5 h-3 bg-amber-400/60 rounded-full inline-block" />
+                      {week.title}
+                    </p>
+                  )}
+                  <div className="space-y-0.5">
+                    {week.tasks.map((task) => {
+                      const checked = checkedIds.has(task.id);
+                      return (
+                        <div key={task.id} className={`flex items-center gap-2 py-1 px-2 rounded ${checked ? "bg-emerald-500/5" : ""}`}>
+                          {checked
+                            ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            : <div className="w-3.5 h-3.5 rounded-full border border-muted-foreground/30 shrink-0" />}
+                          <span className={`text-xs leading-snug ${checked ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                            {task.task_title}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </details>
+        );
+      })}
+    </div>
+  );
 }
