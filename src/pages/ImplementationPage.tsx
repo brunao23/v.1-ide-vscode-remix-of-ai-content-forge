@@ -234,7 +234,7 @@ export default function ImplementationPage() {
       if (toUpsert.length > 0) {
         await (supabase as any)
           .from('implementation_task_checks')
-          .upsert(toUpsert, { onConflict: 'task_id,tenant_id,user_id' });
+          .upsert(toUpsert, { onConflict: 'tenant_id,user_id,task_id' });
 
         // merge auto-detected into checked set
         setCheckedTaskIds((prev) => {
@@ -294,7 +294,7 @@ export default function ImplementationPage() {
         is_checked: !wasChecked,
         checked_at: !wasChecked ? new Date().toISOString() : null,
         auto_detected: false,
-      }, { onConflict: 'task_id,tenant_id,user_id' });
+      }, { onConflict: 'tenant_id,user_id,task_id' });
 
     if (error) {
       console.error('Erro ao atualizar check:', error);
