@@ -161,6 +161,13 @@ function buildTikTokInput(params: {
   };
 }
 
+function parseIsoDuration(iso: string): number {
+  if (!iso) return 0;
+  const match = iso.match(/PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/);
+  if (!match) return 0;
+  return Number(match[1] || 0) * 3600 + Number(match[2] || 0) * 60 + Number(match[3] || 0);
+}
+
 async function ytApiFetch(url: string): Promise<any> {
   const res = await fetch(url);
   const body = await res.json();
@@ -191,7 +198,9 @@ async function handleYouTubeDirect(params: {
   periodDays: number;
   apiKey: string;
 }): Promise<{ metadata?: Record<string, unknown>; posts: Record<string, unknown>[]; pagination: Record<string, unknown> }> {
+  // Request extra results so that Shorts filtering still leaves enough posts
   const limit = Math.min(50, Math.max(1, params.resultsLimit));
+  const fetchLimit = Math.min(50, limit + 15);
   const apiKey = params.apiKey;
   const publishedAfter = new Date(Date.now() - (params.periodDays || 30) * 86_400_000).toISOString();
 
@@ -265,9 +274,10 @@ async function handleYouTubeDirect(params: {
         scraped_at: new Date().toISOString(),
       };
 
-      // First try with publishedAfter filter
+      // First try with publishedAfter filter (exclude Shorts via videoDuration=medium/long is not precise,
+      // so we fetch extra and filter by duration after getting details)
       const videosData = await ytApiFetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${limit}&order=date&publishedAfter=${publishedAfter}&key=${apiKey}`,
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${fetchLimit}&order=date&publishedAfter=${publishedAfter}&key=${apiKey}`,
       );
       videoIds = (videosData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
       console.log(`[YouTube] Videos with date filter: ${videoIds.length}`);
@@ -276,7 +286,7 @@ async function handleYouTubeDirect(params: {
       if (videoIds.length === 0) {
         console.log(`[YouTube] No videos in last ${params.periodDays} days, fetching latest without date filter`);
         const fallbackData = await ytApiFetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${limit}&order=date&key=${apiKey}`,
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${fetchLimit}&order=date&key=${apiKey}`,
         );
         videoIds = (fallbackData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
         console.log(`[YouTube] Videos without date filter: ${videoIds.length}`);
@@ -291,7 +301,7 @@ async function handleYouTubeDirect(params: {
     console.log(`[YouTube] Keyword search: "${query}"`);
 
     const searchData = await ytApiFetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${limit}&order=relevance&publishedAfter=${publishedAfter}&key=${apiKey}`,
+      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${fetchLimit}&order=relevance&publishedAfter=${publishedAfter}&key=${apiKey}`,
     );
     videoIds = (searchData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
     console.log(`[YouTube] Keyword search results: ${videoIds.length}`);
@@ -300,7 +310,7 @@ async function handleYouTubeDirect(params: {
     if (videoIds.length === 0) {
       console.log(`[YouTube] No results with date filter, retrying without`);
       const fallbackData = await ytApiFetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${limit}&order=relevance&key=${apiKey}`,
+        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${fetchLimit}&order=relevance&key=${apiKey}`,
       );
       videoIds = (fallbackData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
       console.log(`[YouTube] Keyword search (no date filter): ${videoIds.length}`);
@@ -319,7 +329,16 @@ async function handleYouTubeDirect(params: {
   const videos = detailsData?.items || [];
   console.log(`[YouTube] Video details fetched: ${videos.length}`);
 
-  const posts = videos.map((video: any, idx: number) => {
+  // Filter out Shorts: videos <= 60 seconds are YouTube Shorts
+  const regularVideos = videos.filter((video: any) => {
+    const duration = parseIsoDuration(video.contentDetails?.duration || "");
+    const isShort = duration <= 60;
+    if (isShort) console.log(`[YouTube] Filtered out Short: ${video.id} (${duration}s)`);
+    return !isShort;
+  });
+  console.log(`[YouTube] After Shorts filter: ${regularVideos.length} regular videos`);
+
+  const posts = regularVideos.slice(0, limit).map((video: any, idx: number) => {
     const stats = video.statistics || {};
     const snippet = video.snippet || {};
     const likes = Number(stats.likeCount || 0);

@@ -45,15 +45,24 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
   const isYT = Boolean(ytId);
   const isVideo = post.type === 'reel' || post.type === 'video';
   const videoSrc = proxyVideoUrl(post.video_url);
+  const isNonYTVideo = isVideo && videoSrc && !isYT;
+
+  // Layout:
+  // YouTube  → max-w-5xl, horizontal side-by-side (video 60% | details 40%)
+  // Non-YT video → max-w-4xl, vertical (video full width, details below)
+  // Image    → max-w-3xl, horizontal side-by-side (image 50% | details 50%)
+  const dialogMaxWidth = isYT ? 'max-w-5xl' : (isNonYTVideo ? 'max-w-4xl' : 'max-w-3xl');
+  const outerFlex = isNonYTVideo ? 'flex-col' : 'flex-col md:flex-row';
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={`${isYT || (isVideo && videoSrc) ? 'max-w-4xl' : 'max-w-3xl'} p-0 gap-0 overflow-hidden`}>
+      <DialogContent className={`${dialogMaxWidth} p-0 gap-0 overflow-hidden`}>
         <VisuallyHidden><DialogTitle>{post.caption?.slice(0, 60) || 'Post'}</DialogTitle></VisuallyHidden>
-        <div className={`flex flex-col ${isYT || (isVideo && videoSrc) ? '' : 'md:flex-row'} max-h-[90vh]`}>
+        <div className={`flex ${outerFlex} max-h-[90vh]`}>
           {/* Media */}
           {isYT ? (
-            <div className="w-full bg-black">
+            /* YouTube: ocupa 60% da largura no layout horizontal */
+            <div className="w-full md:w-3/5 bg-black flex-shrink-0">
               <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
                 <iframe
                   src={`https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0`}
@@ -65,7 +74,8 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
                 />
               </div>
             </div>
-          ) : isVideo && videoSrc ? (
+          ) : isNonYTVideo ? (
+            /* Vídeo não-YouTube: layout vertical, ocupa largura total */
             <div className="w-full bg-black">
               <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
                 <video
@@ -81,6 +91,7 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
               </div>
             </div>
           ) : (
+            /* Imagem: ocupa 50% da largura no layout horizontal */
             <div className="md:w-1/2 bg-secondary flex items-center justify-center">
               <img
                 src={proxyImageUrl(post.media_url || post.thumbnail_url)}
@@ -91,7 +102,7 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
           )}
 
           {/* Details */}
-          <div className={`${isYT || (isVideo && videoSrc) ? 'w-full' : 'md:w-1/2'} p-6 overflow-y-auto flex flex-col gap-4`}>
+          <div className={`${isYT ? 'md:w-2/5' : isNonYTVideo ? 'w-full' : 'md:w-1/2'} p-6 overflow-y-auto flex flex-col gap-4`}>
             <div>
               <p className="text-sm font-medium text-foreground line-clamp-2">
                 {post.caption || (post.mentions.length > 0 ? post.mentions[0] : '@perfil')}
@@ -119,7 +130,7 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
 
             <div className="space-y-2">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Metricas</h4>
-              <div className={`grid ${isYT || (isVideo && videoSrc) ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'} gap-2 text-sm text-foreground`}>
+              <div className={`grid ${isNonYTVideo ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-2'} gap-2 text-sm text-foreground`}>
                 <div className="flex items-center gap-2">
                   <Heart className="w-4 h-4 text-destructive" /> {formatNumber(post.metrics.likes)} curtidas
                 </div>
@@ -137,19 +148,19 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
 
             <div className="border-t border-border" />
 
-            <div className={`flex ${isYT || (isVideo && videoSrc) ? 'flex-row' : 'flex-col'} gap-2 mt-auto`}>
+            <div className="flex flex-col gap-2 mt-auto">
               <a
                 href={post.post_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border hover:bg-secondary transition-colors text-sm text-foreground ${isYT || (isVideo && videoSrc) ? 'flex-1' : ''}`}
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border hover:bg-secondary transition-colors text-sm text-foreground"
               >
                 <ExternalLink className="w-4 h-4" />
                 {isYT ? 'Abrir no YouTube' : 'Abrir post original'}
               </a>
               <button
                 onClick={() => onSave(post)}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${isYT || (isVideo && videoSrc) ? 'flex-1' : ''} ${
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
                   isSaved
                     ? 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'
