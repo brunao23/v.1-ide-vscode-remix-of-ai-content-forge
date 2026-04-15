@@ -48,29 +48,30 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
   const isNonYTVideo = isVideo && videoSrc && !isYT;
 
   // Layout:
-  // YouTube  → max-w-5xl, horizontal side-by-side (video 60% | details 40%)
+  // YouTube  → max-w-6xl, horizontal side-by-side (video 60% | details 40%), sem max-h no outer
   // Non-YT video → max-w-4xl, vertical (video full width, details below)
   // Image    → max-w-3xl, horizontal side-by-side (image 50% | details 50%)
-  const dialogMaxWidth = isYT ? 'max-w-5xl' : (isNonYTVideo ? 'max-w-4xl' : 'max-w-3xl');
+  const dialogMaxWidth = isYT ? 'max-w-6xl' : (isNonYTVideo ? 'max-w-4xl' : 'max-w-3xl');
   const outerFlex = isNonYTVideo ? 'flex-col' : 'flex-col md:flex-row';
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className={`${dialogMaxWidth} p-0 gap-0 overflow-hidden`}>
         <VisuallyHidden><DialogTitle>{post.caption?.slice(0, 60) || 'Post'}</DialogTitle></VisuallyHidden>
-        <div className={`flex ${outerFlex} max-h-[90vh]`}>
+        {/* Para YouTube: sem max-h no outer para o vídeo não ser cortado */}
+        <div className={`flex ${outerFlex} ${isNonYTVideo || !isYT ? 'max-h-[90vh]' : ''}`}>
           {/* Media */}
           {isYT ? (
-            /* YouTube: ocupa 60% da largura no layout horizontal */
-            <div className="w-full md:w-3/5 bg-black flex-shrink-0">
-              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+            /* YouTube: painel esquerdo ocupa 60%, iframe preenche 100% da altura disponível */
+            <div className="w-full md:w-3/5 bg-black flex-shrink-0 flex items-center justify-center self-stretch">
+              <div className="w-full aspect-video">
                 <iframe
                   src={`https://www.youtube.com/embed/${ytId}?autoplay=0&rel=0`}
                   title={post.caption || 'YouTube Video'}
                   allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                   allowFullScreen
-                  className="absolute inset-0 w-full h-full"
-                  style={{ border: 'none' }}
+                  className="w-full h-full"
+                  style={{ border: 'none', display: 'block' }}
                 />
               </div>
             </div>
@@ -102,7 +103,7 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
           )}
 
           {/* Details */}
-          <div className={`${isYT ? 'md:w-2/5' : isNonYTVideo ? 'w-full' : 'md:w-1/2'} p-6 overflow-y-auto flex flex-col gap-4`}>
+          <div className={`${isYT ? 'md:w-2/5' : isNonYTVideo ? 'w-full' : 'md:w-1/2'} p-6 overflow-y-auto flex flex-col gap-4 max-h-[90vh]`}>
             <div>
               <p className="text-sm font-medium text-foreground line-clamp-2">
                 {post.caption || (post.mentions.length > 0 ? post.mentions[0] : '@perfil')}
