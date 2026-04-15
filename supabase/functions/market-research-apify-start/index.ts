@@ -274,22 +274,35 @@ async function handleYouTubeDirect(params: {
         scraped_at: new Date().toISOString(),
       };
 
-      // First try with publishedAfter filter (exclude Shorts via videoDuration=medium/long is not precise,
-      // so we fetch extra and filter by duration after getting details)
-      const videosData = await ytApiFetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${fetchLimit}&order=date&publishedAfter=${publishedAfter}&key=${apiKey}`,
-      );
-      videoIds = (videosData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
-      console.log(`[YouTube] Videos with date filter: ${videoIds.length}`);
+      // Fetch medium (4-20 min) and long (>20 min) videos in parallel — excludes Shorts at API level
+      const baseProfileUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${fetchLimit}&order=date&publishedAfter=${publishedAfter}&key=${apiKey}`;
+      const [profileMedium, profileLong] = await Promise.all([
+        ytApiFetch(`${baseProfileUrl}&videoDuration=medium`),
+        ytApiFetch(`${baseProfileUrl}&videoDuration=long`),
+      ]);
+      const profileItems = [...(profileMedium?.items || []), ...(profileLong?.items || [])];
+      const profileSeen = new Set<string>();
+      const profileMerged = profileItems
+        .sort((a: any, b: any) => new Date(b.snippet?.publishedAt || 0).getTime() - new Date(a.snippet?.publishedAt || 0).getTime())
+        .filter((v: any) => { const id = v.id?.videoId; if (!id || profileSeen.has(id)) return false; profileSeen.add(id); return true; });
+      videoIds = profileMerged.map((v: any) => v.id?.videoId).filter(Boolean).slice(0, fetchLimit);
+      console.log(`[YouTube] Videos with date filter (medium+long): ${videoIds.length}`);
 
       // If no results with date filter, retry without it (get latest videos regardless)
       if (videoIds.length === 0) {
         console.log(`[YouTube] No videos in last ${params.periodDays} days, fetching latest without date filter`);
-        const fallbackData = await ytApiFetch(
-          `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${fetchLimit}&order=date&key=${apiKey}`,
-        );
-        videoIds = (fallbackData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
-        console.log(`[YouTube] Videos without date filter: ${videoIds.length}`);
+        const baseNoDate = `https://www.googleapis.com/youtube/v3/search?part=snippet&channelId=${channelId}&type=video&maxResults=${fetchLimit}&order=date&key=${apiKey}`;
+        const [fallbackMedium, fallbackLong] = await Promise.all([
+          ytApiFetch(`${baseNoDate}&videoDuration=medium`),
+          ytApiFetch(`${baseNoDate}&videoDuration=long`),
+        ]);
+        const fallbackItems = [...(fallbackMedium?.items || []), ...(fallbackLong?.items || [])];
+        const fallbackSeen = new Set<string>();
+        const fallbackMerged = fallbackItems
+          .sort((a: any, b: any) => new Date(b.snippet?.publishedAt || 0).getTime() - new Date(a.snippet?.publishedAt || 0).getTime())
+          .filter((v: any) => { const id = v.id?.videoId; if (!id || fallbackSeen.has(id)) return false; fallbackSeen.add(id); return true; });
+        videoIds = fallbackMerged.map((v: any) => v.id?.videoId).filter(Boolean).slice(0, fetchLimit);
+        console.log(`[YouTube] Videos without date filter (medium+long): ${videoIds.length}`);
       }
     } else {
       console.error(`[YouTube] Could not resolve channel for handle: "${handle}"`);
@@ -300,20 +313,31 @@ async function handleYouTubeDirect(params: {
 
     console.log(`[YouTube] Keyword search: "${query}"`);
 
-    const searchData = await ytApiFetch(
-      `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${fetchLimit}&order=relevance&publishedAfter=${publishedAfter}&key=${apiKey}`,
-    );
-    videoIds = (searchData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
-    console.log(`[YouTube] Keyword search results: ${videoIds.length}`);
+    // Fetch medium + long in parallel to exclude Shorts at API level
+    const baseKwUrl = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${fetchLimit}&order=relevance&publishedAfter=${publishedAfter}&key=${apiKey}`;
+    const [kwMedium, kwLong] = await Promise.all([
+      ytApiFetch(`${baseKwUrl}&videoDuration=medium`),
+      ytApiFetch(`${baseKwUrl}&videoDuration=long`),
+    ]);
+    const kwItems = [...(kwMedium?.items || []), ...(kwLong?.items || [])];
+    const kwSeen = new Set<string>();
+    const kwMerged = kwItems.filter((v: any) => { const id = v.id?.videoId; if (!id || kwSeen.has(id)) return false; kwSeen.add(id); return true; });
+    videoIds = kwMerged.map((v: any) => v.id?.videoId).filter(Boolean).slice(0, fetchLimit);
+    console.log(`[YouTube] Keyword search results (medium+long): ${videoIds.length}`);
 
     // If no results with date filter, retry without it
     if (videoIds.length === 0) {
       console.log(`[YouTube] No results with date filter, retrying without`);
-      const fallbackData = await ytApiFetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${fetchLimit}&order=relevance&key=${apiKey}`,
-      );
-      videoIds = (fallbackData?.items || []).map((v: any) => v.id?.videoId).filter(Boolean);
-      console.log(`[YouTube] Keyword search (no date filter): ${videoIds.length}`);
+      const baseKwNoDate = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(query)}&type=video&maxResults=${fetchLimit}&order=relevance&key=${apiKey}`;
+      const [kwFallbackMedium, kwFallbackLong] = await Promise.all([
+        ytApiFetch(`${baseKwNoDate}&videoDuration=medium`),
+        ytApiFetch(`${baseKwNoDate}&videoDuration=long`),
+      ]);
+      const kwFallbackItems = [...(kwFallbackMedium?.items || []), ...(kwFallbackLong?.items || [])];
+      const kwFallbackSeen = new Set<string>();
+      const kwFallbackMerged = kwFallbackItems.filter((v: any) => { const id = v.id?.videoId; if (!id || kwFallbackSeen.has(id)) return false; kwFallbackSeen.add(id); return true; });
+      videoIds = kwFallbackMerged.map((v: any) => v.id?.videoId).filter(Boolean).slice(0, fetchLimit);
+      console.log(`[YouTube] Keyword search (no date filter, medium+long): ${videoIds.length}`);
     }
   }
 
@@ -329,10 +353,11 @@ async function handleYouTubeDirect(params: {
   const videos = detailsData?.items || [];
   console.log(`[YouTube] Video details fetched: ${videos.length}`);
 
-  // Filter out Shorts: videos <= 60 seconds are YouTube Shorts
+  // Filter out Shorts: YouTube Shorts can be up to 3 minutes (180s). API-level filter
+  // (videoDuration=medium/long) already excludes most, this is a safety net.
   const regularVideos = videos.filter((video: any) => {
     const duration = parseIsoDuration(video.contentDetails?.duration || "");
-    const isShort = duration <= 60;
+    const isShort = duration <= 180;
     if (isShort) console.log(`[YouTube] Filtered out Short: ${video.id} (${duration}s)`);
     return !isShort;
   });
