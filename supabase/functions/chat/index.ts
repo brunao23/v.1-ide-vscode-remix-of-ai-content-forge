@@ -1936,10 +1936,27 @@ Texto aqui...
     const remainingBudget = Math.max(0, 370_000 - elapsedMs);
     // Cap per-attempt timeout at 180s (generous, won't stack because timeouts don't retry)
     const aiTimeoutMs = Math.min(remainingBudget, 180_000);
-    console.log(`[AI] elapsed=${Math.round(elapsedMs / 1000)}s remaining=${Math.round(remainingBudget / 1000)}s aiTimeout=${Math.round(aiTimeoutMs / 1000)}s thinking=${effectiveThinking}`);
 
     // When web search was used, disable extended thinking to save time budget
     const effectiveThinking = Boolean(extendedThinking) && !webContextMeta.used;
+
+    // When web search was executed, replace a trigger-only last message so the AI
+    // doesn't respond with "I'll search now..." but instead generates the enriched content.
+    let finalMessages = messages;
+    if (webContextMeta.used) {
+      const lastMsg = finalMessages[finalMessages.length - 1];
+      if (lastMsg && lastMsg.role === "user" && isSearchTriggerMessage(String(lastMsg.content || ""))) {
+        const realTopic = extractConversationTopic(finalMessages.slice(0, -1), String(lastMsg.content || ""));
+        finalMessages = [
+          ...finalMessages.slice(0, -1),
+          {
+            role: "user",
+            content: `Os dados da pesquisa web sobre "${realTopic}" já foram coletados e estão no contexto acima. GERE AGORA a resposta completa, enriquecida com os dados reais da pesquisa. Não diga que vai pesquisar — a busca já aconteceu. Use os dados fornecidos para construir o conteúdo de ${webContextMeta.mode === "calendar" ? "calendário editorial" : "ideia estratégica"} agora.`,
+          },
+        ];
+        console.log(`[AI] Replaced search-trigger message with generation instruction`);
+      }
+    }
 
     console.log(
       `[AI] elapsed=${Math.round(elapsedMs / 1000)}s, aiTimeout=${Math.round(aiTimeoutMs / 1000)}s, thinking=${effectiveThinking}, webUsed=${webContextMeta.used}`,
@@ -1954,7 +1971,7 @@ Texto aqui...
             maxTokens: Number(maxTokens || 8000),
             extendedThinking: effectiveThinking,
             systemPrompt: fullSystemPrompt,
-            messages,
+            messages: finalMessages,
             timeoutMs: aiTimeoutMs,
           });
         } catch (anthropicError) {
@@ -1969,7 +1986,7 @@ Texto aqui...
             maxTokens: Number(maxTokens || 8000),
             extendedThinking: effectiveThinking,
             systemPrompt: fullSystemPrompt,
-            messages,
+            messages: finalMessages,
             timeoutMs: aiTimeoutMs,
           });
         }
@@ -1980,7 +1997,7 @@ Texto aqui...
           maxTokens: Number(maxTokens || 8000),
           extendedThinking: effectiveThinking,
           systemPrompt: fullSystemPrompt,
-          messages,
+          messages: finalMessages,
           timeoutMs: aiTimeoutMs,
         });
       } else {
@@ -1996,7 +2013,7 @@ Texto aqui...
         maxTokens: Number(maxTokens || 8000),
         extendedThinking: effectiveThinking,
         systemPrompt: fullSystemPrompt,
-        messages,
+        messages: finalMessages,
         timeoutMs: aiTimeoutMs,
       });
     } else if (requestedProvider === "openai" || isOpenAIModel(selectedModelId)) {
@@ -2007,7 +2024,7 @@ Texto aqui...
             modelId: selectedModelId,
             maxTokens: Number(maxTokens || 8000),
             systemPrompt: fullSystemPrompt,
-            messages,
+            messages: finalMessages,
           });
         } catch (openAiError) {
           if (!openRouterKey || !shouldFallbackToOpenRouter(openAiError)) {
@@ -2021,7 +2038,7 @@ Texto aqui...
             maxTokens: Number(maxTokens || 8000),
             extendedThinking: effectiveThinking,
             systemPrompt: fullSystemPrompt,
-            messages,
+            messages: finalMessages,
             timeoutMs: aiTimeoutMs,
           });
         }
@@ -2032,7 +2049,7 @@ Texto aqui...
           maxTokens: Number(maxTokens || 8000),
           extendedThinking: effectiveThinking,
           systemPrompt: fullSystemPrompt,
-          messages,
+          messages: finalMessages,
           timeoutMs: aiTimeoutMs,
         });
       } else {
@@ -2048,7 +2065,7 @@ Texto aqui...
         maxTokens: Number(maxTokens || 8000),
         extendedThinking: effectiveThinking,
         systemPrompt: fullSystemPrompt,
-        messages,
+        messages: finalMessages,
         timeoutMs: aiTimeoutMs,
       });
     }

@@ -383,6 +383,26 @@ export default function AdminPage({ tab = "insights" }: Props) {
                 <div className="lg:col-span-2"><Label className="text-xs text-muted-foreground">Usuario</Label><Select value={selectedUserKey} onValueChange={setSelectedUserKey}><SelectTrigger><SelectValue placeholder="Selecione o usuario" /></SelectTrigger><SelectContent>{allUsers.map((u) => <SelectItem key={u.key} value={u.key}>{u.fullName}</SelectItem>)}</SelectContent></Select><div className="flex items-center gap-2 mt-3"><Switch checked={scopeCurrentTenantOnly} onCheckedChange={setScopeCurrentTenantOnly} /><Label className="text-xs text-muted-foreground">Escopo: somente tenant atual</Label></div></div>
               </div>
               <div className="grid gap-3 md:grid-cols-3 lg:grid-cols-6"><MetricMini title="Submissoes" value={currentMetrics.submissions} /><MetricMini title="Checks" value={currentMetrics.checks} /><MetricMini title="Mensagens" value={currentMetrics.chats} /><MetricMini title="Aulas concluidas" value={currentMetrics.lessons} /><MetricMini title="Engajamento" value={pct(currentMetrics.engagement)} /><MetricMini title="Saude" value={pct(currentMetrics.health)} /></div>
+              {/* Implementação Progress */}
+              {taskCount > 0 && (
+                <div className="rounded-xl border border-border bg-secondary/20 p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-semibold text-foreground">Progresso de Implementação</span>
+                    <span className="text-sm font-bold text-amber-400">
+                      {clamp(Math.round((currentMetrics.checks / taskCount) * 100))}%
+                    </span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-background overflow-hidden mb-2">
+                    <div
+                      className="h-full rounded-full bg-amber-400 transition-all duration-500"
+                      style={{ width: `${clamp(Math.round((currentMetrics.checks / taskCount) * 100))}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {currentMetrics.checks} de {taskCount} tarefas concluídas na janela selecionada
+                  </p>
+                </div>
+              )}
               <div className="grid gap-3 md:grid-cols-3">{WINDOWS.map((w) => <MetricMini key={w} title={`Submissoes em ${w} dias`} value={byWindow[w].submissions} />)}</div>
             </CardContent>
           </Card>
@@ -411,7 +431,28 @@ export default function AdminPage({ tab = "insights" }: Props) {
         )}
 
         {tab === "access" && (
-          <Card><CardHeader><CardTitle className="text-lg flex items-center gap-2"><Building2 className="w-5 h-5" />Tenants e Usuarios</CardTitle><CardDescription>Lista de usuarios com tenant de origem.</CardDescription></CardHeader><CardContent className="space-y-2">{allUsers.map((u) => <button key={u.key} type="button" onClick={() => { setSelectedUserKey(u.key); setActivePage("admin-insights"); }} className={`w-full text-left rounded-lg border px-3 py-2 transition-colors ${u.key === selectedUserKey ? "border-primary/60 bg-primary/10" : "border-border hover:bg-secondary/40"}`}><p className="text-sm font-medium truncate">{u.fullName}</p><p className="text-xs text-muted-foreground truncate">{u.email || u.userId} - {u.tenantName} - {u.role}</p></button>)}</CardContent></Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg flex items-center gap-2"><Building2 className="w-5 h-5" />Tenants e Usuários</CardTitle>
+              <CardDescription>Clique em um usuário para ver métricas detalhadas. Progresso de implementação baseado em todos os checks registrados.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {allUsers.map((u) => (
+                <button
+                  key={u.key}
+                  type="button"
+                  onClick={() => { setSelectedUserKey(u.key); setActivePage("admin-insights"); }}
+                  className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${u.key === selectedUserKey ? "border-primary/60 bg-primary/10" : "border-border hover:bg-secondary/40"}`}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-medium truncate">{u.fullName}</p>
+                    <span className="text-xs text-muted-foreground ml-2 shrink-0">{u.tenantName}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{u.email || u.userId} · {u.role}</p>
+                </button>
+              ))}
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>

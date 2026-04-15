@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
+import { useImplementationStore } from "@/stores/implementationStore";
 import {
   BarChart3,
   BookOpen,
@@ -54,6 +55,9 @@ export default function Sidebar() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [docsOpen, setDocsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+
+  const { checkedCount, totalCount } = useImplementationStore();
+  const implementationPercent = totalCount > 0 ? Math.round((checkedCount / totalCount) * 100) : 0;
 
   const recentConversations = conversations.slice(0, 20);
 
@@ -261,6 +265,34 @@ export default function Sidebar() {
 
       {!isAdminMode && (
         <div className="flex-1 overflow-y-auto px-2 mt-2 space-y-4">
+
+          {/* Meu Progresso — só aparece quando há tarefas carregadas */}
+          {totalCount > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setActivePage("implementation");
+                if (isMobile) setSidebarOpen(false);
+              }}
+              className="w-full px-3 py-3 rounded-xl bg-secondary/60 hover:bg-secondary transition-colors text-left"
+              title="Ver checklist de implementação"
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Meu Progresso</span>
+                <span className="text-xs font-bold text-amber-400">{implementationPercent}%</span>
+              </div>
+              <div className="w-full h-1.5 rounded-full bg-background overflow-hidden">
+                <div
+                  className="h-full rounded-full bg-amber-400 transition-all duration-500"
+                  style={{ width: `${implementationPercent}%` }}
+                />
+              </div>
+              <p className="text-[10px] text-muted-foreground mt-1.5">
+                {checkedCount} de {totalCount} tarefas concluídas
+              </p>
+            </button>
+          )}
+
           <div>
             <span className="px-3 text-xs font-medium text-muted-foreground">Conversas</span>
             <div className="mt-1 space-y-0.5">
