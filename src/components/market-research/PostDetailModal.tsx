@@ -103,12 +103,8 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
 
             <div className="border-t border-border" />
 
-            {!isYT && !(isVideo && videoSrc) && post.caption && (
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-6">{post.caption}</p>
-            )}
-
-            {isVideo && videoSrc && post.caption && (
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">{post.caption}</p>
+            {post.caption && (
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap">{post.caption}</p>
             )}
 
             {post.hashtags.length > 0 && (

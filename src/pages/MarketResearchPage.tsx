@@ -620,11 +620,16 @@ function SearchView({
                     <User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
                   </div>
                 )}
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium text-foreground truncate">@{response.metadata.username}</p>
                   <p className="text-xs text-muted-foreground">
                     {response.metadata.followers.toLocaleString('pt-BR')} {isYouTube ? 'inscritos' : 'seguidores'} • {response.metadata.total_posts.toLocaleString('pt-BR')} {contentLabel}
                   </p>
+                  {response.metadata.bio && (
+                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap">
+                      {response.metadata.bio}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>

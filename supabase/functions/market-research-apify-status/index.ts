@@ -286,6 +286,7 @@ function extractProfileMetadata(params: {
       platform: "tiktok",
       username: author.name || author.nickName || String(params.requestedUsername || "").replace(/^@/, "") || "perfil",
       profile_picture: String(author.avatar || ""),
+      bio: String(author.signature || author.bio || author.description || "") || undefined,
       followers: safeNumber(author.fans),
       following: safeNumber(author.following),
       total_posts: safeNumber(author.video),
@@ -334,6 +335,15 @@ function extractProfileMetadata(params: {
       "",
   );
 
+  const bio = String(
+    parent.biography ||
+      parent.bio ||
+      parent.description ||
+      first.biography ||
+      first.bio ||
+      "",
+  ) || undefined;
+
   const hasMeaningfulProfileData = Boolean(profilePicture) || followers > 0 || totalPosts > 0;
   if (!hasMeaningfulProfileData) return undefined;
 
@@ -341,6 +351,7 @@ function extractProfileMetadata(params: {
     platform: "instagram",
     username: username || "perfil",
     profile_picture: profilePicture,
+    bio,
     followers,
     following,
     total_posts: totalPosts,

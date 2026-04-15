@@ -31,6 +31,7 @@ export interface ProfileMetadata {
   platform: Platform;
   username: string;
   profile_picture: string;
+  bio?: string;
   followers: number;
   following: number;
   total_posts: number;
