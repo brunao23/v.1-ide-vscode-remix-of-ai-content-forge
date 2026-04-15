@@ -761,7 +761,6 @@ function NewsImage({ story, className, eager = false }: { story: Story; classNam
         className={`w-full h-full object-cover transition-opacity duration-500 ease-out ${loaded ? 'opacity-100' : 'opacity-0'}`}
         loading={eager ? 'eager' : 'lazy'}
         decoding="async"
-        referrerPolicy="no-referrer"
         onLoad={handleLoad}
         onError={handleError}
       />

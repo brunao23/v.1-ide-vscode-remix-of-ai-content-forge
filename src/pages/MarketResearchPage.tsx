@@ -8,6 +8,7 @@ import PostDetailModal from '@/components/market-research/PostDetailModal';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ResearchProgressBar from '@/components/market-research/ResearchProgressBar';
+import { proxyImageUrl } from '@/lib/utils';
 
 type PageView = 'search' | 'favorites';
 
@@ -256,7 +257,7 @@ function FavoritesView({
   savePost: (p: Post) => void;
 }) {
   return (
-    <div className="max-w-[640px] mx-auto px-6 py-8 space-y-6">
+    <div className="max-w-[720px] mx-auto px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-medium text-foreground">Posts Salvos</h2>
@@ -288,7 +289,7 @@ function FavoritesView({
       )}
 
       {!savedPostsLoading && savedPosts.length > 0 && (
-        <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}`}>
+        <div className="grid grid-cols-2 gap-3">
           {savedPosts.map((post) => {
             const days = daysRemaining(post.saved_at);
             return (
@@ -415,7 +416,7 @@ function SearchView({
   limitMax: number;
 }) {
   return (
-    <div className="max-w-[640px] mx-auto px-6 py-8 space-y-8">
+    <div className="max-w-[720px] mx-auto px-6 py-8 space-y-8">
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
           Analise de Competidores
@@ -610,10 +611,9 @@ function SearchView({
               <div className="flex items-center gap-3">
                 {response.metadata.profile_picture ? (
                   <img
-                    src={response.metadata.profile_picture}
+                    src={proxyImageUrl(response.metadata.profile_picture)}
                     alt={response.metadata.username}
                     className="w-10 h-10 rounded-full object-cover"
-                    referrerPolicy="no-referrer"
                   />
                 ) : (
                   <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
@@ -655,7 +655,7 @@ function SearchView({
             </div>
           </div>
 
-          <div className={`grid gap-4 ${isMobile ? 'grid-cols-2' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4'}`}>
+          <div className="grid grid-cols-2 gap-3">
             {posts.map((post) => (
               <PostCard
                 key={post.id}

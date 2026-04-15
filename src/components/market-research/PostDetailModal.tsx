@@ -1,8 +1,10 @@
 import { Post } from '@/types/marketResearch';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 import { Heart, MessageCircle, Repeat2, Eye, ExternalLink, Bookmark, BookmarkCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { proxyImageUrl } from '@/lib/utils';
 
 function formatNumber(n: number): string {
   return n.toLocaleString('pt-BR');
@@ -12,6 +14,20 @@ function extractYouTubeId(url: string): string | null {
   if (!url) return null;
   const match = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]{11})/);
   return match?.[1] || null;
+}
+
+function proxyVideoUrl(url: string | null | undefined): string | undefined {
+  if (!url) return undefined;
+  try {
+    const { hostname } = new URL(url);
+    const CDN_DOMAINS = ['cdninstagram.com', 'fbcdn.net', 'tiktokcdn.com', 'tiktokcdn-us.com', 'tiktokv.com', 'muscdn.com'];
+    if (CDN_DOMAINS.some((d) => hostname.endsWith(d))) {
+      return `/api/image-proxy?url=${encodeURIComponent(url)}`;
+    }
+    return url;
+  } catch {
+    return url;
+  }
 }
 
 interface Props {
@@ -27,11 +43,14 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
 
   const ytId = extractYouTubeId(post.post_url);
   const isYT = Boolean(ytId);
+  const isVideo = post.type === 'reel' || post.type === 'video';
+  const videoSrc = proxyVideoUrl(post.video_url);
 
   return (
     <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-      <DialogContent className={`${isYT ? 'max-w-4xl' : 'max-w-3xl'} p-0 gap-0 overflow-hidden`}>
-        <div className={`flex flex-col ${isYT ? '' : 'md:flex-row'} max-h-[90vh]`}>
+      <DialogContent className={`${isYT || (isVideo && videoSrc) ? 'max-w-4xl' : 'max-w-3xl'} p-0 gap-0 overflow-hidden`}>
+        <VisuallyHidden><DialogTitle>{post.caption?.slice(0, 60) || 'Post'}</DialogTitle></VisuallyHidden>
+        <div className={`flex flex-col ${isYT || (isVideo && videoSrc) ? '' : 'md:flex-row'} max-h-[90vh]`}>
           {/* Media */}
           {isYT ? (
             <div className="w-full bg-black">
@@ -46,20 +65,33 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
                 />
               </div>
             </div>
+          ) : isVideo && videoSrc ? (
+            <div className="w-full bg-black">
+              <div className="relative w-full" style={{ paddingBottom: '56.25%' }}>
+                <video
+                  src={videoSrc}
+                  poster={proxyImageUrl(post.thumbnail_url)}
+                  controls
+                  playsInline
+                  className="absolute inset-0 w-full h-full object-contain"
+                  style={{ background: '#000' }}
+                >
+                  Seu navegador não suporta reprodução de vídeo.
+                </video>
+              </div>
+            </div>
           ) : (
             <div className="md:w-1/2 bg-secondary flex items-center justify-center">
               <img
-                src={post.media_url || post.thumbnail_url}
+                src={proxyImageUrl(post.media_url || post.thumbnail_url)}
                 alt="Post"
                 className="w-full h-full object-cover max-h-[40vh] md:max-h-[85vh]"
-                referrerPolicy="no-referrer"
-                crossOrigin="anonymous"
               />
             </div>
           )}
 
           {/* Details */}
-          <div className={`${isYT ? 'w-full' : 'md:w-1/2'} p-6 overflow-y-auto flex flex-col gap-4`}>
+          <div className={`${isYT || (isVideo && videoSrc) ? 'w-full' : 'md:w-1/2'} p-6 overflow-y-auto flex flex-col gap-4`}>
             <div>
               <p className="text-sm font-medium text-foreground line-clamp-2">
                 {post.caption || (post.mentions.length > 0 ? post.mentions[0] : '@perfil')}
@@ -71,8 +103,12 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
 
             <div className="border-t border-border" />
 
-            {!isYT && post.caption && (
+            {!isYT && !(isVideo && videoSrc) && post.caption && (
               <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-6">{post.caption}</p>
+            )}
+
+            {isVideo && videoSrc && post.caption && (
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-wrap line-clamp-4">{post.caption}</p>
             )}
 
             {post.hashtags.length > 0 && (
@@ -87,7 +123,7 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
 
             <div className="space-y-2">
               <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Metricas</h4>
-              <div className={`grid ${isYT ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'} gap-2 text-sm text-foreground`}>
+              <div className={`grid ${isYT || (isVideo && videoSrc) ? 'grid-cols-2 md:grid-cols-4' : 'grid-cols-1'} gap-2 text-sm text-foreground`}>
                 <div className="flex items-center gap-2">
                   <Heart className="w-4 h-4 text-destructive" /> {formatNumber(post.metrics.likes)} curtidas
                 </div>
@@ -105,19 +141,19 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
 
             <div className="border-t border-border" />
 
-            <div className={`flex ${isYT ? 'flex-row' : 'flex-col'} gap-2 mt-auto`}>
+            <div className={`flex ${isYT || (isVideo && videoSrc) ? 'flex-row' : 'flex-col'} gap-2 mt-auto`}>
               <a
                 href={post.post_url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border hover:bg-secondary transition-colors text-sm text-foreground ${isYT ? 'flex-1' : ''}`}
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border hover:bg-secondary transition-colors text-sm text-foreground ${isYT || (isVideo && videoSrc) ? 'flex-1' : ''}`}
               >
                 <ExternalLink className="w-4 h-4" />
                 {isYT ? 'Abrir no YouTube' : 'Abrir post original'}
               </a>
               <button
                 onClick={() => onSave(post)}
-                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${isYT ? 'flex-1' : ''} ${
+                className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${isYT || (isVideo && videoSrc) ? 'flex-1' : ''} ${
                   isSaved
                     ? 'bg-primary/10 text-primary border border-primary/30 hover:bg-primary/20'
                     : 'bg-primary text-primary-foreground hover:bg-primary/90'

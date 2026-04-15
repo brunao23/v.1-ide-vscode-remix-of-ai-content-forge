@@ -76,8 +76,10 @@ function buildInstagramInput(params: {
   periodDays?: number;
   resultsLimit?: number;
 }) {
-  const periodDate = buildDateISO(params.periodDays || 30);
-  const limit = Math.min(20, Math.max(1, Number(params.resultsLimit || 20)));
+  // Request extra results so that client-side date filtering still leaves enough posts.
+  // Avoid onlyPostsNewerThan here: infrequent posters return 0 results when the date
+  // window is too narrow. Date filtering is applied after fetching in the status function.
+  const limit = Math.min(50, Math.max(5, Number(params.resultsLimit || 20) * 2));
   const postType = (params.postType || "all") as PostType;
   const resultsType = mapPostTypeToResultsType(postType);
 
@@ -87,7 +89,6 @@ function buildInstagramInput(params: {
     return {
       addParentData: true,
       directUrls: [profileUrl],
-      onlyPostsNewerThan: periodDate,
       resultsLimit: limit,
       resultsType,
     };
@@ -98,8 +99,7 @@ function buildInstagramInput(params: {
     addParentData: true,
     search: cleanKeyword,
     searchType: "hashtag",
-    searchLimit: 1,
-    onlyPostsNewerThan: periodDate,
+    searchLimit: 5,
     resultsLimit: limit,
     resultsType,
   };

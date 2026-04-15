@@ -65,14 +65,16 @@ export default function Index() {
       {isMobile && !sidebarOpen && (
         <button
           onClick={() => setSidebarOpen(true)}
-          className="fixed top-3 left-3 z-30 p-2 rounded-lg bg-card border border-border hover:bg-secondary transition-colors"
+          className="fixed top-3 left-3 z-30 p-1.5 rounded-lg bg-card border border-border hover:bg-secondary transition-colors"
           aria-label="Abrir menu"
         >
-          <Menu className="w-5 h-5 text-foreground" />
+          <Menu className="w-[18px] h-[18px] text-muted-foreground" />
         </button>
       )}
       <Sidebar />
-      {renderPage()}
+      <div className="flex-1 min-w-0 overflow-hidden">
+        {renderPage()}
+      </div>
     </div>
   );
 }

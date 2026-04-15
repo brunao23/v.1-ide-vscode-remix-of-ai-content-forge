@@ -206,6 +206,8 @@ function mapApifyItemToPost(item: any, platform: Platform, index: number) {
       }).filter(Boolean)
     : parseMentions(caption);
 
+  const videoUrl = String(item.videoUrl || item.webVideoUrl || "") || undefined;
+
   return {
     id: String(item.id || item.shortCode || `${platform}_${Date.now()}_${index}`),
     post_url: postUrl,
@@ -213,6 +215,7 @@ function mapApifyItemToPost(item: any, platform: Platform, index: number) {
     thumbnail_url: thumbnail,
     media_url: mediaUrls[0] || undefined,
     media_urls: mediaUrls.length > 0 ? mediaUrls : undefined,
+    video_url: videoUrl,
     caption,
     published_at: toIsoDate(
       item.timestamp ||
@@ -368,6 +371,7 @@ serve(async (req) => {
     const platform = String(body?.platform || "instagram") as Platform;
     const postType = String(body?.post_type || "all") as PostType;
     const requestedLimit = Math.min(100, Math.max(1, Number(body?.results_limit || 20)));
+    const periodDays = Math.max(0, Number(body?.period_days || 0));
     const waitForFinish = Math.min(120, Math.max(1, Number(body?.waitForFinish || 60)));
     const requestedUsername = String(body?.username || "");
 
@@ -442,9 +446,20 @@ serve(async (req) => {
 
     const candidateItems = items.filter((item) => isLikelyApifyPostItem(item));
     const mappedPosts = candidateItems.map((item, idx) => mapApifyItemToPost(item, platform, idx));
-    const filteredPosts = mappedPosts
-      .filter((post) => matchesRequestedPostType(post.type, postType))
-      .slice(0, requestedLimit);
+
+    // Apply post-type filter
+    const typeFiltered = mappedPosts.filter((post) => matchesRequestedPostType(post.type, postType));
+
+    // Apply date filter with automatic fallback: if the window would return 0 posts,
+    // return all posts instead (handles infrequent posters / wide period_days selections).
+    let dateFiltered = typeFiltered;
+    if (periodDays > 0) {
+      const cutoff = new Date(Date.now() - periodDays * 86_400_000).toISOString();
+      const withinPeriod = typeFiltered.filter((post) => post.published_at >= cutoff);
+      dateFiltered = withinPeriod.length > 0 ? withinPeriod : typeFiltered;
+    }
+
+    const filteredPosts = dateFiltered.slice(0, requestedLimit);
 
     const dedupedPosts = Array.from(
       new Map(

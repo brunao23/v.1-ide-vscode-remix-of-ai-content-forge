@@ -65,15 +65,16 @@ function mapResultsType(postType: SearchRequest['post_type']): 'posts' | 'reels'
 }
 
 function buildInstagramInput(request: SearchRequest) {
-  const limit = Math.min(20, Math.max(1, Number(request.results_limit || 20)));
-  const onlyPostsNewerThan = buildDateISO(Number(request.period_days || 30));
+  // Request extra results so date filtering still leaves enough posts.
+  // onlyPostsNewerThan is intentionally omitted: infrequent posters cause 0
+  // results when the window is narrow. Filtering happens after fetch instead.
+  const limit = Math.min(50, Math.max(5, Number(request.results_limit || 20) * 2));
   const resultsType = mapResultsType(request.post_type);
 
   if (request.search_type === 'profile') {
     return {
       addParentData: true,
       directUrls: [toInstagramProfileUrl(String(request.username || ''))],
-      onlyPostsNewerThan,
       resultsLimit: limit,
       resultsType,
     };
@@ -83,8 +84,7 @@ function buildInstagramInput(request: SearchRequest) {
     addParentData: true,
     search: toHashtagKeyword(String(request.keyword || '')),
     searchType: 'hashtag',
-    searchLimit: 1,
-    onlyPostsNewerThan,
+    searchLimit: 5,
     resultsLimit: limit,
     resultsType,
   };
@@ -555,6 +555,7 @@ async function pollApifyStatus(payload: {
   username?: SearchRequest['username'];
   keyword?: SearchRequest['keyword'];
   results_limit?: SearchRequest['results_limit'];
+  period_days?: SearchRequest['period_days'];
 }): Promise<SearchResponse> {
   const startedAt = Date.now();
 
@@ -572,7 +573,8 @@ async function pollApifyStatus(payload: {
           username: payload.username,
           keyword: payload.keyword,
           results_limit: payload.results_limit,
-          waitForFinish: 30, // reduced from 60 to avoid edge function timeout
+          period_days: payload.period_days,
+          waitForFinish: 30,
         },
       });
       data = response.data;
@@ -713,6 +715,7 @@ export async function searchMarket(request: SearchRequest): Promise<SearchRespon
     username: request.username,
     keyword: request.keyword,
     results_limit: request.results_limit,
+    period_days: request.period_days,
   });
 }
 

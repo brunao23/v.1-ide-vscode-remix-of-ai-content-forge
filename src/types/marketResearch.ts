@@ -19,6 +19,7 @@ export interface Post {
   thumbnail_url: string;
   media_url?: string;
   media_urls?: string[];
+  video_url?: string;
   caption: string;
   published_at: string;
   metrics: PostMetrics;
