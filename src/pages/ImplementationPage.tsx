@@ -385,7 +385,7 @@ export default function ImplementationPage() {
             </div>
             <div className="w-full h-2.5 rounded-full bg-secondary overflow-hidden">
               <div
-                className="h-full rounded-full bg-amber-400 transition-all duration-500"
+                className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
               />
             </div>
@@ -397,7 +397,7 @@ export default function ImplementationPage() {
                   ? '🎉 Programa completo!'
                   : 'Continue assim — cada ação no sistema conta!'}
               </span>
-              <span className="text-sm font-bold text-amber-400">{progressPercent}%</span>
+              <span className="text-sm font-bold text-emerald-500">{progressPercent}%</span>
             </div>
           </div>
 
@@ -435,7 +435,7 @@ export default function ImplementationPage() {
                     >
                       <div className="flex items-center gap-2">
                         {isOpen
-                          ? <ChevronDown className="w-4 h-4 text-amber-400" />
+                          ? <ChevronDown className="w-4 h-4 text-emerald-500" />
                           : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
                         <span className="text-sm font-semibold text-foreground">{month.title}</span>
                       </div>
@@ -443,11 +443,11 @@ export default function ImplementationPage() {
                         <span className="text-xs text-muted-foreground">{monthDone}/{monthTasks.length}</span>
                         <div className="w-20 h-1.5 rounded-full bg-secondary overflow-hidden">
                           <div
-                            className="h-full rounded-full bg-amber-400 transition-all duration-300"
+                            className="h-full rounded-full bg-emerald-500 transition-all duration-300"
                             style={{ width: `${monthPct}%` }}
                           />
                         </div>
-                        <span className="text-xs font-medium text-amber-400 w-9 text-right">{monthPct}%</span>
+                        <span className="text-xs font-medium text-emerald-500 w-9 text-right">{monthPct}%</span>
                       </div>
                     </button>
 
@@ -470,7 +470,7 @@ export default function ImplementationPage() {
                                       ? <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
                                       : <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />}
                                     <span className="text-[13px] font-medium text-foreground flex items-center gap-2">
-                                      <span className="w-0.5 h-4 bg-amber-400 rounded-full" />
+                                      <span className="w-0.5 h-4 bg-emerald-500 rounded-full" />
                                       {week.title}
                                     </span>
                                   </div>
