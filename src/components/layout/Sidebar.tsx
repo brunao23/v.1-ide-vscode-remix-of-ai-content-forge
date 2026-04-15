@@ -368,10 +368,10 @@ function ExpandedSidebar({
             >
               <div className="flex items-center justify-between mb-1.5">
                 <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wide">Meu Progresso</span>
-                <span className="text-xs font-bold text-amber-400">{implementationPercent}%</span>
+                <span className="text-xs font-bold text-emerald-500">{implementationPercent}%</span>
               </div>
               <div className="w-full h-1.5 rounded-full bg-background overflow-hidden">
-                <div className="h-full rounded-full bg-amber-400 transition-all duration-500" style={{ width: `${implementationPercent}%` }} />
+                <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${implementationPercent}%` }} />
               </div>
               <p className="text-[10px] text-muted-foreground mt-1.5">
                 {checkedCount} de {totalCount} tarefas concluídas
