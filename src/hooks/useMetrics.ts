@@ -102,6 +102,8 @@ function aggregateMetrics(data: ClientMetrics[]): ClientMetrics | null {
     'ad_spend', 'new_subscribers', 'net_new_subscribers', 'new_clients',
     'total_posts_made', 'total_videos_podcasts_made',
     'youtube_total_views', 'youtube_total_hours',
+    'total_reach_ig_impressions_li', 'advertising_impressions_ig',
+    'churned_end_of_contract', 'churned_cancellation', 'upsells_expansions',
   ];
 
   for (const f of sumFields) {
@@ -125,11 +127,13 @@ export function useMetrics(period: string, targetUserId?: string) {
   const [previousMetrics, setPreviousMetrics] = useState<ClientMetrics | null>(null);
   const [history, setHistory] = useState<ClientMetrics[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const fetchMetrics = useCallback(async () => {
     const uid = targetUserId || user?.id;
 
     setLoading(true);
+    setError(null);
     const range = parsePeriod(period);
 
     // Build query
@@ -154,6 +158,7 @@ export function useMetrics(period: string, targetUserId?: string) {
     const { data, error } = await query;
 
     if (error || !data) {
+      setError(error?.message || 'Erro ao carregar métricas');
       setLoading(false);
       return;
     }
@@ -200,5 +205,5 @@ export function useMetrics(period: string, targetUserId?: string) {
     return Math.round(((current - previous) / previous) * 100);
   };
 
-  return { metrics, previousMetrics, history, loading, calculateChange, refetch: fetchMetrics };
+  return { metrics, previousMetrics, history, loading, error, calculateChange, refetch: fetchMetrics };
 }

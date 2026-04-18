@@ -330,6 +330,28 @@ export function MetricsSubmissionActions({ onSubmitted }: Props) {
 
       toast.success("Dados mensais enviados com sucesso.");
       setOpenMonthly(false);
+      setMonthlyForm({
+        period_month: String(now.getMonth() + 1),
+        period_year: String(now.getFullYear()),
+        total_cash_collected: "",
+        total_new_revenue: "",
+        monthly_recurring_revenue: "",
+        monthly_expenses: "",
+        ad_spend: "",
+        new_clients_signed: "",
+        active_clients: "",
+        confidence_score: "",
+        booked_calls: "",
+        calls_showed: "",
+        triage_calls: "",
+        strategy_calls: "",
+        offers_made: "",
+        inbound_messages: "",
+        total_followers: "",
+        reach: "",
+        views: "",
+        posts_made: "",
+      });
       onSubmitted?.();
     } catch (err: any) {
       toast.error(`Erro ao enviar dados mensais: ${err?.message || "erro desconhecido"}`);

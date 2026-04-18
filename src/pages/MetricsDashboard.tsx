@@ -77,7 +77,7 @@ export default function MetricsDashboard() {
   const now = new Date();
   const defaultPeriod = `${now.getFullYear()}-${now.getMonth() + 1}`;
   const [period, setPeriod] = useState(defaultPeriod);
-  const { metrics, previousMetrics, history, loading, calculateChange, refetch } = useMetrics(period);
+  const { metrics, previousMetrics, history, loading, error, calculateChange, refetch } = useMetrics(period);
   const options = useMemo(() => buildPeriodOptions(), []);
 
   const chg = (field: keyof NonNullable<typeof metrics>) =>
@@ -89,6 +89,14 @@ export default function MetricsDashboard() {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-sm text-destructive">{error}</p>
       </div>
     );
   }
