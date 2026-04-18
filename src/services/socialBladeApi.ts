@@ -29,24 +29,23 @@ function safeNum(v: unknown): number | undefined {
 
 function parseStats(platform: SbPlatform, json: any): SbStats {
   const d = json?.data ?? json;
-  console.log('[SocialBlade raw data]', JSON.stringify(d).slice(0, 1000));
 
-  const stats = d?.statistics ?? d?.stats ?? {};
-  const total = stats?.total ?? stats ?? {};
-  const avg = stats?.avg_last_30_days ?? stats?.averages ?? stats?.average ?? {};
-  const ranks = d?.ranks ?? d?.rank ?? {};
-  const gradeObj = stats?.grade ?? d?.grade ?? {};
+  const idBlock = d?.id ?? {};
+  const general = d?.general ?? {};
+  const branding = general?.branding ?? {};
+  const stats = d?.statistics ?? {};
+  const total = stats?.total ?? {};
+  const growth = stats?.growth ?? {};
+  const ranks = d?.ranks ?? {};
+  const misc = d?.misc ?? {};
+  const gradeObj = misc?.grade ?? stats?.grade ?? {};
 
-  const grade: string | undefined =
-    typeof gradeObj === 'string' ? gradeObj : (gradeObj?.letter as string | undefined);
-  const gradeColor: string | undefined = gradeObj?.color as string | undefined;
+  const username = (idBlock?.username ?? d?.username ?? '') as string;
+  const displayName = (idBlock?.display_name ?? idBlock?.displayName ?? d?.displayName ?? username) as string;
+  const avatar = (branding?.avatar ?? d?.avatar ?? undefined) as string | undefined;
 
-  const username =
-    (d?.username ?? d?.user_name ?? d?.handle ?? d?.channelName ?? '') as string;
-  const displayName =
-    (d?.displayName ?? d?.display_name ?? d?.channelName ?? d?.title ?? d?.name ?? d?.fullName ?? username) as string;
-  const avatar =
-    (d?.avatar ?? d?.avatar_url ?? d?.profile_image ?? d?.profile_image_url ?? d?.thumbnail ?? undefined) as string | undefined;
+  const grade = (gradeObj?.grade ?? gradeObj?.letter ?? undefined) as string | undefined;
+  const gradeColor = (gradeObj?.color ?? undefined) as string | undefined;
 
   const base = {
     platform,
@@ -56,19 +55,19 @@ function parseStats(platform: SbPlatform, json: any): SbStats {
     grade,
     gradeColor,
     rankSb: safeNum(ranks?.sbrank ?? ranks?.sb_rank),
-    avgUploadsMonthly: safeNum(avg?.uploads ?? avg?.videos ?? avg?.media),
-    avgViewsMonthly: safeNum(avg?.views),
+    avgViewsMonthly: safeNum(growth?.views?.['30'] ?? growth?.views?.['7']),
   };
 
   if (platform === 'youtube') {
     return {
       ...base,
-      followers: safeNum(total?.subscribers) ?? 0,
+      followers: safeNum(total?.subscribers ?? total?.followers) ?? 0,
       following: undefined,
-      uploads: safeNum(total?.videos) ?? 0,
+      uploads: safeNum(total?.videos ?? total?.media) ?? 0,
       totalViews: safeNum(total?.views),
-      rankPrimary: safeNum(ranks?.subscribers),
-      avgFollowersMonthly: safeNum(avg?.subscribers),
+      rankPrimary: safeNum(ranks?.subscribers ?? ranks?.followers),
+      avgFollowersMonthly: safeNum(growth?.subscribers?.['30'] ?? growth?.followers?.['30']),
+      avgUploadsMonthly: safeNum(growth?.videos?.['30'] ?? growth?.media?.['30']),
     };
   }
 
@@ -76,11 +75,12 @@ function parseStats(platform: SbPlatform, json: any): SbStats {
     ...base,
     followers: safeNum(total?.followers) ?? 0,
     following: safeNum(total?.following),
-    uploads: safeNum(total?.uploads ?? total?.media ?? total?.posts) ?? 0,
+    uploads: safeNum(total?.media ?? total?.uploads ?? total?.posts) ?? 0,
     totalViews: safeNum(total?.views),
     totalLikes: safeNum(total?.likes),
     rankPrimary: safeNum(ranks?.followers),
-    avgFollowersMonthly: safeNum(avg?.followers),
+    avgFollowersMonthly: safeNum(growth?.followers?.['30']),
+    avgUploadsMonthly: safeNum(growth?.media?.['30']),
   };
 }
 
