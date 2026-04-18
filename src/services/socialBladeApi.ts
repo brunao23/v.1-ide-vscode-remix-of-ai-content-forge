@@ -75,8 +75,18 @@ function parseStats(platform: SbPlatform, json: any): SbStats {
   };
 }
 
+function extractUsername(input: string): string {
+  const trimmed = input.trim();
+  try {
+    const url = new URL(trimmed);
+    const parts = url.pathname.split('/').filter(Boolean);
+    if (parts.length > 0) return parts[0];
+  } catch {}
+  return trimmed.replace(/^@/, '');
+}
+
 export async function fetchSbStats(platform: SbPlatform, username: string): Promise<SbStats> {
-  const query = username.replace(/^@/, '').trim();
+  const query = extractUsername(username);
   const url = `${SB_PROXY}?platform=${encodeURIComponent(platform)}&query=${encodeURIComponent(query)}`;
 
   const res = await fetch(url, {
