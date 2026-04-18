@@ -20,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ResearchProgressBar from '@/components/market-research/ResearchProgressBar';
 import { proxyImageUrl } from '@/lib/utils';
 
-type PageView = 'feed' | 'favorites' | 'competitors';
+type PageView = 'search' | 'feed' | 'competitors' | 'favorites';
 
 const PERIOD_OPTIONS = [
   { value: '1', label: 'Ultimo dia' },
@@ -72,7 +72,7 @@ export default function MarketResearchPage({ onBack }: Props) {
     hasMore,
   } = useMarketResearch();
 
-  const [pageView, setPageView] = useState<PageView>('feed');
+  const [pageView, setPageView] = useState<PageView>('search');
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
 
   // Search form state (persists across tab switches, used in CompetitorsView)
@@ -164,6 +164,17 @@ export default function MarketResearchPage({ onBack }: Props) {
         {/* Page tabs */}
         <div className="flex items-center gap-1 mt-4 overflow-x-auto">
           <button
+            onClick={() => setPageView('search')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${
+              pageView === 'search'
+                ? 'bg-secondary text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-secondary/50'
+            }`}
+          >
+            <Search className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            Pesquisa
+          </button>
+          <button
             onClick={() => setPageView('feed')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${
               pageView === 'feed'
@@ -173,6 +184,17 @@ export default function MarketResearchPage({ onBack }: Props) {
           >
             <User className="w-4 h-4 shrink-0" strokeWidth={1.5} />
             Meu Feed
+          </button>
+          <button
+            onClick={() => setPageView('competitors')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${
+              pageView === 'competitors'
+                ? 'bg-secondary text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-secondary/50'
+            }`}
+          >
+            <Target className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            Análise de Concorrentes
           </button>
           <button
             onClick={() => setPageView('favorites')}
@@ -190,36 +212,13 @@ export default function MarketResearchPage({ onBack }: Props) {
               </span>
             )}
           </button>
-          <button
-            onClick={() => setPageView('competitors')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${
-              pageView === 'competitors'
-                ? 'bg-secondary text-foreground font-medium'
-                : 'text-muted-foreground hover:bg-secondary/50'
-            }`}
-          >
-            <Target className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-            Análise de Concorrentes
-          </button>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {pageView === 'feed' && (
-          <FeedView isMobile={isMobile} setSelectedPost={setSelectedPost} />
-        )}
-        {pageView === 'favorites' && (
-          <FavoritesView
-            isMobile={isMobile}
-            savedPosts={savedPosts}
-            savedPostsLoading={savedPostsLoading}
-            setSelectedPost={setSelectedPost}
-            savePost={savePost}
-          />
-        )}
-        {pageView === 'competitors' && (
-          <CompetitorsView
+        {pageView === 'search' && (
+          <SearchView
             isMobile={isMobile}
             posts={posts}
             response={response}
@@ -261,6 +260,21 @@ export default function MarketResearchPage({ onBack }: Props) {
             limitLabel={limitLabel}
             limitDesc={limitDesc}
             limitMax={limitMax}
+          />
+        )}
+        {pageView === 'feed' && (
+          <FeedView isMobile={isMobile} setSelectedPost={setSelectedPost} />
+        )}
+        {pageView === 'competitors' && (
+          <SavedCompetitorsView setSelectedPost={setSelectedPost} />
+        )}
+        {pageView === 'favorites' && (
+          <FavoritesView
+            isMobile={isMobile}
+            savedPosts={savedPosts}
+            savedPostsLoading={savedPostsLoading}
+            setSelectedPost={setSelectedPost}
+            savePost={savePost}
           />
         )}
       </div>
@@ -568,8 +582,8 @@ function FavoritesView({
   );
 }
 
-/* ─── Competitors View ─── */
-function CompetitorsView({
+/* ─── Search View ─── */
+function SearchView({
   isMobile,
   posts,
   response,
@@ -654,13 +668,13 @@ function CompetitorsView({
   limitDesc: string;
   limitMax: number;
 }) {
-  const { competitors, isCompetitor, markAsCompetitor } = useCompetitors();
+  const { isCompetitor, markAsCompetitor } = useCompetitors();
 
   return (
     <div className="max-w-[720px] mx-auto px-6 py-8 space-y-8">
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
-          Análise de Concorrentes
+          Pesquisa
         </h2>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">
@@ -931,33 +945,66 @@ function CompetitorsView({
           </p>
         </div>
       )}
+    </div>
+  );
+}
 
-      {/* Saved competitors section */}
-      {competitors.length > 0 && (
-        <div className="space-y-4 pt-4 border-t border-border/30">
-          <div className="flex items-center gap-2">
-            <Target className="w-4 h-4 text-primary" strokeWidth={1.5} />
-            <h3 className="text-sm font-medium text-foreground">Concorrentes Marcados</h3>
-            <span className="ml-auto text-xs text-muted-foreground">
-              {competitors.length} marcado{competitors.length !== 1 ? 's' : ''}
-            </span>
+/* ─── Saved Competitors View ─── */
+function SavedCompetitorsView({ setSelectedPost }: { setSelectedPost: (p: Post) => void }) {
+  const { competitors, loading, isCompetitor, markAsCompetitor } = useCompetitors();
+
+  return (
+    <div className="max-w-[720px] mx-auto px-6 py-8 space-y-8">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+        <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
+          Análise de Concorrentes
+        </h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Perfis e publicações que você marcou como concorrentes na pesquisa. Clique em qualquer card para ver detalhes.
+        </p>
+      </div>
+
+      {loading && (
+        <div className="flex items-center justify-center py-16">
+          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+        </div>
+      )}
+
+      {!loading && competitors.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
+            <Target className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
           </div>
+          <p className="text-sm text-muted-foreground">
+            Nenhum concorrente marcado ainda. Use a aba Pesquisa para encontrar perfis e marcá-los.
+          </p>
+        </div>
+      )}
+
+      {!loading && competitors.length > 0 && (
+        <>
+          <p className="text-xs text-muted-foreground">
+            {competitors.length} concorrente{competitors.length !== 1 ? 's' : ''} marcado{competitors.length !== 1 ? 's' : ''}
+          </p>
           <div className="grid grid-cols-2 gap-3">
             {competitors.map((post) => (
               <div key={post.id} className="relative group">
                 <PostCard post={post} onClick={() => setSelectedPost(post)} />
                 <button
                   onClick={(e) => { e.stopPropagation(); void markAsCompetitor(post); }}
-                  className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm bg-primary text-primary-foreground transition-colors hover:bg-destructive hover:text-white"
-                  title="Remover dos concorrentes"
+                  className={`absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm transition-colors ${
+                    isCompetitor(post.id)
+                      ? 'bg-primary text-primary-foreground opacity-0 group-hover:opacity-100 hover:bg-destructive hover:text-white'
+                      : 'bg-background/80 text-muted-foreground hover:bg-destructive/20 hover:text-destructive opacity-0 group-hover:opacity-100'
+                  }`}
                 >
                   <Target className="w-3 h-3" />
-                  Concorrente
+                  Remover
                 </button>
               </div>
             ))}
           </div>
-        </div>
+        </>
       )}
     </div>
   );

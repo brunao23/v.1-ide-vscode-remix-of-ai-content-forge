@@ -20,9 +20,7 @@ import {
   Settings,
   ShieldCheck,
   Sun,
-  Target,
   Trash2,
-  User,
   Users,
   X,
 } from "lucide-react";
@@ -168,9 +166,7 @@ export default function Sidebar() {
               <>
                 <SlimNavItem icon={<Home className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Início" active={activePage === "home"} onClick={() => setActivePage("home")} />
                 <SlimNavItem icon={<Boxes className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="CreatorFounder Kit" active={activePage === "creator-kit"} onClick={() => setActivePage("creator-kit")} />
-                <SlimNavItem icon={<User className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Meu Feed" active={activePage === "meu-feed"} onClick={() => setActivePage("meu-feed")} />
-                <SlimNavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa" active={activePage === "pesquisa"} onClick={() => setActivePage("pesquisa")} />
-                <SlimNavItem icon={<Target className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Análise de Concorrentes" active={activePage === "analise-concorrentes"} onClick={() => setActivePage("analise-concorrentes")} />
+                <SlimNavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" active={activePage === "market-research"} onClick={() => setActivePage("market-research")} />
                 <SlimNavItem icon={<Search className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Buscar" onClick={() => setSearchOpen(true)} />
                 <SlimNavItem icon={<GraduationCap className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aulas" active={activePage === "aulas"} onClick={() => setActivePage("aulas")} />
                 <SlimNavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => setActivePage("calendario")} />
@@ -338,9 +334,7 @@ function ExpandedSidebar({
           <>
             <NavItem icon={<Home className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Início" active={activePage === "home"} onClick={() => navigate("home")} />
             <NavItem icon={<Boxes className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="CreatorFounder Kit" active={activePage === "creator-kit"} onClick={() => navigate("creator-kit")} />
-            <NavItem icon={<User className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Meu Feed" active={activePage === "meu-feed"} onClick={() => navigate("meu-feed")} />
-            <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa" active={activePage === "pesquisa"} onClick={() => navigate("pesquisa")} />
-            <NavItem icon={<Target className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Análise de Concorrentes" active={activePage === "analise-concorrentes"} onClick={() => navigate("analise-concorrentes")} />
+            <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" active={activePage === "market-research"} onClick={() => navigate("market-research")} />
             <NavItem icon={<Search className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Buscar" onClick={onSearch} />
             <NavItem icon={<GraduationCap className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aulas" active={activePage === "aulas"} onClick={() => navigate("aulas")} />
             <NavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => navigate("calendario")} />
