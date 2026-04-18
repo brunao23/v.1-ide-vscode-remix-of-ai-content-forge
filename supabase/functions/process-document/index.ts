@@ -155,6 +155,25 @@ serve(async (req) => {
       }
     }
 
+    // Track OpenAI embedding call in token_usage
+    const totalEmbedTokens = chunks.reduce((s, c) => s + estimateTokens(c), 0);
+    const embCostUsd = (totalEmbedTokens / 1_000_000) * 0.02;
+    supabase.from("token_usage").insert({
+      tenant_id: tenantId,
+      user_id: effectiveUserId,
+      model_id: embeddingModel,
+      provider: "openai",
+      agent_id: agentId || null,
+      input_tokens: totalEmbedTokens,
+      output_tokens: 0,
+      cost_usd: Number(embCostUsd.toFixed(8)),
+      tool_call_count: 0,
+      rag_docs_retrieved: chunks.length,
+    }).then(({ error }: { error: any }) => {
+      if (error) console.error("[TokenUsage] Embedding insert failed:", error.message);
+      else console.log(`[TokenUsage] Embedding tracked: chunks=${chunks.length} tokens=${totalEmbedTokens}`);
+    });
+
     // Clear previous chunks/vectors for reprocessing
     await supabase
       .from("document_chunks")

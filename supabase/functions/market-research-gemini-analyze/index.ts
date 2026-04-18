@@ -251,6 +251,27 @@ serve(async (req) => {
     const rawText = geminiData.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
     const analysis = parseGeminiJson(rawText);
 
+    // Track Gemini API call in token_usage
+    const geminiUsage = geminiData.usageMetadata || {};
+    const inputTok = Number(geminiUsage.promptTokenCount || 0);
+    const outputTok = Number(geminiUsage.candidatesTokenCount || 0);
+    const geminiCostUsd = (inputTok / 1_000_000) * 0.15 + (outputTok / 1_000_000) * 0.60;
+    serviceClient.from("token_usage").insert({
+      tenant_id: tenantId,
+      user_id: userId,
+      model_id: model,
+      provider: "google",
+      agent_id: null,
+      input_tokens: inputTok,
+      output_tokens: outputTok,
+      cost_usd: Number(geminiCostUsd.toFixed(6)),
+      tool_call_count: 0,
+      rag_docs_retrieved: 0,
+    }).then(({ error }: { error: any }) => {
+      if (error) console.error("[TokenUsage] Gemini insert failed:", error.message);
+      else console.log(`[TokenUsage] Gemini tracked: in=${inputTok} out=${outputTok}`);
+    });
+
     const { data: savedAnalysis, error: saveErr } = await serviceClient
       .from("market_research_gemini_analyses")
       .upsert(
