@@ -6,7 +6,7 @@ const MONTHS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', '
 function fmtCurrency(v: number) {
   if (v >= 1_000_000) return `R$${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `R$${(v / 1_000).toFixed(0)}k`;
-  return `R$${v}`;
+  return `R$${new Intl.NumberFormat('pt-BR').format(v)}`;
 }
 
 interface Props {

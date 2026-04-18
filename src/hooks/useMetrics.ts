@@ -110,12 +110,25 @@ function aggregateMetrics(data: ClientMetrics[]): ClientMetrics | null {
     (base as any)[f] = data.reduce((s, d) => s + ((d as any)[f] || 0), 0);
   }
 
-  // Average fields
-  const avgFields: (keyof ClientMetrics)[] = ['cpm', 'roas', 'daily_ad_spend'];
+  // Average fields (snapshot metrics where average across period is meaningful)
+  const avgFields: (keyof ClientMetrics)[] = ['daily_ad_spend', 'long_form_monthly_audience'];
   for (const f of avgFields) {
     const vals = data.map(d => (d as any)[f]).filter((v: any) => v != null);
     (base as any)[f] = vals.length ? vals.reduce((a: number, b: number) => a + b, 0) / vals.length : null;
   }
+
+  // Recalculate derived metrics from aggregated sums for precision
+  const aggAdSpend = (base as any)['ad_spend'] || 0;
+  const aggReach = (base as any)['total_reach_ig_impressions_li'] || 0;
+  const aggCash = (base as any)['total_cash_collected'] || 0;
+
+  (base as any)['cpm'] = aggAdSpend > 0 && aggReach > 0
+    ? Number((aggAdSpend / (aggReach / 1000)).toFixed(2))
+    : null;
+
+  (base as any)['roas'] = aggAdSpend > 0
+    ? Number((aggCash / aggAdSpend).toFixed(2))
+    : null;
 
   // Last value fields (channel sizes, MRR, etc.) — already from base (last entry)
   return base;
