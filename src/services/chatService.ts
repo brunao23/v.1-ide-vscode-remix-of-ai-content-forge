@@ -59,6 +59,8 @@ interface SendMessageParams {
   userId?: string;
   tenantId?: string;
   webSearchApproved?: boolean;
+  onDelta?: (text: string) => void;
+  onThinkingDelta?: (text: string) => void;
 }
 
 type ChatApiResponse = {
@@ -112,7 +114,12 @@ async function getValidAccessToken(): Promise<string> {
   return refreshedToken;
 }
 
-async function callChatFunction(accessToken: string, payload: Record<string, unknown>) {
+async function callChatFunction(
+  accessToken: string,
+  payload: Record<string, unknown>,
+  onDelta?: (text: string) => void,
+  onThinkingDelta?: (text: string) => void,
+) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 300_000);
 
@@ -128,15 +135,57 @@ async function callChatFunction(accessToken: string, payload: Record<string, unk
       signal: controller.signal,
     });
 
-    const raw = await response.text();
-    let parsed: any = null;
-    try {
-      parsed = raw ? JSON.parse(raw) : null;
-    } catch {
-      parsed = null;
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('text/event-stream')) {
+      const raw = await response.text();
+      let parsed: any = null;
+      try { parsed = raw ? JSON.parse(raw) : null; } catch { parsed = null; }
+      return { response, parsed };
     }
 
-    return { response, parsed, raw };
+    if (!response.body) throw new Error('Response body is null');
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
+    let parsed: any = null;
+    let eventType = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+      const lines = buf.split('\n');
+      buf = lines.pop() ?? '';
+
+      for (const line of lines) {
+        if (line.startsWith('event: ')) {
+          eventType = line.slice(7).trim();
+        } else if (line.startsWith('data: ')) {
+          const data = line.slice(6);
+          if (eventType === 'delta') {
+            try {
+              const { text } = JSON.parse(data);
+              if (text && onDelta) onDelta(text);
+            } catch {}
+          } else if (eventType === 'thinkingDelta') {
+            try {
+              const { text } = JSON.parse(data);
+              if (text && onThinkingDelta) onThinkingDelta(text);
+            } catch {}
+          } else if (eventType === 'done') {
+            try { parsed = JSON.parse(data); } catch {}
+          } else if (eventType === 'error') {
+            let errMsg = 'Erro no servidor.';
+            try { errMsg = JSON.parse(data)?.error || errMsg; } catch {}
+            throw new Error(errMsg);
+          }
+        } else if (line === '') {
+          eventType = '';
+        }
+      }
+    }
+
+    return { response, parsed };
   } catch (err: any) {
     if (err?.name === 'AbortError') {
       throw new Error('A resposta demorou mais que o esperado. Tente novamente com uma pergunta mais curta.');
@@ -144,7 +193,7 @@ async function callChatFunction(accessToken: string, payload: Record<string, unk
     if (err?.message?.includes('Failed to fetch') || err?.message?.includes('NetworkError') || err?.message?.includes('fetch')) {
       throw new Error('Falha na conexao. Verifique sua internet e tente novamente.');
     }
-    throw new Error('Erro de comunicacao com o servidor. Tente novamente.');
+    throw err;
   } finally {
     clearTimeout(timeout);
   }
@@ -185,7 +234,7 @@ export async function sendChatMessage(params: SendMessageParams): Promise<ChatAp
   let parsed: any;
 
   try {
-    ({ response, parsed } = await callChatFunction(accessToken, payload));
+    ({ response, parsed } = await callChatFunction(accessToken, payload, params.onDelta, params.onThinkingDelta));
   } catch (err: any) {
     // Network/timeout errors from callChatFunction
     throw err;
@@ -197,7 +246,7 @@ export async function sendChatMessage(params: SendMessageParams): Promise<ChatAp
       const refreshed = await supabase.auth.refreshSession();
       if (refreshed.data.session?.access_token) {
         accessToken = refreshed.data.session.access_token;
-        ({ response, parsed } = await callChatFunction(accessToken, payload));
+        ({ response, parsed } = await callChatFunction(accessToken, payload, params.onDelta, params.onThinkingDelta));
       }
     } catch {
       throw new Error('Sua sessao expirou. Faca login novamente.');
@@ -215,6 +264,10 @@ export async function sendChatMessage(params: SendMessageParams): Promise<ChatAp
     if (status === 429) throw new Error('Muitas requisicoes. Aguarde alguns segundos e tente novamente.');
     if (status >= 500) throw new Error('Erro temporario no servidor. Tente novamente em alguns instantes.');
     throw new Error(parsed?.error || 'Falha ao processar sua mensagem. Tente novamente.');
+  }
+
+  if (!parsed) {
+    throw new Error('Resposta invalida do servidor. Tente novamente.');
   }
 
   return parsed as ChatApiResponse;

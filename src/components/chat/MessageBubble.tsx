@@ -47,6 +47,7 @@ import {
   CheckCircle2,
   Globe,
   ExternalLink,
+  Brain,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
@@ -241,14 +242,19 @@ export default function MessageBubble({ message, agentId, onWebSearchRequest }: 
       </div>
 
       {message.thinking && (
-        <details className="text-sm text-muted-foreground mb-3 cursor-pointer">
-          <summary className="italic hover:text-foreground transition-colors">
-            Pensou por {message.thinkingDuration?.toFixed(0) || '?'}s
-          </summary>
-          <div className="mt-2 p-3 bg-secondary rounded-lg text-sm text-muted-foreground whitespace-pre-wrap max-h-60 overflow-y-auto">
+        <div className="mb-3 rounded-lg border border-border/40 overflow-hidden">
+          <div className="flex items-center gap-2 px-3 py-2 bg-secondary/50 border-b border-border/40">
+            <Brain className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-xs text-muted-foreground italic">
+              {message.isStreaming
+                ? 'Raciocínio em andamento...'
+                : `Pensou por ${message.thinkingDuration?.toFixed(0) || '?'}s`}
+            </span>
+          </div>
+          <div className="px-3 py-2.5 text-xs text-muted-foreground whitespace-pre-wrap leading-relaxed font-mono">
             {message.thinking}
           </div>
-        </details>
+        </div>
       )}
 
       {message.isStreaming && !message.content?.startsWith('Erro:') ? (

@@ -1760,7 +1760,7 @@ async function callAnthropic(params: {
   timeoutMs?: number;
 }) {
   // Single hard deadline covering ALL retries combined â€” prevents 3Ã—timeout blowup
-  const deadlineMs = params.timeoutMs ?? 180_000;
+  const deadlineMs = params.timeoutMs ?? 90_000;
   const deadline = Date.now() + deadlineMs;
 
   const anthropic = new Anthropic({ apiKey: params.apiKey });
@@ -1810,7 +1810,7 @@ async function callAnthropic(params: {
     }
 
     // Per-attempt timeout = remaining budget (never more than 170s)
-    const attemptTimeout = Math.min(remaining, 170_000);
+    const attemptTimeout = Math.min(remaining, 90_000);
 
     try {
       const startTime = Date.now();
@@ -1868,6 +1868,88 @@ async function callAnthropic(params: {
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
+    },
+    provider: "anthropic",
+  };
+}
+
+async function callAnthropicStream(params: {
+  apiKey: string;
+  modelId: string;
+  maxTokens: number;
+  extendedThinking: boolean;
+  thinkingEffort?: ThinkingEffort;
+  systemPrompt: string;
+  messages: ChatMessage[];
+  timeoutMs?: number;
+  onDelta: (text: string) => void;
+  onThinkingDelta?: (text: string) => void;
+}) {
+  const deadlineMs = params.timeoutMs ?? 90_000;
+  const anthropic = new Anthropic({ apiKey: params.apiKey });
+  const baseModelId = params.modelId || "claude-sonnet-4-20250514";
+  const baseMaxTokens = Math.max(512, Number(params.maxTokens || 8000));
+  const requestedEffort = normalizeThinkingEffort(params.thinkingEffort);
+  const thinkingConfig = resolveAnthropicThinkingConfig({
+    modelId: baseModelId,
+    requested: Boolean(params.extendedThinking),
+    maxTokens: baseMaxTokens,
+    effort: requestedEffort,
+  });
+
+  const requestParams: any = {
+    model: baseModelId,
+    max_tokens: baseMaxTokens,
+    system: params.systemPrompt,
+    messages: params.messages,
+  };
+
+  if (thinkingConfig.enabled && thinkingConfig.mode === "adaptive") {
+    requestParams.thinking = { type: "adaptive", display: "summarized" };
+    requestParams.output_config = { effort: thinkingConfig.effort || requestedEffort };
+  } else if (thinkingConfig.enabled && thinkingConfig.mode === "enabled") {
+    const budgetTokens = Math.max(1024, thinkingConfig.budgetTokens || 1024);
+    requestParams.max_tokens = Math.max(requestParams.max_tokens, budgetTokens + 512);
+    requestParams.thinking = { type: "enabled", budget_tokens: budgetTokens };
+  }
+
+  const startTime = Date.now();
+  const stream = anthropic.messages.stream(requestParams);
+  const abortTimeout = setTimeout(() => stream.abort(), deadlineMs);
+
+  try {
+    for await (const event of stream) {
+      if (event.type === "content_block_delta") {
+        const delta = event.delta as any;
+        if (delta.type === "text_delta") {
+          params.onDelta(delta.text);
+        } else if (delta.type === "thinking_block_delta" && params.onThinkingDelta) {
+          params.onThinkingDelta(delta.thinking);
+        }
+      }
+    }
+  } finally {
+    clearTimeout(abortTimeout);
+  }
+
+  const finalMsg = await stream.finalMessage();
+  const thinkingDuration = (Date.now() - startTime) / 1000;
+  let content = "";
+  let thinking = "";
+
+  for (const block of finalMsg.content) {
+    if (block.type === "text") content += block.text;
+    else if (block.type === "thinking") thinking = (block as any).thinking;
+  }
+
+  return {
+    content,
+    thinking: thinking || undefined,
+    thinkingDuration: thinkingConfig.enabled ? thinkingDuration : undefined,
+    thinkingConfig,
+    usage: {
+      inputTokens: finalMsg.usage.input_tokens,
+      outputTokens: finalMsg.usage.output_tokens,
     },
     provider: "anthropic",
   };
@@ -2160,7 +2242,7 @@ async function callAnthropicWithTools(params: {
 }> {
   const anthropic = new Anthropic({ apiKey: params.apiKey });
   const maxIter = Math.min(params.maxIterations ?? 6, 8);
-  const deadline = Date.now() + (params.timeoutMs ?? 200_000);
+  const deadline = Date.now() + (params.timeoutMs ?? 120_000);
 
   const thinkingConfig = resolveAnthropicThinkingConfig({
     modelId: params.modelId,
@@ -2180,6 +2262,14 @@ async function callAnthropicWithTools(params: {
   const apiMessages: any[] = params.messages
     .filter((m) => m.role !== "system")
     .map((m) => ({ role: m.role, content: String(m.content || "") }));
+
+  // Trim history to last 8 messages to prevent context explosion on subsequent requests
+  if (apiMessages.length > 8) {
+    const trimmed = apiMessages.slice(apiMessages.length - 8);
+    const firstUserIdx = trimmed.findIndex((m: any) => m.role === "user");
+    apiMessages.splice(0, apiMessages.length, ...(firstUserIdx > 0 ? trimmed.slice(firstUserIdx) : trimmed));
+    console.log(`[AgentMode] History trimmed to ${apiMessages.length} messages`);
+  }
 
   for (let iter = 0; iter < maxIter; iter++) {
     const remaining = deadline - Date.now();
@@ -2206,16 +2296,32 @@ async function callAnthropicWithTools(params: {
 
     const startTime = Date.now();
     let response: any;
-    try {
-      response = await Promise.race([
-        anthropic.messages.create(requestParams),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error("Agentic tool loop request timed out")), Math.min(remaining, 170_000))
-        ),
-      ]);
-    } catch (err) {
-      throw wrapProviderError("Anthropic", err);
+    let lastAgentErr: any;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await Promise.race([
+          anthropic.messages.create(requestParams),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error("Agentic tool loop request timed out")), Math.min(remaining, 90_000))
+          ),
+        ]);
+        break;
+      } catch (err) {
+        lastAgentErr = err;
+        const msg = String((err as any)?.message || "");
+        const isTimeout = msg.includes("timed out") || msg.includes("timeout");
+        if (!isTimeout && attempt === 0 && isTransientUpstreamError(err)) {
+          const retryWait = Math.min(2000, deadline - Date.now() - 8000);
+          if (retryWait > 500) {
+            console.warn(`[AgentMode] iter=${iter} attempt 1 failed, retrying in ${retryWait}ms:`, msg.slice(0, 80));
+            await waitForRetry(retryWait);
+            continue;
+          }
+        }
+        throw wrapProviderError("Anthropic", err);
+      }
     }
+    if (!response) throw wrapProviderError("Anthropic", lastAgentErr);
 
     thinkingDuration += (Date.now() - startTime) / 1000;
     totalInputTokens += response.usage?.input_tokens ?? 0;
@@ -2398,6 +2504,19 @@ serve(async (req) => {
   // Track wall-clock time so AI calls get the remaining budget
   const requestStartMs = Date.now();
 
+  // ── SSE streaming setup ──────────────────────────────────────────────────
+  let _ctrl: ReadableStreamDefaultController<Uint8Array> | null = null;
+  const _enc = new TextEncoder();
+  const _sseStream = new ReadableStream<Uint8Array>({ start(c) { _ctrl = c; } });
+  const _sse = (event: string, data: unknown) => {
+    try { _ctrl?.enqueue(_enc.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`)); } catch {}
+  };
+  const _pingTimer = setInterval(() => {
+    try { _ctrl?.enqueue(_enc.encode(`: ping\n\n`)); } catch {}
+  }, 15_000);
+  const _closeSSE = () => { clearInterval(_pingTimer); try { _ctrl?.close(); } catch {} };
+
+  (async () => {
   try {
     const body = await req.json();
     const {
@@ -2915,12 +3034,11 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
           toolCallCount?: number;
         };
 
-    // wall_clock_limit = 400s (set in config.toml). Reserve 20s buffer â†’ 380s total.
-    // AI gets whatever is left after web search and other pre-processing.
+    // wall_clock_limit = 150s (config.toml). Reserve 30s buffer → 120s total for AI.
     const elapsedMs = Date.now() - requestStartMs;
-    const remainingBudget = Math.max(0, 370_000 - elapsedMs);
-    // Cap per-attempt timeout at 180s (generous, won't stack because timeouts don't retry)
-    const aiTimeoutMs = Math.min(remainingBudget, 180_000);
+    const remainingBudget = Math.max(0, 120_000 - elapsedMs);
+    // Cap per-attempt timeout at 90s to stay within wall time even with pre-processing overhead
+    const aiTimeoutMs = Math.min(remainingBudget, 90_000);
 
     // Extended thinking always active when requested — web search doesn't disable it
     const effectiveThinking = Boolean(extendedThinking);
@@ -2986,7 +3104,7 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
       if (!anthropicKey) {
         throw new Error("ANTHROPIC_API_KEY not configured");
       }
-      result = await callAnthropic({
+      result = await callAnthropicStream({
         apiKey: anthropicKey,
         modelId: selectedModelId,
         maxTokens: Number(maxTokens || 8000),
@@ -2995,6 +3113,8 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         systemPrompt: fullSystemPrompt,
         messages: finalMessages,
         timeoutMs: aiTimeoutMs,
+        onDelta: (text: string) => _sse("delta", { text }),
+        onThinkingDelta: (text: string) => _sse("thinkingDelta", { text }),
       });
     } else if (effectiveProvider === "openai") {
       if (!openaiKey) {
@@ -3056,38 +3176,33 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
       console.warn("[TokenUsage] Skipped — missing supabase/userId/tenantId:", { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
     }
 
-    return new Response(
-      JSON.stringify({
-        content: sanitizedContent,
-        thinking: result.thinking,
-        thinkingDuration: result.thinkingDuration,
-        thinkingConfig: result.thinkingConfig || null,
-        usage: result.usage,
-        provider: result.provider,
-        documentsContext: {
-          enabled: shouldAttachDocuments,
-          consultIntentDetected,
-          requiredTypes: filterTypes || [],
-          systemDocsUsed: promptAssembly.systemDocsUsed,
-          userChunksUsed: promptAssembly.userChunksUsed,
-          retrievalSources: promptAssembly.userChunkSources,
-          usedDocumentTypes: promptAssembly.usedDocumentTypes,
-          topic: documentsContextMeta.topic,
-          retrievalSteps: documentsContextMeta.steps,
-        },
-        webContext: webContextMeta,
-        agenticMode: useAgenticMode ? { active: true, toolCallCount: result.toolCallCount ?? 0 } : null,
-        routing: {
-          requestedProvider: requestedProvider || null,
-          effectiveProvider,
-          finalProvider: result.provider,
-          selectedModelId,
-        },
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    _sse("done", {
+      content: sanitizedContent,
+      thinking: result.thinking,
+      thinkingDuration: result.thinkingDuration,
+      thinkingConfig: result.thinkingConfig || null,
+      usage: result.usage,
+      provider: result.provider,
+      documentsContext: {
+        enabled: shouldAttachDocuments,
+        consultIntentDetected,
+        requiredTypes: filterTypes || [],
+        systemDocsUsed: promptAssembly.systemDocsUsed,
+        userChunksUsed: promptAssembly.userChunksUsed,
+        retrievalSources: promptAssembly.userChunkSources,
+        usedDocumentTypes: promptAssembly.usedDocumentTypes,
+        topic: documentsContextMeta.topic,
+        retrievalSteps: documentsContextMeta.steps,
       },
-    );
+      webContext: webContextMeta,
+      agenticMode: useAgenticMode ? { active: true, toolCallCount: result.toolCallCount ?? 0 } : null,
+      routing: {
+        requestedProvider: requestedProvider || null,
+        effectiveProvider,
+        finalProvider: result.provider,
+        selectedModelId,
+      },
+    });
   } catch (error: any) {
     console.error("Chat function error:", error);
     const rawMessage = String(error?.message || "");
@@ -3116,16 +3231,20 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
       userMessage = "Erro temporario no servidor. Tente novamente em alguns instantes.";
     }
 
-    return new Response(
-      JSON.stringify({
-        error: userMessage,
-      }),
-      {
-        status: status >= 500 ? 200 : status, // Return 200 for server errors so frontend parses the JSON
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    _sse("error", { error: userMessage });
+  } finally {
+    _closeSSE();
   }
+  })();
+
+  return new Response(_sseStream, {
+    headers: {
+      ...corsHeaders,
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "X-Accel-Buffering": "no",
+    },
+  });
 });
 
 

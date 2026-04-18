@@ -182,7 +182,7 @@ export default function HomePage() {
 
       window.clearInterval(stageTimer);
 
-      if (response.webContext?.searched && response.webContext?.used) {
+      if (response?.webContext?.searched && response?.webContext?.used) {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === assistantId ? { ...m, content: 'Buscando na web...', isStreaming: true } : m,
@@ -202,11 +202,11 @@ export default function HomePage() {
           m.id === assistantId
             ? {
                 ...m,
-                content: response.content,
+                content: response?.content ?? '',
                 isStreaming: false,
-                thinking: response.thinking,
-                thinkingDuration: response.thinkingDuration,
-                webSources: response.webContext?.sources?.length ? response.webContext.sources : undefined,
+                thinking: response?.thinking,
+                thinkingDuration: response?.thinkingDuration,
+                webSources: response?.webContext?.sources?.length ? response.webContext.sources : undefined,
               }
             : m
         )

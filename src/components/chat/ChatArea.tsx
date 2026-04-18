@@ -258,12 +258,44 @@ export default function ChatArea() {
         }
       }, 2400);
 
+      let stageCleared = false;
       try {
         const conv = useChatStore.getState().conversations.find((item) => item.id === convId);
         const historyMessages = (conv?.messages || [])
           .filter((item) => item.id !== assistantId)
           .filter((item) => item.role === 'user' || (item.role === 'assistant' && item.content))
           .map((item) => ({ role: item.role, content: item.content }));
+
+        let streamedContent = '';
+        const handleDelta = (text: string) => {
+          if (!stageCleared) {
+            window.clearInterval(stageTimer);
+            stageCleared = true;
+          }
+          streamedContent += text;
+          updateMessage(convId, assistantId, streamedContent);
+        };
+
+        let streamingThinking = '';
+        const handleThinkingDelta = (text: string) => {
+          if (!stageCleared) {
+            window.clearInterval(stageTimer);
+            stageCleared = true;
+          }
+          streamingThinking += text;
+          const store = useChatStore.getState();
+          const conv = store.conversations.find((item) => item.id === convId);
+          if (!conv) return;
+          const msgIdx = conv.messages.findIndex((item) => item.id === assistantId);
+          if (msgIdx === -1) return;
+          const updatedMsgs = [...conv.messages];
+          updatedMsgs[msgIdx] = { ...updatedMsgs[msgIdx], thinking: streamingThinking };
+          useChatStore.setState({
+            conversations: store.conversations.map((item) =>
+              item.id === convId ? { ...item, messages: updatedMsgs } : item,
+            ),
+          });
+        };
 
         const response = await sendChatMessage({
           messages: historyMessages,
@@ -274,18 +306,22 @@ export default function ChatArea() {
           userId: user?.id,
           tenantId: activeTenant?.id,
           webSearchApproved: options?.webSearchApproved || false,
+          onDelta: handleDelta,
+          onThinkingDelta: handleThinkingDelta,
         });
 
-        window.clearInterval(stageTimer);
+        if (!response) throw new Error('Resposta invalida do servidor. Tente novamente.');
 
-        if (response.webContext?.searched && response.webContext?.used) {
+        if (!stageCleared) window.clearInterval(stageTimer);
+
+        if (!stageCleared && response.webContext?.searched && response.webContext?.used) {
           updateMessage(convId, assistantId, 'Buscando na web...');
           await new Promise((r) => setTimeout(r, 900));
           updateMessage(convId, assistantId, 'Gerando resposta...');
           await new Promise((r) => setTimeout(r, 600));
         }
 
-        updateMessage(convId, assistantId, response.content);
+        updateMessage(convId, assistantId, response.content ?? '');
 
         {
           const store = useChatStore.getState();
@@ -325,6 +361,7 @@ export default function ChatArea() {
           console.error('Falha ao salvar resposta do assistente:', error);
         });
       } catch (error: any) {
+        if (!stageCleared) window.clearInterval(stageTimer);
         const errMsg = String(error?.message || '');
         console.error('Chat error:', errMsg);
 
