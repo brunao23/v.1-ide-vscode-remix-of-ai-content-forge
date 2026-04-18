@@ -29,25 +29,34 @@ function safeNum(v: unknown): number | undefined {
 
 function parseStats(platform: SbPlatform, json: any): SbStats {
   const d = json?.data ?? json;
-  const stats = d?.statistics ?? {};
-  const total = stats?.total ?? {};
-  const avg = stats?.avg_last_30_days ?? {};
-  const ranks = d?.ranks ?? {};
-  const gradeObj = stats?.grade ?? {};
+  console.log('[SocialBlade raw data]', JSON.stringify(d).slice(0, 1000));
+
+  const stats = d?.statistics ?? d?.stats ?? {};
+  const total = stats?.total ?? stats ?? {};
+  const avg = stats?.avg_last_30_days ?? stats?.averages ?? stats?.average ?? {};
+  const ranks = d?.ranks ?? d?.rank ?? {};
+  const gradeObj = stats?.grade ?? d?.grade ?? {};
 
   const grade: string | undefined =
     typeof gradeObj === 'string' ? gradeObj : (gradeObj?.letter as string | undefined);
   const gradeColor: string | undefined = gradeObj?.color as string | undefined;
 
+  const username =
+    (d?.username ?? d?.user_name ?? d?.handle ?? d?.channelName ?? '') as string;
+  const displayName =
+    (d?.displayName ?? d?.display_name ?? d?.channelName ?? d?.title ?? d?.name ?? d?.fullName ?? username) as string;
+  const avatar =
+    (d?.avatar ?? d?.avatar_url ?? d?.profile_image ?? d?.profile_image_url ?? d?.thumbnail ?? undefined) as string | undefined;
+
   const base = {
     platform,
-    username: (d?.username as string) || '',
-    displayName: (d?.displayName ?? d?.channelName ?? d?.username ?? '') as string,
-    avatar: (d?.avatar as string | undefined) || undefined,
+    username,
+    displayName,
+    avatar: avatar || undefined,
     grade,
     gradeColor,
-    rankSb: safeNum(ranks?.sbrank),
-    avgUploadsMonthly: safeNum(avg?.uploads ?? avg?.videos),
+    rankSb: safeNum(ranks?.sbrank ?? ranks?.sb_rank),
+    avgUploadsMonthly: safeNum(avg?.uploads ?? avg?.videos ?? avg?.media),
     avgViewsMonthly: safeNum(avg?.views),
   };
 
@@ -67,7 +76,7 @@ function parseStats(platform: SbPlatform, json: any): SbStats {
     ...base,
     followers: safeNum(total?.followers) ?? 0,
     following: safeNum(total?.following),
-    uploads: safeNum(total?.uploads) ?? 0,
+    uploads: safeNum(total?.uploads ?? total?.media ?? total?.posts) ?? 0,
     totalViews: safeNum(total?.views),
     totalLikes: safeNum(total?.likes),
     rankPrimary: safeNum(ranks?.followers),
