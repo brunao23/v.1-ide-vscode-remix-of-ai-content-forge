@@ -1,4 +1,5 @@
 const SB_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/social-blade-proxy`;
+const SB_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
 export type SbPlatform = 'instagram' | 'youtube' | 'tiktok';
 
@@ -78,7 +79,12 @@ export async function fetchSbStats(platform: SbPlatform, username: string): Prom
   const query = username.replace(/^@/, '').trim();
   const url = `${SB_PROXY}?platform=${encodeURIComponent(platform)}&query=${encodeURIComponent(query)}`;
 
-  const res = await fetch(url);
+  const res = await fetch(url, {
+    headers: {
+      apikey: SB_ANON_KEY,
+      Authorization: `Bearer ${SB_ANON_KEY}`,
+    },
+  });
 
   if (!res.ok) {
     throw new Error(`Erro ${res.status}: ${res.statusText}`);
