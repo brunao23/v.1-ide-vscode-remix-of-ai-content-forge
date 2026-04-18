@@ -502,7 +502,7 @@ function extractPromptTokenLimitFromOpenRouterError(
   };
 }
 
-// â”€â”€â”€ Model pricing (USD per million tokens) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// â"€â"€â"€ Model pricing (USD per million tokens) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 function getModelPricing(modelId: string): { inputPerM: number; outputPerM: number } {
   const id = (modelId || "").toLowerCase();
@@ -773,7 +773,7 @@ function userExplicitlyRequestsWebSearch(text: string): boolean {
     normalized.includes("noticias recentes") ||
     normalized.includes("dados recentes") ||
     normalized.includes("tendencias") ||
-    // Approval patterns â€” user confirming AI should search
+    // Approval patterns â€" user confirming AI should search
     normalized.includes("pode buscar") ||
     normalized.includes("pode pesquisar") ||
     normalized.includes("pode procurar") ||
@@ -895,11 +895,11 @@ function isSearchTriggerMessage(text: string): boolean {
  */
 function extractConversationTopic(messages: ChatMessage[], latestUserText: string): string {
   if (!isSearchTriggerMessage(latestUserText)) {
-    // Latest message has real substance â€” use it
+    // Latest message has real substance â€" use it
     return latestUserText;
   }
 
-  // It's a search trigger â€” look back for the REAL topic
+  // It's a search trigger â€" look back for the REAL topic
   // Collect all substantive user messages, excluding search triggers
   const substantiveUserMessages = messages
     .filter((m) => m.role === "user")
@@ -914,7 +914,7 @@ function extractConversationTopic(messages: ChatMessage[], latestUserText: strin
     return combined;
   }
 
-  // Nothing useful in history â€” fallback to the trigger message itself
+  // Nothing useful in history â€" fallback to the trigger message itself
   return latestUserText;
 }
 
@@ -1759,7 +1759,7 @@ async function callAnthropic(params: {
   messages: ChatMessage[];
   timeoutMs?: number;
 }) {
-  // Single hard deadline covering ALL retries combined â€” prevents 3Ã—timeout blowup
+  // Single hard deadline covering ALL retries combined â€" prevents 3Ã—timeout blowup
   const deadlineMs = params.timeoutMs ?? 180_000;
   const deadline = Date.now() + deadlineMs;
 
@@ -1832,7 +1832,7 @@ async function callAnthropic(params: {
       const msg = String((error as any)?.message || error);
       console.error(`Anthropic attempt ${attempt + 1}/3 failed (${Math.round((deadline - Date.now()) / 1000)}s left):`, msg.slice(0, 120));
 
-      // Don't retry timeouts â€” just fail immediately
+      // Don't retry timeouts â€" just fail immediately
       const isTimeout = msg.includes("timed out") || msg.includes("timeout") || msg.includes("AbortError");
       if (isTimeout) break;
 
@@ -2487,7 +2487,7 @@ serve(async (req) => {
 
     let fullSystemPrompt = String(systemPrompt ||
       "Voce e um assistente util e inteligente.");
-    fullSystemPrompt += "\n\nREGRA CRITICA: Voce NUNCA deve incluir tags XML, HTML ou qualquer markup de ferramentas na sua resposta. Nunca escreva <function_calls>, <invoke>, <parameter_name>, <parameter_value>, <function_calls>, <invoke>, <parameter> ou qualquer tag similar. Responda sempre em texto puro com markdown quando necessario. Se voce precisar pesquisar algo, os dados ja foram pesquisados e fornecidos no contexto â€” use-os diretamente. Nunca simule chamadas de ferramentas.";
+    fullSystemPrompt += "\n\nREGRA CRITICA: Voce NUNCA deve incluir tags XML, HTML ou qualquer markup de ferramentas na sua resposta. Nunca escreva <function_calls>, <invoke>, <parameter_name>, <parameter_value>, <function_calls>, <invoke>, <parameter> ou qualquer tag similar. Responda sempre em texto puro com markdown quando necessario. Se voce precisar pesquisar algo, os dados ja foram pesquisados e fornecidos no contexto â€" use-os diretamente. Nunca simule chamadas de ferramentas.";
     let agentPrompt: AgentPromptConfig | null = null;
     if (supabase && agentId) {
       const { data } = await supabase
@@ -2739,9 +2739,9 @@ Voce NAO tem dados de pesquisa web nesta conversa ainda. Siga estas regras:
 ### PROIBICOES ABSOLUTAS:
 - NUNCA invente tags diferentes. A UNICA tag permitida e [SUGERIR_PESQUISA_WEB]. Nada mais.
 - NUNCA use [EXECUTAR_PESQUISA_WEB], [BUSCAR_WEB], [INICIAR_PESQUISA] ou qualquer variacao.
-- NUNCA diga ao usuario “nao tenho acesso a internet” ou “nao consigo buscar na web” — o SISTEMA realiza buscas reais via API. Voce aciona isso com a tag [SUGERIR_PESQUISA_WEB].
+- NUNCA diga ao usuario "nao tenho acesso a internet" ou "nao consigo buscar na web" — o SISTEMA realiza buscas reais via API. Voce aciona isso com a tag [SUGERIR_PESQUISA_WEB].
 - NUNCA finja estar buscando enquanto escreve. A busca, quando ocorre, acontece ANTES desta resposta chegar ate voce.
-- NUNCA escreva “Aguarde enquanto busco...” — se precisar de dados, use a tag e o sistema busca na proxima interacao.
+- NUNCA escreva "Aguarde enquanto busco..." — se precisar de dados, use a tag e o sistema busca na proxima interacao.
 - NUNCA coloque texto ou parametros dentro dos colchetes da tag.
 - CORRETO quando precisar de dados: explique que precisa de dados atuais e adicione [SUGERIR_PESQUISA_WEB] na ultima linha.`;
       }
@@ -2936,7 +2936,7 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
           ...finalMessages.slice(0, -1),
           {
             role: "user",
-            content: `Os dados da pesquisa web sobre "${realTopic}" jÃ¡ foram coletados e estÃ£o no contexto acima. GERE AGORA a resposta completa, enriquecida com os dados reais da pesquisa. NÃ£o diga que vai pesquisar â€” a busca jÃ¡ aconteceu. Use os dados fornecidos para construir o conteÃºdo de ${webContextMeta.mode === "calendar" ? "calendÃ¡rio editorial" : "ideia estratÃ©gica"} agora.`,
+            content: `Os dados da pesquisa web sobre "${realTopic}" jÃ¡ foram coletados e estÃ£o no contexto acima. GERE AGORA a resposta completa, enriquecida com os dados reais da pesquisa. NÃ£o diga que vai pesquisar â€" a busca jÃ¡ aconteceu. Use os dados fornecidos para construir o conteÃºdo de ${webContextMeta.mode === "calendar" ? "calendÃ¡rio editorial" : "ideia estratÃ©gica"} agora.`,
           },
         ];
         console.log(`[AI] Replaced search-trigger message with generation instruction`);
@@ -3024,11 +3024,11 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
 
     const sanitizedContent = sanitizeLeakedToolCalls(result.content);
 
-    // â”€â”€ Record token usage (fire-and-forget â€” does not block response) â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ Record token usage (fire-and-forget â€" does not block response) â"€â"€â"€â"€â"€â"€â"€â"€
     // Tracks every turn individually — multiple messages in same session = multiple rows
     if (supabase && effectiveUserId && tenantId) {
       const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
-      if (!result.usage) console.warn(“[TokenUsage] usage undefined for model:”, selectedModelId);
+      if (!result.usage) console.warn("[TokenUsage] usage undefined for model:", selectedModelId);
       const { inputPerM, outputPerM } = getModelPricing(selectedModelId);
       const costUsd = (usage.inputTokens / 1_000_000) * inputPerM
                     + (usage.outputTokens / 1_000_000) * outputPerM;
@@ -3037,11 +3037,11 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         : userDocumentChunks.length;
       const toolCalls = (result as any).toolCallCount ?? 0;
       console.log(`[TokenUsage] Inserting: model=${selectedModelId} in=${usage.inputTokens} out=${usage.outputTokens} tenant=${tenantId} user=${effectiveUserId}`);
-      supabase.from(“token_usage”).insert({
+      supabase.from("token_usage").insert({
         tenant_id: tenantId,
         user_id: effectiveUserId,
         model_id: selectedModelId,
-        provider: result.provider || “unknown”,
+        provider: result.provider || "unknown",
         agent_id: agentId || null,
         input_tokens: usage.inputTokens,
         output_tokens: usage.outputTokens,
@@ -3049,11 +3049,11 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         tool_call_count: toolCalls,
         rag_docs_retrieved: ragDocsCount,
       }).then(({ error }) => {
-        if (error) console.error(“[TokenUsage] INSERT failed:”, error.message, { tenantId, userId: effectiveUserId, model: selectedModelId });
+        if (error) console.error("[TokenUsage] INSERT failed:", error.message, { tenantId, userId: effectiveUserId, model: selectedModelId });
         else console.log(`[TokenUsage] Saved: in=${usage.inputTokens} out=${usage.outputTokens} cost=$${costUsd.toFixed(6)} tools=${toolCalls} rag=${ragDocsCount}`);
       });
     } else {
-      console.warn(“[TokenUsage] Skipped — missing supabase/userId/tenantId:”, { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
+      console.warn("[TokenUsage] Skipped — missing supabase/userId/tenantId:", { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
     }
 
     return new Response(
@@ -3109,7 +3109,7 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
     } else if (rawMessage.includes("overloaded") || rawMessage.includes("529") || rawMessage.includes("capacity")) {
       userMessage = "O servico de IA esta sobrecarregado no momento. Aguarde alguns segundos e tente novamente.";
     } else if (rawMessage.includes("timeout") || rawMessage.includes("AbortError") || rawMessage.includes("deadline")) {
-      userMessage = "A resposta demorou mais que o esperado. Tente novamente â€” funciona melhor com perguntas mais curtas.";
+      userMessage = "A resposta demorou mais que o esperado. Tente novamente â€" funciona melhor com perguntas mais curtas.";
     } else if (rawMessage.includes("rate") || rawMessage.includes("429")) {
       userMessage = "Muitas requisicoes simultaneas. Aguarde alguns segundos e tente novamente.";
     } else if (status >= 500) {
