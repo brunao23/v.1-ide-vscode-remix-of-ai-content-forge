@@ -9,6 +9,7 @@ import MetricsDashboard from '@/pages/MetricsDashboard';
 import CalendarPage from '@/pages/CalendarPage';
 import NewsFeedPage from '@/pages/NewsFeedPage';
 import AdminPage from '@/pages/AdminPage';
+import SuaJornadaPage from '@/pages/SuaJornadaPage';
 import { useChatStore } from '@/stores/chatStore';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuth } from '@/contexts/AuthContext';
@@ -42,6 +43,8 @@ export default function Index() {
         return <ImplementationPage />;
       case 'aulas':
         return <AulasPage />;
+      case 'jornada':
+        return <SuaJornadaPage />;
       case 'metrics':
         return <MetricsDashboard />;
       case 'calendario':
