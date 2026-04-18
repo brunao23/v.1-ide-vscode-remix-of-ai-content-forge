@@ -2285,6 +2285,12 @@ async function callAnthropicWithTools(params: {
       tools: params.tools,
     };
 
+    // After first round of tool calls, force model to generate final text response
+    if (toolCallCount > 0) {
+      requestParams.tool_choice = { type: "none" };
+      console.log(`[AgentMode] iter=${iter} toolCallCount=${toolCallCount} — forcing tool_choice:none to get final response`);
+    }
+
     if (thinkingConfig.enabled && thinkingConfig.mode === "adaptive") {
       requestParams.thinking = { type: "adaptive", display: "summarized" };
       requestParams.output_config = { effort: thinkingConfig.effort || "medium" };
@@ -2380,7 +2386,9 @@ async function callAnthropicWithTools(params: {
     apiMessages.push({ role: "user", content: toolResults });
   }
 
-  throw new Error(`Agentic loop: exceeded ${maxIter} iterations without final response`);
+  const iterErr = new Error(`A resposta demorou mais que o esperado. Tente novamente com uma pergunta mais curta.`) as Error & { status: number };
+  iterErr.status = 503;
+  throw iterErr;
 }
 
 function buildMarketingToolExecutor(context: {
