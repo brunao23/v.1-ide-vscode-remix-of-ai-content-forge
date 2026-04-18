@@ -1,6 +1,4 @@
-const SB_CLIENT_ID = 'cli_69150c2fcfb9eaa7420d6388';
-const SB_TOKEN = 'c10994b1bc9685545c0ec2908d36f09c5a25a8a8807ab26a3d621dc8c83c2ac7';
-const SB_BASE = 'https://matrix.sbapis.com/b';
+const SB_PROXY = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/social-blade-proxy`;
 
 export type SbPlatform = 'instagram' | 'youtube' | 'tiktok';
 
@@ -78,14 +76,9 @@ function parseStats(platform: SbPlatform, json: any): SbStats {
 
 export async function fetchSbStats(platform: SbPlatform, username: string): Promise<SbStats> {
   const query = username.replace(/^@/, '').trim();
-  const url = `${SB_BASE}/${platform}/statistics?query=${encodeURIComponent(query)}`;
+  const url = `${SB_PROXY}?platform=${encodeURIComponent(platform)}&query=${encodeURIComponent(query)}`;
 
-  const res = await fetch(url, {
-    headers: {
-      clientid: SB_CLIENT_ID,
-      token: SB_TOKEN,
-    },
-  });
+  const res = await fetch(url);
 
   if (!res.ok) {
     throw new Error(`Erro ${res.status}: ${res.statusText}`);
