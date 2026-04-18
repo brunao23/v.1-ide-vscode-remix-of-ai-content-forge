@@ -3024,7 +3024,7 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
 
     const sanitizedContent = sanitizeLeakedToolCalls(result.content);
 
-    // â”€â”€ Record token usage (fire-and-forget â€” does not block response) â”€â”€â”€â”€â”€â”€â”€â”€
+    // â"€â"€ Record token usage (fire-and-forget â€" does not block response) â"€â"€â"€â"€â"€â"€â"€â"€
     // Tracks every turn individually — multiple messages in same session = multiple rows
     if (supabase && effectiveUserId && tenantId) {
       const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
@@ -3037,11 +3037,11 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         : userDocumentChunks.length;
       const toolCalls = (result as any).toolCallCount ?? 0;
       console.log(`[TokenUsage] Inserting: model=${selectedModelId} in=${usage.inputTokens} out=${usage.outputTokens} tenant=${tenantId} user=${effectiveUserId}`);
-      supabase.from(“token_usage”).insert({
+      supabase.from("token_usage").insert({
         tenant_id: tenantId,
         user_id: effectiveUserId,
         model_id: selectedModelId,
-        provider: result.provider || “unknown”,
+        provider: result.provider || "unknown",
         agent_id: agentId || null,
         input_tokens: usage.inputTokens,
         output_tokens: usage.outputTokens,
@@ -3049,11 +3049,11 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         tool_call_count: toolCalls,
         rag_docs_retrieved: ragDocsCount,
       }).then(({ error }) => {
-        if (error) console.error(“[TokenUsage] INSERT failed:”, error.message, { tenantId, userId: effectiveUserId, model: selectedModelId });
+        if (error) console.error("[TokenUsage] INSERT failed:", error.message, { tenantId, userId: effectiveUserId, model: selectedModelId });
         else console.log(`[TokenUsage] Saved: in=${usage.inputTokens} out=${usage.outputTokens} cost=$${costUsd.toFixed(6)} tools=${toolCalls} rag=${ragDocsCount}`);
       });
     } else {
-      console.warn(“[TokenUsage] Skipped — missing supabase/userId/tenantId:”, { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
+      console.warn("[TokenUsage] Skipped — missing supabase/userId/tenantId:", { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
     }
 
     return new Response(
