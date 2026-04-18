@@ -3090,13 +3090,13 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         apiKey: anthropicKey,
         modelId: selectedModelId,
         maxTokens: Number(maxTokens || 8000),
-        extendedThinking: effectiveThinking,
+        extendedThinking: false, // disabled in agentic mode: tool_use + thinking requires beta header not yet enabled
         thinkingEffort: requestedThinkingEffort,
         systemPrompt: fullSystemPrompt,
         messages: finalMessages,
         tools: MARKETING_MANAGER_TOOLS,
         toolExecutor,
-        maxIterations: 6,
+        maxIterations: 3,
         timeoutMs: aiTimeoutMs,
       });
       console.log(`[AgentMode] Concluido: toolCallCount=${(result as any).toolCallCount}`);
