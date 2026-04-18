@@ -1,6 +1,9 @@
 import Sidebar from '@/components/layout/Sidebar';
 import ChatArea from '@/components/chat/ChatArea';
 import MarketResearchPage from '@/pages/MarketResearchPage';
+import MeuFeedPage from '@/pages/MeuFeedPage';
+import PesquisaPage from '@/pages/PesquisaPage';
+import AnaliseConcorrentesPage from '@/pages/AnaliseConcorrentesPage';
 import HomePage from '@/pages/HomePage';
 import CreatorKitPage from '@/pages/CreatorKitPage';
 import ImplementationPage from '@/pages/ImplementationPage';
@@ -36,6 +39,12 @@ export default function Index() {
         return <HomePage />;
       case 'market-research':
         return <MarketResearchPage onBack={() => setActivePage('home')} />;
+      case 'meu-feed':
+        return <MeuFeedPage />;
+      case 'pesquisa':
+        return <PesquisaPage />;
+      case 'analise-concorrentes':
+        return <AnaliseConcorrentesPage />;
       case 'creator-kit':
         return <CreatorKitPage />;
       case 'implementation':
