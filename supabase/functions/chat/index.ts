@@ -3025,29 +3025,35 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
     const sanitizedContent = sanitizeLeakedToolCalls(result.content);
 
     // â”€â”€ Record token usage (fire-and-forget â€” does not block response) â”€â”€â”€â”€â”€â”€â”€â”€
-    if (supabase && result.usage && effectiveUserId && tenantId) {
+    // Tracks every turn individually — multiple messages in same session = multiple rows
+    if (supabase && effectiveUserId && tenantId) {
+      const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
+      if (!result.usage) console.warn(“[TokenUsage] usage undefined for model:”, selectedModelId);
       const { inputPerM, outputPerM } = getModelPricing(selectedModelId);
-      const costUsd = (result.usage.inputTokens / 1_000_000) * inputPerM
-                    + (result.usage.outputTokens / 1_000_000) * outputPerM;
+      const costUsd = (usage.inputTokens / 1_000_000) * inputPerM
+                    + (usage.outputTokens / 1_000_000) * outputPerM;
       const ragDocsCount = useAgenticMode
         ? ((result as any).ragDocsRetrieved ?? 0)
         : userDocumentChunks.length;
       const toolCalls = (result as any).toolCallCount ?? 0;
-      supabase.from("token_usage").insert({
+      console.log(`[TokenUsage] Inserting: model=${selectedModelId} in=${usage.inputTokens} out=${usage.outputTokens} tenant=${tenantId} user=${effectiveUserId}`);
+      supabase.from(“token_usage”).insert({
         tenant_id: tenantId,
         user_id: effectiveUserId,
         model_id: selectedModelId,
-        provider: result.provider || "unknown",
+        provider: result.provider || “unknown”,
         agent_id: agentId || null,
-        input_tokens: result.usage.inputTokens,
-        output_tokens: result.usage.outputTokens,
+        input_tokens: usage.inputTokens,
+        output_tokens: usage.outputTokens,
         cost_usd: Number(costUsd.toFixed(6)),
         tool_call_count: toolCalls,
         rag_docs_retrieved: ragDocsCount,
       }).then(({ error }) => {
-        if (error) console.error("[TokenUsage] INSERT failed:", error.message, { tenantId, userId: effectiveUserId, model: selectedModelId });
-        else console.log(`[TokenUsage] Saved: in=${result.usage!.inputTokens} out=${result.usage!.outputTokens} cost=$${costUsd.toFixed(6)} tools=${toolCalls} rag=${ragDocsCount}`);
+        if (error) console.error(“[TokenUsage] INSERT failed:”, error.message, { tenantId, userId: effectiveUserId, model: selectedModelId });
+        else console.log(`[TokenUsage] Saved: in=${usage.inputTokens} out=${usage.outputTokens} cost=$${costUsd.toFixed(6)} tools=${toolCalls} rag=${ragDocsCount}`);
       });
+    } else {
+      console.warn(“[TokenUsage] Skipped — missing supabase/userId/tenantId:”, { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
     }
 
     return new Response(
