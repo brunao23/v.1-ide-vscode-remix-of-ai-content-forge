@@ -2382,6 +2382,12 @@ async function callAnthropicWithTools(params: {
       toolResults.push({ type: "tool_result", tool_use_id: toolBlock.id, content: toolResult });
     }
 
+    // After tool calls, inject instruction so model generates final response (not another "I'll search now")
+    toolResults.push({
+      type: "text",
+      text: "Você já tem todos os dados e documentos necessários acima. GERE AGORA a resposta completa, detalhada e final solicitada. Não diga que vai pesquisar ou que vai fazer algo — escreva o conteúdo final completo agora.",
+    });
+
     // Append tool results as a user turn
     apiMessages.push({ role: "user", content: toolResults });
   }
