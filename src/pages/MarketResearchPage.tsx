@@ -294,6 +294,25 @@ export default function MarketResearchPage({ onBack }: Props) {
 /* ─── Feed View (Social Blade) ─── */
 const FEED_CONFIG_KEY = 'meu-feed-config';
 const FEED_STATS_KEY = 'meu-feed-stats';
+const FEED_HISTORY_KEY = 'meu-feed-history';
+const FEED_HISTORY_MAX = 5;
+
+type FeedHistoryEntry = SbStats & { searchedAt: string };
+
+function loadHistory(): FeedHistoryEntry[] {
+  try {
+    const raw = localStorage.getItem(FEED_HISTORY_KEY);
+    if (raw) return JSON.parse(raw) as FeedHistoryEntry[];
+  } catch {}
+  return [];
+}
+
+function saveHistory(entry: SbStats, prev: FeedHistoryEntry[]): FeedHistoryEntry[] {
+  const filtered = prev.filter((e) => !(e.platform === entry.platform && e.username === entry.username));
+  const next = [{ ...entry, searchedAt: new Date().toISOString() }, ...filtered].slice(0, FEED_HISTORY_MAX);
+  try { localStorage.setItem(FEED_HISTORY_KEY, JSON.stringify(next)); } catch {}
+  return next;
+}
 
 function fmtNum(n: number | undefined): string {
   if (n == null) return '—';
@@ -423,13 +442,14 @@ function FeedView({ isMobile }: { isMobile: boolean; setSelectedPost: (p: Post) 
     } catch {}
     return null;
   });
+  const [history, setHistory] = useState<FeedHistoryEntry[]>(() => loadHistory());
 
   const saveConfig = (next: typeof config) => {
     setConfig(next);
     try { localStorage.setItem(FEED_CONFIG_KEY, JSON.stringify(next)); } catch {}
   };
 
-  const saveStats = (s: SbStats | null) => {
+  const applyStats = (s: SbStats | null) => {
     setStats(s);
     try {
       if (s) localStorage.setItem(FEED_STATS_KEY, JSON.stringify(s));
@@ -443,12 +463,19 @@ function FeedView({ isMobile }: { isMobile: boolean; setSelectedPost: (p: Post) 
     setError(null);
     try {
       const result = await fetchSbStats(config.platform, config.username.trim());
-      saveStats(result);
+      applyStats(result);
+      setHistory((prev) => saveHistory(result, prev));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao buscar dados');
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadFromHistory = (entry: FeedHistoryEntry) => {
+    saveConfig({ platform: entry.platform, username: entry.username });
+    applyStats(entry);
+    setError(null);
   };
 
   const isYouTube = config.platform === 'youtube';
@@ -516,6 +543,32 @@ function FeedView({ isMobile }: { isMobile: boolean; setSelectedPost: (p: Post) 
               <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
               {error}
             </p>
+          </div>
+        )}
+
+        {/* Recent searches history */}
+        {history.length > 0 && (
+          <div className="space-y-2">
+            <p className="text-[11px] font-medium text-muted-foreground uppercase tracking-wider px-0.5">Pesquisas recentes</p>
+            <div className="space-y-1">
+              {history.map((entry) => (
+                <button
+                  key={`${entry.platform}-${entry.username}`}
+                  onClick={() => loadFromHistory(entry)}
+                  className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-secondary/60 transition-colors text-left group"
+                >
+                  {entry.avatar
+                    ? <img src={entry.avatar} alt={entry.displayName} className="w-7 h-7 rounded-full object-cover shrink-0" />
+                    : <div className="w-7 h-7 rounded-full bg-secondary/60 flex items-center justify-center shrink-0"><User className="w-3.5 h-3.5 text-muted-foreground" strokeWidth={1.5} /></div>
+                  }
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium text-foreground truncate">{entry.displayName || entry.username}</p>
+                    <p className="text-[10px] text-muted-foreground truncate capitalize">{entry.platform}</p>
+                  </div>
+                  <PlatformIcon platform={entry.platform} size={14} />
+                </button>
+              ))}
+            </div>
           </div>
         )}
       </div>
