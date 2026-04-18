@@ -293,6 +293,7 @@ export default function MarketResearchPage({ onBack }: Props) {
 
 /* ─── Feed View (Social Blade) ─── */
 const FEED_CONFIG_KEY = 'meu-feed-config';
+const FEED_STATS_KEY = 'meu-feed-stats';
 
 function fmtNum(n: number | undefined): string {
   if (n == null) return '—';
@@ -301,14 +302,14 @@ function fmtNum(n: number | undefined): string {
   return n.toLocaleString('pt-BR');
 }
 
-function StatCard({ label, value, icon, highlight }: { label: string; value: string; icon: ReactNode; highlight?: boolean }) {
+function BigStatCard({ label, value, icon, highlight }: { label: string; value: string; icon: ReactNode; highlight?: boolean }) {
   return (
-    <div className={`rounded-xl border p-4 space-y-2 ${highlight ? 'border-foreground/20 bg-secondary/60' : 'border-border/50 bg-card/60'}`}>
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <span className="text-muted-foreground/50">{icon}</span>
+    <div className={`rounded-2xl border p-5 space-y-1 ${highlight ? 'border-foreground/20 bg-secondary/60' : 'border-border/40 bg-card/50'}`}>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+        <span className="text-muted-foreground/40">{icon}</span>
       </div>
-      <p className="text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+      <p className="text-3xl font-semibold tracking-tight text-foreground">{value}</p>
     </div>
   );
 }
@@ -316,52 +317,55 @@ function StatCard({ label, value, icon, highlight }: { label: string; value: str
 function SbStatsDisplay({ stats }: { stats: SbStats }) {
   const isYT = stats.platform === 'youtube';
   const gradeStyle = stats.gradeColor
-    ? { backgroundColor: stats.gradeColor + '22', color: stats.gradeColor, borderColor: stats.gradeColor + '44' }
+    ? { backgroundColor: stats.gradeColor + '22', color: stats.gradeColor, borderColor: stats.gradeColor + '55' }
     : {};
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        {stats.avatar && (
-          <img src={stats.avatar} alt={stats.displayName} className="w-10 h-10 rounded-full object-cover" />
-        )}
-        <div>
-          <p className="text-sm font-medium text-foreground">{stats.displayName || stats.username}</p>
-          <p className="text-xs text-muted-foreground">@{stats.username}</p>
+    <div className="space-y-6">
+      {/* Profile header */}
+      <div className="flex items-center gap-4 p-4 rounded-2xl border border-border/40 bg-card/50">
+        {stats.avatar
+          ? <img src={stats.avatar} alt={stats.displayName} className="w-14 h-14 rounded-full object-cover ring-2 ring-border/40" />
+          : <div className="w-14 h-14 rounded-full bg-secondary/60 flex items-center justify-center"><User className="w-6 h-6 text-muted-foreground" strokeWidth={1.5} /></div>
+        }
+        <div className="flex-1 min-w-0">
+          <p className="text-base font-semibold text-foreground truncate">{stats.displayName || stats.username}</p>
+          <p className="text-sm text-muted-foreground">@{stats.username}</p>
         </div>
         {stats.grade && (
-          <div className="ml-auto px-3 py-1 rounded-full border text-sm font-bold" style={gradeStyle}>
+          <div className="px-4 py-1.5 rounded-full border text-base font-bold shrink-0" style={gradeStyle}>
             {stats.grade}
           </div>
         )}
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-        <StatCard
+      {/* Main stats grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <BigStatCard
           label={isYT ? 'Inscritos' : 'Seguidores'}
           value={fmtNum(stats.followers)}
           icon={<TrendingUp className="w-4 h-4" strokeWidth={1.5} />}
           highlight
         />
         {stats.following != null && (
-          <StatCard label="Seguindo" value={fmtNum(stats.following)} icon={<User className="w-4 h-4" strokeWidth={1.5} />} />
+          <BigStatCard label="Seguindo" value={fmtNum(stats.following)} icon={<User className="w-4 h-4" strokeWidth={1.5} />} />
         )}
-        <StatCard
+        <BigStatCard
           label={isYT ? 'Vídeos' : 'Publicações'}
           value={fmtNum(stats.uploads)}
           icon={<BarChart2 className="w-4 h-4" strokeWidth={1.5} />}
         />
         {stats.totalViews != null && (
-          <StatCard label="Views Totais" value={fmtNum(stats.totalViews)} icon={<BarChart2 className="w-4 h-4" strokeWidth={1.5} />} />
+          <BigStatCard label="Views Totais" value={fmtNum(stats.totalViews)} icon={<BarChart2 className="w-4 h-4" strokeWidth={1.5} />} />
         )}
         {stats.totalLikes != null && (
-          <StatCard label="Likes Totais" value={fmtNum(stats.totalLikes)} icon={<Star className="w-4 h-4" strokeWidth={1.5} />} />
+          <BigStatCard label="Likes Totais" value={fmtNum(stats.totalLikes)} icon={<Star className="w-4 h-4" strokeWidth={1.5} />} />
         )}
         {stats.rankSb != null && (
-          <StatCard label="Rank Social Blade" value={`#${stats.rankSb.toLocaleString('pt-BR')}`} icon={<Star className="w-4 h-4" strokeWidth={1.5} />} />
+          <BigStatCard label="Rank Social Blade" value={`#${stats.rankSb.toLocaleString('pt-BR')}`} icon={<Star className="w-4 h-4" strokeWidth={1.5} />} />
         )}
         {stats.rankPrimary != null && (
-          <StatCard
+          <BigStatCard
             label={isYT ? 'Rank Inscritos' : 'Rank Seguidores'}
             value={`#${stats.rankPrimary.toLocaleString('pt-BR')}`}
             icon={<Star className="w-4 h-4" strokeWidth={1.5} />}
@@ -369,26 +373,27 @@ function SbStatsDisplay({ stats }: { stats: SbStats }) {
         )}
       </div>
 
+      {/* Monthly averages */}
       {(stats.avgFollowersMonthly != null || stats.avgUploadsMonthly != null || stats.avgViewsMonthly != null) && (
-        <div className="rounded-xl border border-border/50 bg-card/60 p-4 space-y-3">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Médias mensais (últimos 30 dias)</p>
-          <div className="grid grid-cols-3 gap-3">
+        <div className="rounded-2xl border border-border/40 bg-card/50 p-5 space-y-4">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-widest">Crescimento — últimos 30 dias</p>
+          <div className="grid grid-cols-3 gap-4">
             {stats.avgFollowersMonthly != null && (
-              <div className="text-center">
-                <p className="text-lg font-semibold text-foreground">{fmtNum(stats.avgFollowersMonthly)}</p>
-                <p className="text-[11px] text-muted-foreground">{isYT ? 'Inscritos/mês' : 'Seguidores/mês'}</p>
+              <div>
+                <p className="text-2xl font-semibold text-foreground">{fmtNum(stats.avgFollowersMonthly)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{isYT ? 'Inscritos/mês' : 'Seguidores/mês'}</p>
               </div>
             )}
             {stats.avgUploadsMonthly != null && (
-              <div className="text-center">
-                <p className="text-lg font-semibold text-foreground">{fmtNum(stats.avgUploadsMonthly)}</p>
-                <p className="text-[11px] text-muted-foreground">{isYT ? 'Vídeos/mês' : 'Posts/mês'}</p>
+              <div>
+                <p className="text-2xl font-semibold text-foreground">{fmtNum(stats.avgUploadsMonthly)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{isYT ? 'Vídeos/mês' : 'Posts/mês'}</p>
               </div>
             )}
             {stats.avgViewsMonthly != null && (
-              <div className="text-center">
-                <p className="text-lg font-semibold text-foreground">{fmtNum(stats.avgViewsMonthly)}</p>
-                <p className="text-[11px] text-muted-foreground">Views/mês</p>
+              <div>
+                <p className="text-2xl font-semibold text-foreground">{fmtNum(stats.avgViewsMonthly)}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">Views/mês</p>
               </div>
             )}
           </div>
@@ -398,7 +403,7 @@ function SbStatsDisplay({ stats }: { stats: SbStats }) {
   );
 }
 
-function FeedView({ isMobile: _isMobile }: { isMobile: boolean; setSelectedPost: (p: Post) => void }) {
+function FeedView({ isMobile }: { isMobile: boolean; setSelectedPost: (p: Post) => void }) {
   const [config, setConfig] = useState<{ platform: SbPlatform; username: string }>(() => {
     try {
       const saved = localStorage.getItem(FEED_CONFIG_KEY);
@@ -411,21 +416,34 @@ function FeedView({ isMobile: _isMobile }: { isMobile: boolean; setSelectedPost:
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [stats, setStats] = useState<SbStats | null>(null);
+  const [stats, setStats] = useState<SbStats | null>(() => {
+    try {
+      const saved = localStorage.getItem(FEED_STATS_KEY);
+      if (saved) return JSON.parse(saved) as SbStats;
+    } catch {}
+    return null;
+  });
 
   const saveConfig = (next: typeof config) => {
     setConfig(next);
     try { localStorage.setItem(FEED_CONFIG_KEY, JSON.stringify(next)); } catch {}
   };
 
+  const saveStats = (s: SbStats | null) => {
+    setStats(s);
+    try {
+      if (s) localStorage.setItem(FEED_STATS_KEY, JSON.stringify(s));
+      else localStorage.removeItem(FEED_STATS_KEY);
+    } catch {}
+  };
+
   const handleSearch = async () => {
     if (loading || !config.username.trim()) return;
     setLoading(true);
     setError(null);
-    setStats(null);
     try {
       const result = await fetchSbStats(config.platform, config.username.trim());
-      setStats(result);
+      saveStats(result);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao buscar dados');
     } finally {
@@ -437,92 +455,88 @@ function FeedView({ isMobile: _isMobile }: { isMobile: boolean; setSelectedPost:
   const isTikTok = config.platform === 'tiktok';
 
   return (
-    <div className="max-w-[720px] mx-auto px-6 py-8 space-y-8">
-      <div className="rounded-xl border border-border bg-card p-6 space-y-3">
-        <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
-          Meu Feed
-        </h2>
-        <p className="text-sm text-muted-foreground leading-relaxed">
-          Acompanhe as métricas do seu perfil em tempo real com dados do Social Blade — seguidores, engajamento, crescimento e ranking.
-        </p>
-      </div>
-
-      <div className="space-y-0">
-        <ConnectorRow
-          icon={<PlatformIcon platform={config.platform} size={36} />}
-          label="Plataforma"
-          description="Sua rede social principal"
-        >
-          <Select
-            value={config.platform}
-            onValueChange={(v) => saveConfig({ ...config, platform: v as SbPlatform })}
-          >
-            <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="min-w-[220px]">
-              {PLATFORM_LIST.filter((p) => ['instagram', 'youtube', 'tiktok'].includes(p.value)).map((p) => (
-                <SelectItem key={p.value} value={p.value}>
-                  <div className="flex items-center gap-2.5">
-                    <PlatformIcon platform={p.value} size={24} />
-                    <span>{p.label}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </ConnectorRow>
-
-        <RowDivider />
-
-        <ConnectorRow
-          icon={<IconCircle><User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-          label={isYouTube ? 'Seu Canal' : 'Seu Usuário'}
-          description={isYouTube ? 'Handle ou nome do canal' : isTikTok ? 'Seu usuário no TikTok' : 'Seu usuário ou URL do perfil'}
-        >
-          <input
-            type="text"
-            value={config.username}
-            onChange={(e) => saveConfig({ ...config, username: e.target.value })}
-            placeholder={isYouTube ? '@canal ou nome' : '@username'}
-            className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
-            onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
-          />
-        </ConnectorRow>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          onClick={() => void handleSearch()}
-          disabled={loading || !config.username.trim()}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" strokeWidth={1.5} />}
-          {loading ? 'Buscando...' : 'Buscar Meu Perfil'}
-        </button>
-      </div>
-
-      {error && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
-          <p className="text-sm text-destructive flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
-            {error}
-          </p>
+    <div className={`flex gap-6 px-6 py-8 ${isMobile ? 'flex-col' : 'flex-row items-start'}`}>
+      {/* Left panel — search */}
+      <div className="shrink-0 space-y-4" style={{ width: isMobile ? '100%' : '260px' }}>
+        <div>
+          <h2 className="text-xl text-foreground mb-1" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>Meu Feed</h2>
+          <p className="text-xs text-muted-foreground leading-relaxed">Métricas do seu perfil via Social Blade.</p>
         </div>
-      )}
 
-      {!stats && !loading && !error && (
-        <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
-            <User className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+        <div className="rounded-2xl border border-border/40 bg-card/50 p-4 space-y-4">
+          {/* Platform */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Plataforma</p>
+            <Select
+              value={config.platform}
+              onValueChange={(v) => saveConfig({ ...config, platform: v as SbPlatform })}
+            >
+              <SelectTrigger className="h-9 w-full rounded-lg border border-border/60 bg-transparent text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLATFORM_LIST.filter((p) => ['instagram', 'youtube', 'tiktok'].includes(p.value)).map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    <div className="flex items-center gap-2">
+                      <PlatformIcon platform={p.value} size={20} />
+                      <span>{p.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
-          <p className="text-sm text-muted-foreground">
-            Configure seu usuário e clique em "Buscar Meu Perfil"
-          </p>
-        </div>
-      )}
 
-      {stats && !loading && <SbStatsDisplay stats={stats} />}
+          {/* Username */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">{isYouTube ? 'Canal' : 'Usuário'}</p>
+            <input
+              type="text"
+              value={config.username}
+              onChange={(e) => saveConfig({ ...config, username: e.target.value })}
+              placeholder={isYouTube ? '@canal ou nome' : isTikTok ? '@username' : '@username'}
+              className="h-9 w-full px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors"
+              onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
+            />
+          </div>
+
+          <button
+            onClick={() => void handleSearch()}
+            disabled={loading || !config.username.trim()}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" strokeWidth={1.5} />}
+            {loading ? 'Buscando...' : 'Buscar Perfil'}
+          </button>
+        </div>
+
+        {error && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5">
+            <p className="text-xs text-destructive flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+              {error}
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Right panel — stats */}
+      <div className="flex-1 min-w-0">
+        {loading && (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        )}
+        {!stats && !loading && (
+          <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
+            <div className="w-14 h-14 rounded-full bg-secondary/60 flex items-center justify-center">
+              <TrendingUp className="w-6 h-6 text-muted-foreground" strokeWidth={1.5} />
+            </div>
+            <p className="text-sm text-muted-foreground">Configure seu usuário e clique em "Buscar Perfil"</p>
+          </div>
+        )}
+        {stats && !loading && <SbStatsDisplay stats={stats} />}
+      </div>
     </div>
   );
 }
