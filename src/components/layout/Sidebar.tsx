@@ -169,8 +169,7 @@ export default function Sidebar() {
                 <SlimNavItem icon={<Boxes className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="CreatorFounder Kit" active={activePage === "creator-kit"} onClick={() => setActivePage("creator-kit")} />
                 <SlimNavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" active={activePage === "market-research"} onClick={() => setActivePage("market-research")} />
                 <SlimNavItem icon={<GraduationCap className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aulas" active={activePage === "aulas"} onClick={() => setActivePage("aulas")} />
-                <SlimNavItem icon={<Map className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Sua Jornada" active={activePage === "jornada"} onClick={() => setActivePage("jornada")} />
-                <SlimNavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => setActivePage("calendario")} />
+<SlimNavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => setActivePage("calendario")} />
                 <SlimNavItem icon={<BookOpen className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Documentos" onClick={() => setDocsOpen(true)} />
                 <SlimNavItem icon={<ClipboardCheck className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Implementação" active={activePage === "implementation"} onClick={() => setActivePage("implementation")} />
                 <SlimNavItem icon={<BarChart3 className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Métricas" active={activePage === "metrics"} onClick={() => setActivePage("metrics")} />
@@ -337,8 +336,7 @@ function ExpandedSidebar({
             <NavItem icon={<Boxes className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="CreatorFounder Kit" active={activePage === "creator-kit"} onClick={() => navigate("creator-kit")} />
             <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" active={activePage === "market-research"} onClick={() => navigate("market-research")} />
             <NavItem icon={<GraduationCap className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aulas" active={activePage === "aulas"} onClick={() => navigate("aulas")} />
-            <NavItem icon={<Map className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Sua Jornada" active={activePage === "jornada"} onClick={() => navigate("jornada")} />
-            <NavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => navigate("calendario")} />
+<NavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => navigate("calendario")} />
             <NavItem icon={<BookOpen className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Documentos" onClick={onDocs} />
             <NavItem icon={<ClipboardCheck className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Implementação" active={activePage === "implementation"} onClick={() => navigate("implementation")} />
             <NavItem icon={<BarChart3 className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Métricas" active={activePage === "metrics"} onClick={() => navigate("metrics")} />
