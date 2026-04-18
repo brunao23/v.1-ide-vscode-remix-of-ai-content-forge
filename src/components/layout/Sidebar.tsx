@@ -167,7 +167,6 @@ export default function Sidebar() {
                 <SlimNavItem icon={<Home className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Início" active={activePage === "home"} onClick={() => setActivePage("home")} />
                 <SlimNavItem icon={<Boxes className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="CreatorFounder Kit" active={activePage === "creator-kit"} onClick={() => setActivePage("creator-kit")} />
                 <SlimNavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" active={activePage === "market-research"} onClick={() => setActivePage("market-research")} />
-                <SlimNavItem icon={<Search className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Buscar" onClick={() => setSearchOpen(true)} />
                 <SlimNavItem icon={<GraduationCap className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aulas" active={activePage === "aulas"} onClick={() => setActivePage("aulas")} />
                 <SlimNavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => setActivePage("calendario")} />
                 <SlimNavItem icon={<BookOpen className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Documentos" onClick={() => setDocsOpen(true)} />
@@ -335,7 +334,6 @@ function ExpandedSidebar({
             <NavItem icon={<Home className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Início" active={activePage === "home"} onClick={() => navigate("home")} />
             <NavItem icon={<Boxes className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="CreatorFounder Kit" active={activePage === "creator-kit"} onClick={() => navigate("creator-kit")} />
             <NavItem icon={<FlaskConical className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Pesquisa de Mercado" active={activePage === "market-research"} onClick={() => navigate("market-research")} />
-            <NavItem icon={<Search className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Buscar" onClick={onSearch} />
             <NavItem icon={<GraduationCap className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Aulas" active={activePage === "aulas"} onClick={() => navigate("aulas")} />
             <NavItem icon={<CalendarDays className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Calendário" active={activePage === "calendario"} onClick={() => navigate("calendario")} />
             <NavItem icon={<BookOpen className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Documentos" onClick={onDocs} />
@@ -380,6 +378,14 @@ function ExpandedSidebar({
           )}
 
           <div>
+            <button
+              onClick={onSearch}
+              className="w-full flex items-center gap-2 px-3 py-2 mb-2 rounded-lg border border-border/40 bg-secondary/30 hover:bg-secondary/60 transition-colors text-left"
+            >
+              <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" strokeWidth={1.5} />
+              <span className="text-xs text-muted-foreground">Buscar conversas...</span>
+              <span className="ml-auto text-[10px] text-muted-foreground/50">⌘K</span>
+            </button>
             <span className="px-3 text-xs font-medium text-muted-foreground">Conversas</span>
             <div className="mt-1 space-y-0.5">
               {recentConversations.length === 0 && (
