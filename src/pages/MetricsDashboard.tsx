@@ -1,9 +1,13 @@
-﻿import { useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useMetrics } from '@/hooks/useMetrics';
 import { MetricCard } from '@/components/metrics/MetricCard';
 import { MetricsSection } from '@/components/metrics/MetricsSection';
-import { RevenueChart } from '@/components/metrics/RevenueChart';
-import { RoasChart } from '@/components/metrics/RoasChart';
+import { FaturamentoChart } from '@/components/metrics/FaturamentoChart';
+import { NewClientsChart } from '@/components/metrics/NewClientsChart';
+import { AdSpendChart } from '@/components/metrics/AdSpendChart';
+import { InstagramReachChart } from '@/components/metrics/InstagramReachChart';
+import { InstagramFollowersChart } from '@/components/metrics/InstagramFollowersChart';
+import { EmailListChart } from '@/components/metrics/EmailListChart';
 import { ClientsFunnel } from '@/components/metrics/ClientsFunnel';
 import { ClientCompositionBar } from '@/components/metrics/ClientCompositionBar';
 import { MetricsSubmissionActions } from '@/components/metrics/MetricsSubmissionActions';
@@ -169,51 +173,79 @@ export default function MetricsDashboard() {
               <span style={{ color: '#5a6b2a' }}>+</span> <span className="text-destructive">-</span> vs mês anterior
             </p>
 
-            <MetricsSection title="Receita e finanças" icon="$" columns={5}>
-              <MetricCard title="Receita nova total" value={v('total_new_revenue')} format="currency" change={chg('total_new_revenue')} />
-              <MetricCard title="Caixa total recebido" value={v('total_cash_collected')} format="currency" change={chg('total_cash_collected')} />
+            {/* ── RECEITA ── */}
+            <MetricsSection title="Receita" icon="$" columns={5}>
+              <MetricCard title="Total Faturamento" value={v('total_new_revenue')} format="currency" change={chg('total_new_revenue')} highlight />
+              <MetricCard title="Total Cash Collected" value={v('total_cash_collected')} format="currency" change={chg('total_cash_collected')} />
               <MetricCard title="MRR" value={v('monthly_recurring_revenue')} format="currency" change={chg('monthly_recurring_revenue')} />
+              <MetricCard title="Clientes Ativos" value={v('active_clients')} change={chg('active_clients')} />
+              <MetricCard title="Novos Clientes" value={v('new_clients')} change={chg('new_clients')} />
+              <MetricCard title="Investimento em Anúncios" value={v('ad_spend')} format="currency" change={chg('ad_spend')} />
               <MetricCard title="Despesas" value={v('expenses')} format="currency" change={chg('expenses')} />
               <MetricCard title="Lucro" value={v('profit')} format="currency" change={chg('profit')} highlight />
+              <MetricCard
+                title="Margem de Lucro"
+                value={
+                  v('total_cash_collected') > 0
+                    ? `${Math.round((v('profit') / v('total_cash_collected')) * 1000) / 10}%`
+                    : '0%'
+                }
+                highlight
+              />
             </MetricsSection>
 
-            <RevenueChart history={history} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <FaturamentoChart history={history} />
+              <NewClientsChart history={history} />
+            </div>
 
-            <MetricsSection title="Publicidade" icon="ADS" columns={6}>
-              <MetricCard title="Investimento em anúncios" value={v('ad_spend')} format="currency" change={chg('ad_spend')} />
-              <MetricCard title="Investimento diário em anúncios" value={v('daily_ad_spend')} format="currency" change={chg('daily_ad_spend')} />
-              <MetricCard title="Alcance (IG)" value={v('advertising_reach_ig')} change={chg('advertising_reach_ig')} />
+            {/* ── ANÚNCIOS ── */}
+            <MetricsSection title="Anúncios" icon="ADS" columns={4}>
+              <MetricCard title="Investimento" value={v('ad_spend')} format="currency" change={chg('ad_spend')} />
+              <MetricCard title="Alcance (IG)" value={v('total_reach_ig_impressions_li')} change={chg('total_reach_ig_impressions_li')} />
               <MetricCard title="Impressões (IG)" value={v('advertising_impressions_ig')} change={chg('advertising_impressions_ig')} />
               <MetricCard title="CPM" value={v('cpm')} format="currency" change={chg('cpm')} />
+              <MetricCard title="Gasto Diário" value={v('daily_ad_spend')} format="currency" change={chg('daily_ad_spend')} />
               <MetricCard title="ROAS" value={`${v('roas')}x`} change={chg('roas')} highlight />
             </MetricsSection>
 
-            <RoasChart history={history} />
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <AdSpendChart history={history} />
+              <InstagramReachChart history={history} />
+            </div>
 
-            <MetricsSection title="Conteúdo curto" icon="SF" columns={4}>
-              <MetricCard title="Tamanho do canal" value={v('short_form_channel_size')} change={chg('short_form_channel_size')} />
-              <MetricCard title="Alcance / impressões totais" value={v('total_reach_ig_impressions_li')} change={chg('total_reach_ig_impressions_li')} />
-              <MetricCard title="Total de posts publicados" value={v('total_posts_made')} change={chg('total_posts_made')} />
+            {/* ── INSTAGRAM ── */}
+            <MetricsSection title="Instagram" icon="IG" columns={4}>
+              <MetricCard title="Seguidores" value={v('short_form_channel_size')} change={chg('short_form_channel_size')} />
+              <MetricCard title="Alcance Total" value={v('total_reach_ig_impressions_li')} change={chg('total_reach_ig_impressions_li')} />
+              <MetricCard title="Total Posts Perfil" value={v('total_posts_made')} change={chg('total_posts_made')} />
               <MetricCard
-                title="Alcance por post"
+                title="Alcance por Post"
                 value={v('total_posts_made') > 0 ? Math.round(v('total_reach_ig_impressions_li') / v('total_posts_made')) : 0}
               />
             </MetricsSection>
 
-            <MetricsSection title="Conteúdo longo" icon="LF" columns={5}>
-              <MetricCard title="Tamanho do canal" value={v('long_form_channel_size')} change={chg('long_form_channel_size')} />
-              <MetricCard title="Audiência mensal" value={v('long_form_monthly_audience')} change={chg('long_form_monthly_audience')} />
-              <MetricCard title="Visualizações no YouTube" value={v('youtube_total_views')} change={chg('youtube_total_views')} />
-              <MetricCard title="Horas no YouTube" value={v('youtube_total_hours')} change={chg('youtube_total_hours')} />
+            <InstagramFollowersChart history={history} />
+
+            {/* ── YOUTUBE ── */}
+            <MetricsSection title="YouTube" icon="YT" columns={5}>
+              <MetricCard title="Inscritos Canal" value={v('long_form_channel_size')} change={chg('long_form_channel_size')} />
+              <MetricCard title="Audiência Mensal" value={v('long_form_monthly_audience')} change={chg('long_form_monthly_audience')} />
+              <MetricCard title="Visualizações Totais" value={v('youtube_total_views')} change={chg('youtube_total_views')} />
+              <MetricCard title="Horas Assistidas" value={v('youtube_total_hours')} change={chg('youtube_total_hours')} />
               <MetricCard title="Vídeos / Podcasts" value={v('total_videos_podcasts_made')} change={chg('total_videos_podcasts_made')} />
             </MetricsSection>
 
-            <MetricsSection title="Marketing por e-mail" icon="MAIL" columns={3}>
-              <MetricCard title="Tamanho da lista de e-mails" value={v('email_list_size')} change={chg('email_list_size')} />
-              <MetricCard title="Novos inscritos" value={v('new_subscribers')} change={chg('new_subscribers')} />
-              <MetricCard title="Novos inscritos líquidos" value={v('net_new_subscribers')} change={chg('net_new_subscribers')} />
+            {/* ── E-MAIL ── */}
+            <MetricsSection title="E-mail" icon="MAIL" columns={3}>
+              <MetricCard title="Inscritos Lista de E-mail" value={v('email_list_size')} change={chg('email_list_size')} />
+              <MetricCard title="Novos Inscritos" value={v('new_subscribers')} change={chg('new_subscribers')} />
+              <MetricCard title="Novos Inscritos Líquidos" value={v('net_new_subscribers')} change={chg('net_new_subscribers')} />
             </MetricsSection>
 
+            <EmailListChart history={history} />
+
+            {/* ── SAÚDE DO NEGÓCIO ── */}
             <ClientsFunnel metrics={metrics} change={chg('new_clients')} />
 
             {(() => {
