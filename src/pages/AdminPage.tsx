@@ -552,10 +552,18 @@ export default function AdminPage({ tab = "insights" }: Props) {
                   <h3 className="text-sm font-semibold flex items-center gap-2">
                     <BarChart3 className="w-4 h-4 text-violet-400" /> Consumo de Tokens & Custo Estimado
                   </h3>
-                  {tokenUsageRows.length === 0 && (
-                    <span className="text-xs text-muted-foreground italic">Nenhum registro ainda (dados aparecem a partir da próxima conversa)</span>
-                  )}
+                  <button
+                    onClick={() => void loadUserMetrics(selectedUser)}
+                    disabled={loadingMetrics}
+                    className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-secondary/60 transition-colors disabled:opacity-50"
+                  >
+                    <RefreshCw className={`w-3 h-3 ${loadingMetrics ? "animate-spin" : ""}`} />
+                    Atualizar
+                  </button>
                 </div>
+                {tokenUsageRows.length === 0 && !loadingMetrics && (
+                  <span className="text-xs text-muted-foreground italic">Nenhum registro ainda (dados aparecem a partir da próxima conversa)</span>
+                )}
 
                 {tokenUsageRows.length > 0 && (
                   <>

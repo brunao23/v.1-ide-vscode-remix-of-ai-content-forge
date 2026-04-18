@@ -2288,6 +2288,7 @@ function buildMarketingToolExecutor(context: {
   userId: string;
   tenantId: string;
   filterTypes: string[];
+  agentId?: string | null;
 }): ToolExecutor {
   return async (toolName: string, toolInput: AgentToolInput): Promise<string> => {
     if (toolName === "search_web") {
@@ -2296,6 +2297,22 @@ function buildMarketingToolExecutor(context: {
       }
       const query = String(toolInput.query || "");
       const results = await callPerplexitySearch(context.perplexityKey, query, 5);
+      // Track Perplexity API call in token_usage ($0.005/request for Sonar)
+      context.supabase.from("token_usage").insert({
+        tenant_id: context.tenantId,
+        user_id: context.userId,
+        model_id: "sonar",
+        provider: "perplexity",
+        agent_id: context.agentId || null,
+        input_tokens: 0,
+        output_tokens: 0,
+        cost_usd: 0.005,
+        tool_call_count: 1,
+        rag_docs_retrieved: 0,
+      }).then(({ error }: { error: any }) => {
+        if (error) console.error("[TokenUsage] Perplexity insert failed:", error.message);
+        else console.log("[TokenUsage] Perplexity search tracked");
+      });
       if (results.length === 0) {
         return "Nenhum resultado encontrado para a busca. Tente reformular a consulta.";
       }
@@ -2315,6 +2332,22 @@ function buildMarketingToolExecutor(context: {
       if (context.openaiKey) {
         try {
           const queryEmbedding = await buildQueryEmbedding(context.openaiKey, topic, context.embeddingModel);
+          // Track embedding call: text-embedding-3-small = $0.02/1M tokens, ~1 token per 4 chars
+          const estTokens = Math.ceil(topic.length / 4);
+          context.supabase.from("token_usage").insert({
+            tenant_id: context.tenantId,
+            user_id: context.userId,
+            model_id: context.embeddingModel || "text-embedding-3-small",
+            provider: "openai",
+            agent_id: context.agentId || null,
+            input_tokens: estTokens,
+            output_tokens: 0,
+            cost_usd: Number(((estTokens / 1_000_000) * 0.02).toFixed(8)),
+            tool_call_count: 0,
+            rag_docs_retrieved: 0,
+          }).then(({ error }: { error: any }) => {
+            if (error) console.error("[TokenUsage] Embedding insert failed:", error.message);
+          });
           chunks = await retrieveDocumentChunks({
             queryEmbedding,
             userId: context.userId,
@@ -2933,6 +2966,7 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         userId: String(effectiveUserId),
         tenantId: String(tenantId),
         filterTypes: filterTypes ?? [],
+        agentId: agentId || null,
       });
       result = await callAnthropicWithTools({
         apiKey: anthropicKey,
