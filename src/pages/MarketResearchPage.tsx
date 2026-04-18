@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import {
-  ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar,
-  ListOrdered, Bookmark, Clock, Trash2, Target, Sparkles,
+  ArrowLeft, Search, Loader2, AlertTriangle, User,
+  Bookmark, Clock, Trash2, Target, Sparkles,
   TrendingUp, Star, BarChart2,
 } from 'lucide-react';
 import { PlatformIcon, PLATFORM_LIST } from '@/components/market-research/PlatformIcons';
@@ -111,8 +111,8 @@ export default function MarketResearchPage({ onBack }: Props) {
   const userFieldPlaceholder = isYouTube ? '@canal ou nome' : isTikTok ? '@username' : '@username';
   const contentLabel = isYouTube ? 'videos' : 'posts';
   const limitLabel = isYouTube ? 'Limite de videos' : 'Limite de posts';
-  const limitDesc = isYouTube ? 'Maximo de resultados (1-50)' : 'Maximo de resultados (1-20)';
-  const limitMax = isYouTube ? 50 : 20;
+  const limitDesc = 'Maximo de resultados (1-50)';
+  const limitMax = 50;
 
   const handleSearch = async () => {
     if (isSearching || loading) return;
@@ -821,280 +821,247 @@ function SearchView({
   const { isCompetitor, markAsCompetitor } = useCompetitors();
 
   return (
-    <div className="max-w-[720px] mx-auto px-6 py-8 space-y-8">
-      <div className="rounded-xl border border-border bg-card p-6 space-y-4">
-        <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
-          Pesquisa
-        </h2>
-        <div className="space-y-3">
-          <p className="text-sm text-muted-foreground leading-relaxed">
-            Pesquise perfis ou palavras-chave e marque os posts mais relevantes como concorrentes para referencia.
-          </p>
-          <ul className="space-y-1.5 text-sm text-muted-foreground">
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 mt-0.5">•</span>
-              <span>Processo automatico sem dependencias de webhook externo</span>
-            </li>
-            <li className="flex items-start gap-2">
-              <span className="text-amber-400 mt-0.5">•</span>
-              <span>Suporte para YouTube, Instagram e TikTok</span>
-            </li>
-          </ul>
+    <div className={`flex gap-6 px-6 py-8 ${isMobile ? 'flex-col' : 'flex-row items-start'}`}>
+      {/* Left panel — form */}
+      <div className="shrink-0 space-y-4" style={{ width: isMobile ? '100%' : '280px' }}>
+        <div>
+          <h2 className="text-xl text-foreground mb-1" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>Pesquisa</h2>
+          <p className="text-xs text-muted-foreground leading-relaxed">Perfis e palavras-chave no YouTube, Instagram e TikTok.</p>
         </div>
+
+        {/* Profile / Keyword tab switcher */}
+        <div className="flex rounded-lg bg-secondary/40 p-1 gap-1">
+          <button
+            onClick={() => setTab('profile')}
+            className={`flex-1 text-xs py-1.5 rounded-md transition-colors font-medium ${
+              tab === 'profile' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {profileLabel}
+          </button>
+          <button
+            onClick={() => setTab('keyword')}
+            className={`flex-1 text-xs py-1.5 rounded-md transition-colors font-medium ${
+              tab === 'keyword' ? 'bg-background text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
+            }`}
+          >
+            {keywordLabel}
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-border/40 bg-card/50 p-4 space-y-4">
+          {/* Platform */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Plataforma</p>
+            <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
+              <SelectTrigger className="h-9 w-full rounded-lg border border-border/60 bg-transparent text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PLATFORM_LIST.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>
+                    <div className="flex items-center gap-2">
+                      <PlatformIcon platform={p.value} size={20} />
+                      <span>{p.label}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Username or keyword */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">
+              {tab === 'profile' ? userFieldLabel : 'Palavra-chave'}
+            </p>
+            {tab === 'profile' ? (
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                placeholder={userFieldPlaceholder}
+                className="h-9 w-full px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors"
+                onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
+              />
+            ) : (
+              <input
+                type="text"
+                value={keyword}
+                onChange={(e) => setKeyword(e.target.value)}
+                placeholder="Ex: marketing digital"
+                className="h-9 w-full px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors"
+                onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
+              />
+            )}
+          </div>
+
+          {/* Post type */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">{isYouTube ? 'Tipo de Conteudo' : 'Tipo de Post'}</p>
+            <Select value={postType} onValueChange={(v) => setPostType(v as PostType)}>
+              <SelectTrigger className="h-9 w-full rounded-lg border border-border/60 bg-transparent text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {postTypeOptions.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Period */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">Período</p>
+            <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
+              <SelectTrigger className="h-9 w-full rounded-lg border border-border/60 bg-transparent text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {PERIOD_OPTIONS.map((o) => (
+                  <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Limit */}
+          <div className="space-y-1.5">
+            <p className="text-xs font-medium text-muted-foreground">{limitLabel}</p>
+            <input
+              type="number"
+              min={1}
+              max={limitMax}
+              value={resultsLimit}
+              onChange={(e) => setResultsLimit(e.target.value)}
+              placeholder="20"
+              className="h-9 w-full px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors"
+            />
+          </div>
+
+          <button
+            onClick={() => void handleSearch()}
+            disabled={isSearching || loading}
+            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {(isSearching || loading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
+            {(isSearching || loading) ? 'Processando...' : 'Pesquisar'}
+          </button>
+        </div>
+
+        <ResearchProgressBar active={isSearching || loading} />
+
+        {error && (
+          <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-3 py-2.5">
+            <p className="text-xs text-destructive flex items-center gap-1.5">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0" strokeWidth={1.5} />
+              {error}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Search sub-tabs */}
-      <div className="flex items-center gap-6">
-        <button
-          onClick={() => setTab('profile')}
-          className={`text-sm pb-1.5 transition-colors border-b-2 ${
-            tab === 'profile'
-              ? 'text-foreground font-medium border-foreground'
-              : 'text-muted-foreground border-transparent hover:text-foreground/70'
-          }`}
-        >
-          {profileLabel}
-        </button>
-        <button
-          onClick={() => setTab('keyword')}
-          className={`text-sm pb-1.5 transition-colors border-b-2 ${
-            tab === 'keyword'
-              ? 'text-foreground font-medium border-foreground'
-              : 'text-muted-foreground border-transparent hover:text-foreground/70'
-          }`}
-        >
-          {keywordLabel}
-        </button>
-      </div>
-
-      {/* Search form */}
-      <div className="space-y-0">
-        <ConnectorRow
-          icon={<PlatformIcon platform={platform} size={36} />}
-          label="Plataforma"
-          description="Rede social para pesquisa"
-        >
-          <Select value={platform} onValueChange={(v) => setPlatform(v as Platform)}>
-            <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="min-w-[220px]">
-              {PLATFORM_LIST.map((p) => (
-                <SelectItem key={p.value} value={p.value}>
-                  <div className="flex items-center gap-2.5">
-                    <PlatformIcon platform={p.value} size={24} />
-                    <span>{p.label}</span>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </ConnectorRow>
-
-        <RowDivider />
-
-        {tab === 'profile' ? (
-          <ConnectorRow
-            icon={<IconCircle><User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-            label={userFieldLabel}
-            description={userFieldDesc}
-          >
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              placeholder={userFieldPlaceholder}
-              className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
-              onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
-            />
-          </ConnectorRow>
-        ) : (
-          <ConnectorRow
-            icon={<IconCircle><Search className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-            label="Palavra-chave"
-            description="Termo para buscar conteudo"
-          >
-            <input
-              type="text"
-              value={keyword}
-              onChange={(e) => setKeyword(e.target.value)}
-              placeholder="Ex: marketing digital"
-              className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
-              onKeyDown={(e) => e.key === 'Enter' && void handleSearch()}
-            />
-          </ConnectorRow>
+      {/* Right panel — results */}
+      <div className="flex-1 min-w-0">
+        {!searched && (
+          <div className="flex flex-col items-center justify-center py-24 text-center space-y-3">
+            <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
+              <Target className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Pesquise perfis ou palavras-chave para analisar concorrentes
+            </p>
+          </div>
         )}
 
-        <RowDivider />
-
-        <ConnectorRow
-          icon={<IconCircle><Image className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-          label={isYouTube ? 'Tipo de Conteudo' : 'Tipo de Post'}
-          description={isYouTube ? 'Formato do conteudo' : 'Filtrar por formato de conteudo'}
-        >
-          <Select value={postType} onValueChange={(v) => setPostType(v as PostType)}>
-            <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {postTypeOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </ConnectorRow>
-
-        <RowDivider />
-
-        <ConnectorRow
-          icon={<IconCircle><Calendar className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-          label="Periodo"
-          description="Intervalo de tempo da pesquisa"
-        >
-          <Select value={String(periodDays)} onValueChange={(v) => setPeriodDays(Number(v))}>
-            <SelectTrigger className="h-9 w-auto min-w-[160px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {PERIOD_OPTIONS.map((o) => (
-                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </ConnectorRow>
-
-        <RowDivider />
-
-        <ConnectorRow
-          icon={<IconCircle><ListOrdered className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
-          label={limitLabel}
-          description={limitDesc}
-        >
-          <input
-            type="number"
-            min={1}
-            max={limitMax}
-            value={resultsLimit}
-            onChange={(e) => setResultsLimit(e.target.value)}
-            placeholder="20"
-            className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground text-center placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[72px]"
-          />
-        </ConnectorRow>
-      </div>
-
-      <div className="flex justify-end">
-        <button
-          onClick={() => void handleSearch()}
-          disabled={isSearching || loading}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {(isSearching || loading) ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
-          {(isSearching || loading) ? 'Processando...' : 'Pesquisar'}
-        </button>
-      </div>
-
-      <ResearchProgressBar active={isSearching || loading} />
-
-      {error && (
-        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
-          <p className="text-sm text-destructive flex items-center gap-2">
-            <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
-            {error}
-          </p>
-        </div>
-      )}
-
-      {!searched && (
-        <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
-            <Target className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+        {(isSearching || loading) && posts.length === 0 && (
+          <div className="flex items-center justify-center py-24">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
           </div>
-          <p className="text-sm text-muted-foreground">
-            Pesquise perfis ou palavras-chave para analisar concorrentes
-          </p>
-        </div>
-      )}
+        )}
 
-      {posts.length > 0 && !loading && (
-        <>
-          {response?.metadata && (
-            <ProfileMetadataCard
-              metadata={response.metadata}
-              isYouTube={isYouTube}
-              contentLabel={contentLabel}
-            />
-          )}
+        {posts.length > 0 && !loading && (
+          <div className="space-y-4">
+            {response?.metadata && (
+              <ProfileMetadataCard
+                metadata={response.metadata}
+                isYouTube={isYouTube}
+                contentLabel={contentLabel}
+              />
+            )}
 
-          <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
-            <p className="text-xs text-muted-foreground">
-              {response?.pagination?.total || posts.length} {contentLabel} encontrados
-            </p>
-            <div className="flex items-center gap-2">
-              <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
-                <SelectTrigger className="w-auto min-w-[160px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {SORT_OPTIONS.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
-                <SelectTrigger className="w-auto min-w-[80px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="desc">Desc</SelectItem>
-                  <SelectItem value="asc">Asc</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
+              <p className="text-xs text-muted-foreground">
+                {response?.pagination?.total || posts.length} {contentLabel} encontrados
+              </p>
+              <div className="flex items-center gap-2">
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as SortBy)}>
+                  <SelectTrigger className="w-auto min-w-[160px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {SORT_OPTIONS.map((o) => (
+                      <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
+                  <SelectTrigger className="w-auto min-w-[80px] border-0 bg-secondary/40 hover:bg-secondary/60 h-8 text-xs text-foreground focus:ring-0 focus:ring-offset-0">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="desc">Desc</SelectItem>
+                    <SelectItem value="asc">Asc</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3">
-            {posts.map((post) => (
-              <div key={post.id} className="relative group">
-                <PostCard post={post} onClick={() => setSelectedPost(post)} />
+            <div className={`grid ${isMobile ? 'grid-cols-2' : 'grid-cols-3'} gap-3`}>
+              {posts.map((post) => (
+                <div key={post.id} className="relative group">
+                  <PostCard post={post} onClick={() => setSelectedPost(post)} />
+                  <button
+                    onClick={(e) => { e.stopPropagation(); void markAsCompetitor(post); }}
+                    className={`absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm transition-colors ${
+                      isCompetitor(post.id)
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-background/80 text-muted-foreground hover:bg-primary/20 hover:text-primary opacity-0 group-hover:opacity-100'
+                    }`}
+                    title={isCompetitor(post.id) ? 'Remover dos concorrentes' : 'Marcar como concorrente'}
+                  >
+                    <Target className="w-3 h-3" />
+                    {isCompetitor(post.id) ? 'Concorrente' : 'Marcar'}
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {hasMore && (
+              <div className="flex justify-center pt-4">
                 <button
-                  onClick={(e) => { e.stopPropagation(); void markAsCompetitor(post); }}
-                  className={`absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm transition-colors ${
-                    isCompetitor(post.id)
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-background/80 text-muted-foreground hover:bg-primary/20 hover:text-primary opacity-0 group-hover:opacity-100'
-                  }`}
-                  title={isCompetitor(post.id) ? 'Remover dos concorrentes' : 'Marcar como concorrente'}
+                  onClick={loadMore}
+                  disabled={loadingMore}
+                  className="flex items-center gap-2 px-5 py-2 rounded-lg border border-border/40 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground disabled:opacity-50"
                 >
-                  <Target className="w-3 h-3" />
-                  {isCompetitor(post.id) ? 'Concorrente' : 'Marcar'}
+                  {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {loadingMore ? 'Carregando...' : 'Carregar mais'}
                 </button>
               </div>
-            ))}
+            )}
           </div>
+        )}
 
-          {hasMore && (
-            <div className="flex justify-center pt-4">
-              <button
-                onClick={loadMore}
-                disabled={loadingMore}
-                className="flex items-center gap-2 px-5 py-2 rounded-lg border border-border/40 hover:bg-secondary/40 transition-colors text-xs text-muted-foreground disabled:opacity-50"
-              >
-                {loadingMore && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                {loadingMore ? 'Carregando...' : 'Carregar mais'}
-              </button>
-            </div>
-          )}
-        </>
-      )}
-
-      {!loading && !error && searched && posts.length === 0 && (
-        <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
-          <p className="text-sm text-foreground">Nenhum {isYouTube ? 'video' : 'post'} encontrado</p>
-          <p className="text-xs text-muted-foreground">
-            Tente aumentar o periodo da busca (ex.: 365 dias), ajustar os filtros ou pesquisar outro perfil.
-          </p>
-        </div>
-      )}
+        {!loading && !error && searched && posts.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+            <p className="text-sm text-foreground">Nenhum {isYouTube ? 'video' : 'post'} encontrado</p>
+            <p className="text-xs text-muted-foreground">
+              Tente aumentar o periodo da busca (ex.: 365 dias), ajustar os filtros ou pesquisar outro perfil.
+            </p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -1201,38 +1168,3 @@ function ProfileMetadataCard({
   );
 }
 
-/* ─── Shared UI Components ─── */
-function ConnectorRow({
-  icon,
-  label,
-  description,
-  children,
-}: {
-  icon: ReactNode;
-  label: string;
-  description?: string;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-center gap-4 py-5">
-      <div className="shrink-0">{icon}</div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-foreground">{label}</p>
-        {description && <p className="text-xs text-muted-foreground mt-0.5">{description}</p>}
-      </div>
-      <div className="shrink-0">{children}</div>
-    </div>
-  );
-}
-
-function IconCircle({ children }: { children: ReactNode }) {
-  return (
-    <div className="w-9 h-9 rounded-[8px] bg-secondary/60 flex items-center justify-center shrink-0">
-      {children}
-    </div>
-  );
-}
-
-function RowDivider() {
-  return <div className="border-t border-border/30" />;
-}

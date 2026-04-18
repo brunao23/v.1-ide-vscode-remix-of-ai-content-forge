@@ -150,15 +150,6 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
             <div className="border-t border-border" />
 
             <div className="flex flex-col gap-2 mt-auto">
-              <a
-                href={post.post_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border hover:bg-secondary transition-colors text-sm text-foreground"
-              >
-                <ExternalLink className="w-4 h-4" />
-                {isYT ? 'Abrir no YouTube' : 'Abrir post original'}
-              </a>
               <button
                 onClick={() => onSave(post)}
                 className={`flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg transition-colors text-sm font-medium ${
@@ -173,6 +164,15 @@ export default function PostDetailModal({ post, open, onClose, onSave, isSaved }
                   <><Bookmark className="w-4 h-4" /> Salvar para referencia</>
                 )}
               </button>
+              <a
+                href={post.post_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg border border-border hover:bg-secondary transition-colors text-sm text-foreground"
+              >
+                <ExternalLink className="w-4 h-4" />
+                {isYT ? 'Abrir no YouTube' : 'Abrir post original'}
+              </a>
             </div>
           </div>
         </div>
