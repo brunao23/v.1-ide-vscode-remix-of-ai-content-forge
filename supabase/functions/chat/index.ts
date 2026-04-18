@@ -135,9 +135,9 @@ const DOCUMENT_TYPE_ALIASES: Record<string, string[]> = {
 
 const MAX_SYSTEM_DOC_TOKENS = 2200;
 const MAX_SYSTEM_DOCS_IN_PROMPT = 8;
-const MAX_USER_DOC_TOKENS = 4200;
-const MAX_USER_DOC_CHUNKS_IN_PROMPT = 10;
-const MAX_SINGLE_CHUNK_TOKENS = 420;
+const MAX_USER_DOC_TOKENS = 8000;
+const MAX_USER_DOC_CHUNKS_IN_PROMPT = 16;
+const MAX_SINGLE_CHUNK_TOKENS = 600;
 
 type ChatMessage = {
   role: "user" | "assistant" | "system";
@@ -154,6 +154,7 @@ type RetrievedDocumentChunk = {
   similarity: number;
   source: RetrievedDocumentSource;
   documentType: string | null;
+  subject?: string | null;
 };
 
 type SystemDocument = {
@@ -170,9 +171,34 @@ type AgentPromptConfig = {
 
 type RuntimeModelProvider = "anthropic" | "openai" | "openrouter";
 type MarketingMode = "calendar" | "idea";
+type ThinkingEffort = "low" | "medium" | "high" | "xhigh" | "max";
+type AnthropicThinkingResolution = {
+  requested: boolean;
+  enabled: boolean;
+  mode: "disabled" | "enabled" | "adaptive";
+  reason: string;
+  budgetTokens?: number;
+  effort?: ThinkingEffort;
+};
 type MarketingWebSearchDecision = {
   shouldSearch: boolean;
   reason: string;
+};
+type MarketingDocumentSearchStep = {
+  subject: string;
+  query: string;
+  maxChunks: number;
+};
+type MarketingWebSearchStep = {
+  label: string;
+  query: string;
+  maxResults: number;
+};
+type MarketingWebStepResult = {
+  label: string;
+  query: string;
+  resultCount: number;
+  domains: string[];
 };
 
 function resolveTenantNamespace(basePrefix: string, tenantId: string): string {
@@ -196,11 +222,12 @@ function normalizeMessages(rawMessages: unknown): ChatMessage[] {
 }
 
 function isAnthropicModel(modelId: string): boolean {
-  return modelId.startsWith("claude-");
+  return String(modelId || "").toLowerCase().startsWith("claude-");
 }
 
 function isOpenAIModel(modelId: string): boolean {
-  return modelId.startsWith("gpt-") || modelId.startsWith("o");
+  const normalized = String(modelId || "").toLowerCase();
+  return normalized.startsWith("gpt-") || normalized.startsWith("o");
 }
 
 function mapModelToOpenRouter(modelId: string): string {
@@ -210,6 +237,11 @@ function mapModelToOpenRouter(modelId: string): string {
   const lower = normalized.toLowerCase();
 
   const knownMappings: Record<string, string> = {
+    "claude-opus-4-7": "anthropic/claude-opus-4.7",
+    "claude-opus-4-6": "anthropic/claude-opus-4.6",
+    "claude-sonnet-4-6": "anthropic/claude-sonnet-4.6",
+    "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
+    "claude-haiku-4-5": "anthropic/claude-haiku-4.5",
     "claude-opus-4-20250514": "anthropic/claude-opus-4",
     "claude-sonnet-4-20250514": "anthropic/claude-sonnet-4",
     "claude-3-5-haiku-20241022": "anthropic/claude-3.5-haiku",
@@ -228,10 +260,142 @@ function mapModelToOpenRouter(modelId: string): string {
   }
 
   if (lower.startsWith("claude-")) {
-    return "anthropic/claude-sonnet-4";
+    return `anthropic/${lower}`;
   }
 
   return normalized || "openrouter/auto";
+}
+
+function inferProviderFromModelId(modelId: string): RuntimeModelProvider {
+  const normalized = String(modelId || "").trim().toLowerCase();
+  if (!normalized) return "anthropic";
+  if (normalized.includes("/")) return "openrouter";
+  if (isAnthropicModel(normalized)) return "anthropic";
+  if (isOpenAIModel(normalized)) return "openai";
+  return "openrouter";
+}
+
+function resolveEffectiveProvider(
+  modelId: string,
+  requestedProvider: RuntimeModelProvider | null,
+): RuntimeModelProvider {
+  const inferred = inferProviderFromModelId(modelId);
+  if (!requestedProvider) return inferred;
+
+  if (requestedProvider !== inferred) {
+    throw new HttpError(
+      400,
+      `Modelo '${modelId}' pertence ao provedor '${inferred}', mas foi solicitado '${requestedProvider}'. Corrija a selecao de modelo/provedor.`,
+    );
+  }
+
+  return requestedProvider;
+}
+
+function isAdaptiveThinkingOnlyAnthropicModel(modelId: string): boolean {
+  const n = String(modelId || "").toLowerCase();
+  if (n.includes("claude-mythos-preview")) return true;
+  if (n.includes("opus-4-7") || n.includes("opus-4.7")) return true;
+  if (n.includes("opus-5") || n.includes("opus-6")) return true;
+  return false;
+}
+
+function isAdaptivePreferredAnthropicModel(modelId: string): boolean {
+  const n = String(modelId || "").toLowerCase();
+  return (
+    isAdaptiveThinkingOnlyAnthropicModel(n) ||
+    n.includes("opus-4-6") ||
+    n.includes("opus-4.6") ||
+    n.includes("sonnet-4-6") ||
+    n.includes("sonnet-4.6")
+  );
+}
+
+function supportsAnthropicThinking(modelId: string): boolean {
+  const n = String(modelId || "").toLowerCase();
+  if (!n.startsWith("claude-")) return false;
+  if (n.includes("3-5-haiku")) return false;
+  if (n.includes("3-5-sonnet")) return false;
+  return (
+    n.includes("sonnet-3-7") ||
+    n.includes("opus-4") ||
+    n.includes("sonnet-4") ||
+    n.includes("haiku-4-5") ||
+    n.includes("mythos-preview")
+  );
+}
+
+function normalizeThinkingEffort(value: unknown): ThinkingEffort {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (
+    normalized === "low" ||
+    normalized === "medium" ||
+    normalized === "high" ||
+    normalized === "xhigh" ||
+    normalized === "max"
+  ) {
+    return normalized;
+  }
+  return "high";
+}
+
+function resolveAnthropicThinkingConfig(params: {
+  modelId: string;
+  requested: boolean;
+  maxTokens: number;
+  effort: ThinkingEffort;
+}): AnthropicThinkingResolution {
+  const safeMaxTokens = Math.max(512, Math.floor(params.maxTokens || 0));
+  if (!params.requested) {
+    return {
+      requested: false,
+      enabled: false,
+      mode: "disabled",
+      reason: "disabled-by-user",
+    };
+  }
+
+  if (!supportsAnthropicThinking(params.modelId)) {
+    return {
+      requested: true,
+      enabled: false,
+      mode: "disabled",
+      reason: "model-does-not-support-thinking",
+    };
+  }
+
+  if (isAdaptivePreferredAnthropicModel(params.modelId)) {
+    return {
+      requested: true,
+      enabled: true,
+      mode: "adaptive",
+      reason: isAdaptiveThinkingOnlyAnthropicModel(params.modelId)
+        ? "adaptive-required-by-model"
+        : "adaptive-recommended-by-model",
+      effort: params.effort,
+    };
+  }
+
+  const targetBudget = Math.max(
+    1024,
+    Math.min(10000, Math.floor(safeMaxTokens * 0.55)),
+  );
+  if (targetBudget >= safeMaxTokens) {
+    return {
+      requested: true,
+      enabled: false,
+      mode: "disabled",
+      reason: "insufficient-max_tokens-for-manual-thinking",
+    };
+  }
+
+  return {
+    requested: true,
+    enabled: true,
+    mode: "enabled",
+    reason: "manual-thinking",
+    budgetTokens: targetBudget,
+  };
 }
 
 function isAuthenticationError(error: any): boolean {
@@ -338,18 +502,31 @@ function extractPromptTokenLimitFromOpenRouterError(
   };
 }
 
-// ─── Model pricing (USD per million tokens) ──────────────────────────────────
+// â”€â”€â”€ Model pricing (USD per million tokens) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function getModelPricing(modelId: string): { inputPerM: number; outputPerM: number } {
   const id = (modelId || "").toLowerCase();
+  // Claude 2026 series
+  if (id.includes("opus-4-7") || id === "claude-opus-4-7") return { inputPerM: 15, outputPerM: 75 };
+  if (id.includes("opus-4-6") || id === "claude-opus-4-6") return { inputPerM: 15, outputPerM: 75 };
+  if (id.includes("sonnet-4-6") || id === "claude-sonnet-4-6") return { inputPerM: 3, outputPerM: 15 };
+  if (id.includes("haiku-4-5") || id.includes("claude-haiku-4-5")) return { inputPerM: 0.80, outputPerM: 4 };
+  // Claude 2025 / legacy
   if (id.includes("opus-4") || id.includes("claude-opus-4")) return { inputPerM: 15, outputPerM: 75 };
   if (id.includes("sonnet-4") || id.includes("claude-sonnet-4")) return { inputPerM: 3, outputPerM: 15 };
   if (id.includes("haiku-4") || id.includes("claude-haiku-4")) return { inputPerM: 0.80, outputPerM: 4 };
   if (id.includes("3-5-sonnet") || id.includes("3.5-sonnet")) return { inputPerM: 3, outputPerM: 15 };
   if (id.includes("3-5-haiku") || id.includes("3.5-haiku")) return { inputPerM: 0.80, outputPerM: 4 };
   if (id.includes("claude-3-opus")) return { inputPerM: 15, outputPerM: 75 };
+  // OpenAI
   if (id.includes("gpt-4o-mini")) return { inputPerM: 0.15, outputPerM: 0.60 };
   if (id.includes("gpt-4o")) return { inputPerM: 2.50, outputPerM: 10 };
+  if (id.includes("gpt-4.1-nano")) return { inputPerM: 0.10, outputPerM: 0.40 };
+  if (id.includes("gpt-4.1-mini")) return { inputPerM: 0.40, outputPerM: 1.60 };
+  if (id.includes("gpt-4.1")) return { inputPerM: 2.00, outputPerM: 8.00 };
+  // Gemini
+  if (id.includes("gemini-2.5-pro")) return { inputPerM: 1.25, outputPerM: 10 };
+  if (id.includes("gemini-2.5-flash")) return { inputPerM: 0.15, outputPerM: 0.60 };
   return { inputPerM: 3, outputPerM: 15 }; // default: sonnet pricing
 }
 
@@ -460,6 +637,114 @@ function normalizeMarketingMode(value: unknown): MarketingMode {
   return raw === "idea" ? "idea" : "calendar";
 }
 
+function buildMarketingDocumentRetrievalPlan(
+  userPrompt: string,
+  mode: MarketingMode,
+): MarketingDocumentSearchStep[] {
+  const baseTopic = String(userPrompt || "").trim();
+  const compactTopic = baseTopic.slice(0, 420);
+
+  if (mode === "idea") {
+    return [
+      {
+        subject: "Marca, metodo e posicionamento",
+        query: `${compactTopic} brand book proposta de valor diferenciais mecanismo assinatura`,
+        maxChunks: 4,
+      },
+      {
+        subject: "ICP, dores e linguagem",
+        query: `${compactTopic} icp publico alvo dores desejos objecoes linguagem comportamento compra`,
+        maxChunks: 4,
+      },
+      {
+        subject: "Pilares, matriz e angulos",
+        query: `${compactTopic} pilares subpilares matriz de conteudo big ideas angulos narrativos`,
+        maxChunks: 4,
+      },
+      {
+        subject: "Voz, banlist e padroes de comunicacao",
+        query: `${compactTopic} voz de marca tom de voz padroes de comunicacao ban list proibicoes`,
+        maxChunks: 4,
+      },
+    ];
+  }
+
+  return [
+    {
+      subject: "Direcionamento estrategico da marca",
+      query: `${compactTopic} brand book objetivo de negocio oferta posicionamento`,
+      maxChunks: 4,
+    },
+    {
+      subject: "Contexto do publico e temas prioritarios",
+      query: `${compactTopic} icp pilares subpilares matriz prioridades de conteudo`,
+      maxChunks: 4,
+    },
+    {
+      subject: "Regras de comunicacao e execucao",
+      query: `${compactTopic} voz de marca ban list padroes comunicacao roteiro calendario`,
+      maxChunks: 4,
+    },
+  ];
+}
+function buildMarketingWebSearchPlan(
+  userPrompt: string,
+  mode: MarketingMode,
+): MarketingWebSearchStep[] {
+  const topic = String(userPrompt || "").trim().slice(0, 220);
+
+  if (mode === "idea") {
+    return [
+      {
+        label: "Fatos e contexto principal do tema",
+        query: `${topic} fatos recentes contexto oficial`,
+        maxResults: 6,
+      },
+      {
+        label: "Acoes, ativacoes e execucao pratica",
+        query: `${topic} ativacao campanha execucao experiencia fisica resultados`,
+        maxResults: 6,
+      },
+      {
+        label: "Dados de mercado, numeros e impacto",
+        query: `${topic} dados metricas numeros crescimento receita impacto`,
+        maxResults: 6,
+      },
+      {
+        label: "Contrapontos e angulos alternativos",
+        query: `${topic} analise critica contraponto opinioes especialistas`,
+        maxResults: 6,
+      },
+    ];
+  }
+
+  return [
+    {
+      label: "Tendencias e pautas quentes",
+      query: `${topic} tendencias atuais pautas quentes`,
+      maxResults: 6,
+    },
+    {
+      label: "Exemplos aplicaveis ao calendario",
+      query: `${topic} exemplos de conteudo calendario editorial redes sociais`,
+      maxResults: 6,
+    },
+    {
+      label: "Dados e fatos para validar premissas",
+      query: `${topic} dados fatos recentes fonte confiavel`,
+      maxResults: 6,
+    },
+  ];
+}
+function parseDomain(url: string): string {
+  try {
+    const hostname = new URL(url).hostname || "";
+    return hostname.replace(/^www\./i, "").toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 function hasUrlReference(text: string): boolean {
   return /https?:\/\/|www\./i.test(String(text || ""));
 }
@@ -488,7 +773,7 @@ function userExplicitlyRequestsWebSearch(text: string): boolean {
     normalized.includes("noticias recentes") ||
     normalized.includes("dados recentes") ||
     normalized.includes("tendencias") ||
-    // Approval patterns — user confirming AI should search
+    // Approval patterns â€” user confirming AI should search
     normalized.includes("pode buscar") ||
     normalized.includes("pode pesquisar") ||
     normalized.includes("pode procurar") ||
@@ -513,15 +798,30 @@ function userExplicitlyDisablesWebSearch(text: string): boolean {
     normalized.includes("sem busca na web") ||
     normalized.includes("sem pesquisar na web") ||
     normalized.includes("nao busque na web") ||
-    normalized.includes("nao pesquisar na web") ||
-    normalized.includes("não busque na web") ||
-    normalized.includes("não pesquisar na web")
+    normalized.includes("nao pesquisar na web")
   );
 }
 
 function hasRecentResearchInConversation(messages: ChatMessage[]): boolean {
   const recentMessages = messages.slice(-8);
   return recentMessages.some((message) => containsResearchSignals(message.content));
+}
+
+function marketingResearchAutoTrigger(text: string): boolean {
+  const n = normalizeIntentText(text);
+  // Only auto-trigger for substantive messages
+  if (n.length < 40) return false;
+  const signals = [
+    "tendencia", "tendencias", "mercado", "concorrente", "concorrencia",
+    "competidor", "dado", "dados", "estatistica", "estatisticas",
+    "pesquisa de mercado", "analise de mercado",
+    "o que esta", "como esta", "atualmente", "hoje em dia", "recente",
+    "ultimos meses", "viral", "o que bomba", "o que funciona",
+    "temas quentes", "assuntos quentes", "o que ta em alta",
+    "estrategia de conteudo", "planejamento de conteudo",
+    "ideias de conteudo", "roteiro", "campanha", "lancamento",
+  ];
+  return signals.some((s) => n.includes(s));
 }
 
 function resolveMarketingWebSearchDecision(
@@ -537,40 +837,29 @@ function resolveMarketingWebSearchDecision(
     return { shouldSearch: false, reason: "disabled-by-user" };
   }
 
-  // Only search if explicitly approved by user (button click) or explicit text request
+  const recentResearchExists = hasRecentResearchInConversation(messages);
+  const explicitRequest = userExplicitlyRequestsWebSearch(latestUserText);
+  const autoTrigger = marketingResearchAutoTrigger(latestUserText);
+
+  // If recent web research already exists, skip re-run unless explicitly requested or auto-triggered
+  if (recentResearchExists && !webSearchApproved && !explicitRequest && !autoTrigger) {
+    return { shouldSearch: false, reason: "recent-research-already-present" };
+  }
+
   if (webSearchApproved) {
     return { shouldSearch: true, reason: "user-approved-via-button" };
   }
 
-  if (userExplicitlyRequestsWebSearch(latestUserText)) {
+  if (explicitRequest) {
     return { shouldSearch: true, reason: "explicit-web-search-request" };
+  }
+
+  if (autoTrigger) {
+    return { shouldSearch: true, reason: "auto-research-intent-detected" };
   }
 
   return { shouldSearch: false, reason: "awaiting-user-approval" };
 }
-
-function extractKeywords(text: string, limit = 6): string[] {
-  const stopwords = new Set([
-    "de", "da", "do", "das", "dos", "em", "no", "na", "nos", "nas",
-    "e", "ou", "para", "com", "por", "que", "uma", "um", "como",
-    "sobre", "meu", "minha", "quero", "preciso", "fazer", "criar",
-    "calendario", "conteudo", "ideia", "solta", "marketing",
-  ]);
-
-  const normalized = String(text || "")
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ");
-
-  const tokens = normalized
-    .split(/\s+/)
-    .map((token) => token.trim())
-    .filter((token) => token.length >= 4 && !stopwords.has(token));
-
-  return Array.from(new Set(tokens)).slice(0, limit);
-}
-
 /**
  * Extracts the real topic from the full conversation history.
  * When the user says "pode buscar" or clicks the search button,
@@ -606,11 +895,11 @@ function isSearchTriggerMessage(text: string): boolean {
  */
 function extractConversationTopic(messages: ChatMessage[], latestUserText: string): string {
   if (!isSearchTriggerMessage(latestUserText)) {
-    // Latest message has real substance — use it
+    // Latest message has real substance â€” use it
     return latestUserText;
   }
 
-  // It's a search trigger — look back for the REAL topic
+  // It's a search trigger â€” look back for the REAL topic
   // Collect all substantive user messages, excluding search triggers
   const substantiveUserMessages = messages
     .filter((m) => m.role === "user")
@@ -625,7 +914,7 @@ function extractConversationTopic(messages: ChatMessage[], latestUserText: strin
     return combined;
   }
 
-  // Nothing useful in history — fallback to the trigger message itself
+  // Nothing useful in history â€” fallback to the trigger message itself
   return latestUserText;
 }
 
@@ -635,26 +924,28 @@ async function callPerplexitySearch(
   maxResults = 4,
 ): Promise<Array<{ title: string; url: string; summary: string }>> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 25000);
 
   try {
-    const response = await fetch("https://api.perplexity.ai/search", {
+    const response = await fetch("https://api.perplexity.ai/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        query,
-        max_results: maxResults,
-        max_tokens_per_page: 400,
+        model: "sonar-pro",
+        messages: [{ role: "user", content: query }],
+        max_tokens: 1200,
+        return_citations: true,
+        search_recency_filter: "month",
       }),
       signal: controller.signal,
     });
 
     const rawText = await response.text();
     if (!response.ok) {
-      console.error(`Perplexity /search failed (${response.status}): ${rawText?.slice(0, 300)}`);
+      console.error(`Perplexity /chat/completions failed (${response.status}): ${rawText?.slice(0, 300)}`);
       return [];
     }
 
@@ -665,25 +956,42 @@ async function callPerplexitySearch(
       return [];
     }
 
-    // /search returns { results: [{ title, url, content, ... }] }
+    // sonar-pro returns { choices: [{message:{content}}], citations: ["url1","url2",...] }
+    const content = String(parsed?.choices?.[0]?.message?.content || "").trim();
+    const citations: string[] = Array.isArray(parsed?.citations) ? parsed.citations : [];
+
+    if (!content) return [];
+
     const results: Array<{ title: string; url: string; summary: string }> = [];
-    const items = Array.isArray(parsed?.results) ? parsed.results : [];
 
-    for (const item of items.slice(0, maxResults)) {
-      const url = String(item?.url || "").trim();
-      const title = String(item?.title || "").trim();
-      const summary = String(item?.content || item?.snippet || item?.text || "").slice(0, 500).trim();
+    // Split content into paragraphs to create structured results
+    const paragraphs = content.split(/\n+/).filter((p: string) => p.trim().length > 40);
+    const usedParagraphs = paragraphs.slice(0, maxResults);
 
-      if (!url && !summary) continue;
-
+    // Map paragraphs to results, attaching citations when available
+    for (let i = 0; i < Math.max(usedParagraphs.length, Math.min(citations.length, maxResults)); i++) {
+      const url = citations[i] || "";
+      const summary = usedParagraphs[i] || (i === 0 ? content.slice(0, 800) : "");
+      if (!summary && !url) continue;
       results.push({
-        title: title || url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] || `Fonte ${results.length + 1}`,
+        title: url ? url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] : `Resultado ${i + 1}`,
         url,
-        summary,
+        summary: summary.slice(0, 700),
       });
     }
 
-    console.log(`[Perplexity] query="${query.slice(0, 80)}" → ${results.length} results`);
+    // If we have only 1 result but multiple citations, add remaining citations as sources
+    if (results.length <= 1 && citations.length > 1) {
+      for (let i = results.length; i < Math.min(citations.length, maxResults); i++) {
+        results.push({
+          title: citations[i].replace(/^https?:\/\/(www\.)?/, "").split("/")[0],
+          url: citations[i],
+          summary: content.slice(0, 500),
+        });
+      }
+    }
+
+    console.log(`[Perplexity sonar-pro] query="${query.slice(0, 80)}" → ${results.length} results, ${citations.length} citations`);
     return results;
   } catch (err: any) {
     const msg = err?.name === "AbortError"
@@ -706,79 +1014,109 @@ async function buildMarketingManagerWebContext(params: {
   queryCount: number;
   resultCount: number;
   sources: Array<{ title: string; url: string; summary: string }>;
+  steps: MarketingWebStepResult[];
+  topic: string;
 }> {
-  // Use the full conversation to determine what to search for
-  const realTopic = extractConversationTopic(params.messages, params.userPrompt);
-  const keywords = extractKeywords(realTopic);
-  const keywordBlock = keywords.join(" ");
-  const baseTopic = keywordBlock || realTopic.slice(0, 180);
+  const realTopic = extractConversationTopic(params.messages, params.userPrompt).slice(0, 420);
+  const searchPlan = buildMarketingWebSearchPlan(realTopic, params.mode);
 
-  console.log(`[WebSearch] Real topic resolved: "${baseTopic}" (from: "${params.userPrompt.slice(0, 60)}")`);
+  const budgetMs = 30_000;
+  const startedAt = Date.now();
+  const rawResults: Array<{ title: string; url: string; summary: string; query: string; label: string }> = [];
+  const stepResults: MarketingWebStepResult[] = [];
 
-  // Use full real topic for richer queries
-  const topicDescription = realTopic.slice(0, 300);
+  for (const step of searchPlan) {
+    if (Date.now() - startedAt > budgetMs) {
+      console.warn(`[WebSearch] budget exceeded (${budgetMs}ms), stopping at step: ${step.label}`);
+      break;
+    }
 
-  // Queries are DIRECT about the topic — no marketing framing added.
-  // The AI will apply the marketing angle; Perplexity just finds facts.
-  const queries = [
-    `${topicDescription} dados estatisticas fatos recentes 2024 2025`,
-    `${baseTopic} tendencias cases estudos pesquisas mercado brasileiro`,
-  ];
-
-  console.log(`[WebSearch] Queries: ${JSON.stringify(queries)}`);
-
-  const snippets: Array<{ title: string; url: string; summary: string; query: string }> = [];
-
-  // Global budget: if ALL queries together take > 18s, stop and use whatever came back
-  const budgetMs = 18_000;
-  let budgetTimerId: ReturnType<typeof setTimeout> | null = null;
-  const allResults = await Promise.race([
-    Promise.all(
-      queries.map((query) =>
-        callPerplexitySearch(params.apiKey, query, 4).then(
-          (results) => results.map((r) => ({ ...r, query })),
-        ),
+    const results = await callPerplexitySearch(params.apiKey, step.query, step.maxResults);
+    const uniqueDomains = Array.from(
+      new Set(
+        results
+          .map((item) => parseDomain(item.url))
+          .filter((domain) => Boolean(domain)),
       ),
-    ),
-    new Promise<Array<Array<{ title: string; url: string; summary: string; query: string }>>>(
-      (resolve) => {
-        budgetTimerId = setTimeout(() => {
-          console.error(`Web search budget exceeded (${budgetMs}ms) — continuing without results`);
-          resolve([]);
-        }, budgetMs);
-      },
-    ),
-  ]).finally(() => {
-    // Always clear the budget timer so it doesn't keep the isolate alive
-    if (budgetTimerId !== null) clearTimeout(budgetTimerId);
-  });
+    ).slice(0, 6);
 
-  for (const results of allResults) {
-    snippets.push(...results);
+    stepResults.push({
+      label: step.label,
+      query: step.query,
+      resultCount: results.length,
+      domains: uniqueDomains,
+    });
+
+    rawResults.push(
+      ...results.map((item) => ({
+        ...item,
+        query: step.query,
+        label: step.label,
+      })),
+    );
   }
 
+  // Deduplicate by URL first
   const dedupedByUrl = Array.from(
-    new Map(snippets.filter((s) => s.url).map((item) => [item.url.toLowerCase(), item])).values(),
-  ).slice(0, 10);
+    new Map(rawResults.filter((item) => item.url).map((item) => [item.url.toLowerCase(), item])).values(),
+  );
 
-  let context = "## PESQUISA WEB RECENTE\n";
-  context += `Topico pesquisado: "${baseTopic}"\n`;
+  // Keep source diversity (max 2 entries per domain)
+  const selected: Array<{ title: string; url: string; summary: string; query: string; label: string }> = [];
+  const perDomain = new Map<string, number>();
+  for (const item of dedupedByUrl) {
+    if (selected.length >= 14) break;
+    const domain = parseDomain(item.url);
+    const current = perDomain.get(domain) || 0;
+    if (domain && current >= 2) continue;
+    selected.push(item);
+    if (domain) {
+      perDomain.set(domain, current + 1);
+    }
+  }
+
+  let context = "## PESQUISA WEB PARCELADA\n";
+  context += `Topico pesquisado: "${realTopic}"\n`;
   context += `Modo selecionado: ${params.mode === "calendar" ? "calendario" : "ideia solta"}.\n\n`;
   context += "### INSTRUCOES DE USO DOS DADOS (OBRIGATORIO)\n";
-  context += "- Voce DEVE usar estes dados para construir sua resposta. Eles sao o alicerce factual.\n";
-  context += "- Conecte CADA dado/insight ao tema que o usuario pediu na conversa.\n";
-  context += "- Se um dado nao tem relacao com o pedido do usuario, IGNORE-O. Nao inclua dados irrelevantes.\n";
-  context += "- Cite a fonte ao lado do dado: ex. 'Segundo pesquisa da Gartner (2025)...'.\n\n";
-  context += "### REGRAS DE LINKS\n";
-  context += "- SOMENTE cite URLs que aparecem EXATAMENTE nos dados abaixo.\n";
-  context += "- NUNCA invente URLs. Se nao tem URL exata, cite a fonte por nome.\n";
-  context += "- Ao final, inclua '## Fontes' SOMENTE com URLs reais dos dados abaixo.\n\n";
-  context += "### DADOS DA PESQUISA:\n";
-  dedupedByUrl.forEach((item, index) => {
-    context += `\n[${index + 1}] ${item.title}\nURL: ${item.url}\nConteudo: ${item.summary || "Sem resumo"}\n`;
-  });
+  context += "- Use os dados abaixo como premissas factuais da resposta.\n";
+  context += "- Conecte cada insight diretamente ao pedido do usuario.\n";
+  context += "- Cite fonte real sempre que usar dado numerico ou afirmacao objetiva.\n";
+  context += "- Nunca invente URL. Se nao houver URL exata, cite apenas o nome da fonte.\n\n";
 
-  const sources = dedupedByUrl
+  if (stepResults.length > 0) {
+    context += "### ETAPAS EXECUTADAS\n";
+    stepResults.forEach((step, index) => {
+      context += `- Etapa ${index + 1}: ${step.label} | resultados: ${step.resultCount}\n`;
+      context += `  consulta: ${step.query}\n`;
+    });
+    context += "\n";
+  }
+
+  if (selected.length === 0) {
+    context += "### DADOS ENCONTRADOS\nNenhum resultado confiavel retornado pela pesquisa web nesta tentativa.\n";
+  } else {
+    context += "### DADOS ENCONTRADOS (POR ETAPA)\n";
+    const byLabel = new Map<string, Array<{ title: string; url: string; summary: string; query: string; label: string }>>();
+    for (const item of selected) {
+      const list = byLabel.get(item.label) || [];
+      list.push(item);
+      byLabel.set(item.label, list);
+    }
+
+    let globalIndex = 1;
+    for (const [label, items] of byLabel.entries()) {
+      context += `\n#### ${label}\n`;
+      for (const item of items) {
+        context += `\n[${globalIndex}] ${item.title}\n`;
+        context += `URL: ${item.url}\n`;
+        context += `Resumo: ${item.summary || "Sem resumo"}\n`;
+        globalIndex += 1;
+      }
+    }
+  }
+
+  const sources = selected
     .filter((item) => item.url)
     .map((item) => ({
       title: item.title,
@@ -788,12 +1126,13 @@ async function buildMarketingManagerWebContext(params: {
 
   return {
     context,
-    queryCount: queries.length,
-    resultCount: dedupedByUrl.length,
+    queryCount: stepResults.length,
+    resultCount: selected.length,
     sources,
+    steps: stepResults,
+    topic: realTopic,
   };
 }
-
 function normalizeTypeToken(value: string): string {
   return normalizeIntentText(value).replace(/[\s_]+/g, "-").trim();
 }
@@ -830,7 +1169,7 @@ function isDocumentConsultIntent(text: string): boolean {
     normalized.includes("revisar") ||
     normalized.includes("revisao") ||
     normalized.includes("rever") ||
-    normalized.includes("revisão") ||
+    normalized.includes("revisÃ£o") ||
     normalized.includes("consultar") ||
     normalized.includes("analisar") ||
     normalized.includes("existente") ||
@@ -840,7 +1179,7 @@ function isDocumentConsultIntent(text: string): boolean {
     normalized.includes("meu brand book") ||
     normalized.includes("meu brandbook") ||
     normalized.includes("ja tenho") ||
-    normalized.includes("já tenho") ||
+    normalized.includes("jÃ¡ tenho") ||
     normalized.includes("com base no meu")
   );
 }
@@ -921,12 +1260,30 @@ async function fetchSystemDocuments(
 
   const priority = (name: string) => {
     const n = String(name || "").toLowerCase();
-    if (n.includes("banlist") || n.includes("lista de banimento")) return 0;
+    if (
+      n.includes("banlist") ||
+      n.includes("ban list") ||
+      n.includes("ban_list") ||
+      n.includes("lista de banimento")
+    ) return 0;
     if (n.includes("prompt principal") || n.includes("instru")) return 1;
     return 10;
   };
 
-  return normalizedDocs.sort((a, b) => {
+  const dedupMap = new Map<string, SystemDocument>();
+  for (const doc of normalizedDocs) {
+    const fingerprint = chunkFingerprint(doc.content);
+    const existing = dedupMap.get(fingerprint);
+    if (!existing) {
+      dedupMap.set(fingerprint, doc);
+      continue;
+    }
+    if (doc.isMandatory && !existing.isMandatory) {
+      dedupMap.set(fingerprint, doc);
+    }
+  }
+
+  return Array.from(dedupMap.values()).sort((a, b) => {
     if (a.isMandatory !== b.isMandatory) {
       return a.isMandatory ? -1 : 1;
     }
@@ -1024,6 +1381,82 @@ function selectUserChunksForPrompt(
   return selected;
 }
 
+function selectMarketingChunksForPrompt(
+  chunks: RetrievedDocumentChunk[],
+): RetrievedDocumentChunk[] {
+  const grouped = new Map<string, RetrievedDocumentChunk[]>();
+
+  for (const chunk of chunks) {
+    const key = (chunk.subject && chunk.subject.trim()) || "Contexto geral";
+    const existing = grouped.get(key) || [];
+    existing.push(chunk);
+    grouped.set(key, existing);
+  }
+
+  for (const [key, group] of grouped.entries()) {
+    grouped.set(key, group.sort((a, b) => (b.similarity || 0) - (a.similarity || 0)));
+  }
+
+  const orderedSubjects = Array.from(grouped.keys());
+  const selected: RetrievedDocumentChunk[] = [];
+  const seen = new Set<string>();
+  let usedTokens = 0;
+  let cursor = 0;
+
+  while (
+    selected.length < MAX_USER_DOC_CHUNKS_IN_PROMPT &&
+    orderedSubjects.length > 0
+  ) {
+    const subject = orderedSubjects[cursor % orderedSubjects.length];
+    const queue = grouped.get(subject) || [];
+
+    if (queue.length === 0) {
+      grouped.delete(subject);
+      orderedSubjects.splice(cursor % orderedSubjects.length, 1);
+      if (orderedSubjects.length === 0) break;
+      continue;
+    }
+
+    const chunk = queue.shift() as RetrievedDocumentChunk;
+    const normalized = normalizeChunkContent(chunk.content);
+    if (!normalized) {
+      cursor += 1;
+      continue;
+    }
+
+    const fingerprint = chunkFingerprint(normalized);
+    if (seen.has(fingerprint)) {
+      cursor += 1;
+      continue;
+    }
+
+    const truncated = truncateTextToTokenBudget(normalized, MAX_SINGLE_CHUNK_TOKENS);
+    const chunkTokens = estimateTokenCount(truncated);
+    if (usedTokens + chunkTokens > MAX_USER_DOC_TOKENS) {
+      const remaining = MAX_USER_DOC_TOKENS - usedTokens;
+      if (remaining >= 80) {
+        selected.push({
+          ...chunk,
+          content: truncateTextToTokenBudget(truncated, remaining),
+          subject,
+        });
+      }
+      break;
+    }
+
+    selected.push({
+      ...chunk,
+      content: truncated,
+      subject,
+    });
+    seen.add(fingerprint);
+    usedTokens += chunkTokens;
+    cursor += 1;
+  }
+
+  return selected;
+}
+
 async function backfillMissingRequiredDocumentTypes(params: {
   supabase: ReturnType<typeof createClient>;
   tenantId: string;
@@ -1069,7 +1502,7 @@ async function backfillMissingRequiredDocumentTypes(params: {
     if (!content) continue;
 
     fallbackChunks.push({
-      content: truncateTextToTokenBudget(content, 380),
+      content: truncateTextToTokenBudget(content, 2000),
       similarity: 1,
       source: "MANDATORY_FALLBACK",
       documentType: canonicalType,
@@ -1097,14 +1530,16 @@ async function backfillMissingRequiredDocumentTypes(params: {
         .eq("tenant_id", tenantId)
         .eq("user_id", userId)
         .order("chunk_index", { ascending: true })
-        .limit(1);
+        .limit(6);
 
-      const firstChunk = chunkRows?.[0];
-      const chunkContent = normalizeChunkContent(String(firstChunk?.content || ""));
-      if (!chunkContent) continue;
+      const combinedChunkContent = (chunkRows || [])
+        .map((c: any) => normalizeChunkContent(String(c.content || "")))
+        .filter(Boolean)
+        .join("\n\n");
+      if (!combinedChunkContent) continue;
 
       fallbackChunks.push({
-        content: truncateTextToTokenBudget(chunkContent, 380),
+        content: truncateTextToTokenBudget(combinedChunkContent, 2000),
         similarity: 0.95,
         source: "MANDATORY_FALLBACK",
         documentType: canonicalType,
@@ -1154,8 +1589,10 @@ async function retrieveDocumentChunks(params: {
         filter.document_type = { "$in": filterTypes };
       }
 
+      console.log(`[RAG:Pinecone] namespace=${tenantNamespace} userId=${userId} tenantId=${tenantId} filterTypes=${JSON.stringify(filterTypes)}`);
+
       const queryResponse = await index.query({
-        topK: 14,
+        topK: 20,
         vector: queryEmbedding,
         includeMetadata: true,
         filter,
@@ -1172,6 +1609,8 @@ async function retrieveDocumentChunks(params: {
             : null,
         }));
 
+      console.log(`[RAG:Pinecone] retornou ${pineconeChunks.length} chunks`);
+
       if (pineconeChunks.length > 0) {
         chunks.push(...pineconeChunks);
       }
@@ -1186,7 +1625,7 @@ async function retrieveDocumentChunks(params: {
         "search_documents",
         {
           query_embedding: JSON.stringify(queryEmbedding),
-          match_count: 14,
+          match_count: 20,
           filter_user_id: userId,
           filter_document_types: filterTypes,
           filter_tenant_id: tenantId,
@@ -1200,6 +1639,7 @@ async function retrieveDocumentChunks(params: {
         documentType: chunk.document_type ? String(chunk.document_type) : null,
       }));
 
+      console.log(`[RAG:Supabase] retornou ${fallbackChunks.length} chunks`);
       chunks.push(...fallbackChunks);
     } catch (error) {
       console.error("Supabase fallback documentos retrieval failed:", error);
@@ -1231,9 +1671,29 @@ function appendDocumentsContextToPrompt(
 
   if (userDocumentChunks.length > 0) {
     output += "\n\n## DOCUMENTOS DO USUARIO (MEMORIA CONTEXTUAL)\n";
-    userDocumentChunks.forEach((chunk, index) => {
-      output += `\n[Trecho ${index + 1} - ${chunk.source} - relevancia ${(chunk.similarity * 100).toFixed(1)}%]\n${chunk.content}\n`;
-    });
+    const hasSubjects = userDocumentChunks.some((chunk) => Boolean(chunk.subject));
+    if (hasSubjects) {
+      const grouped = new Map<string, RetrievedDocumentChunk[]>();
+      for (const chunk of userDocumentChunks) {
+        const subject = (chunk.subject && chunk.subject.trim()) || "Contexto geral";
+        const existing = grouped.get(subject) || [];
+        existing.push(chunk);
+        grouped.set(subject, existing);
+      }
+
+      let counter = 1;
+      for (const [subject, chunks] of grouped.entries()) {
+        output += `\n### Assunto: ${subject}\n`;
+        for (const chunk of chunks) {
+          output += `\n[Trecho ${counter} - ${chunk.source} - relevancia ${(chunk.similarity * 100).toFixed(1)}%]\n${chunk.content}\n`;
+          counter += 1;
+        }
+      }
+    } else {
+      userDocumentChunks.forEach((chunk, index) => {
+        output += `\n[Trecho ${index + 1} - ${chunk.source} - relevancia ${(chunk.similarity * 100).toFixed(1)}%]\n${chunk.content}\n`;
+      });
+    }
   }
 
   return {
@@ -1294,28 +1754,48 @@ async function callAnthropic(params: {
   modelId: string;
   maxTokens: number;
   extendedThinking: boolean;
+  thinkingEffort?: ThinkingEffort;
   systemPrompt: string;
   messages: ChatMessage[];
   timeoutMs?: number;
 }) {
-  // Single hard deadline covering ALL retries combined — prevents 3×timeout blowup
+  // Single hard deadline covering ALL retries combined â€” prevents 3Ã—timeout blowup
   const deadlineMs = params.timeoutMs ?? 180_000;
   const deadline = Date.now() + deadlineMs;
 
   const anthropic = new Anthropic({ apiKey: params.apiKey });
+  const baseModelId = params.modelId || "claude-sonnet-4-20250514";
+  const baseMaxTokens = Math.max(512, Number(params.maxTokens || 8000));
+  const requestedEffort = normalizeThinkingEffort(params.thinkingEffort);
+  const thinkingConfig = resolveAnthropicThinkingConfig({
+    modelId: baseModelId,
+    requested: Boolean(params.extendedThinking),
+    maxTokens: baseMaxTokens,
+    effort: requestedEffort,
+  });
+
   const requestParams: any = {
-    model: params.modelId || "claude-sonnet-4-20250514",
-    max_tokens: params.maxTokens || 8000,
+    model: baseModelId,
+    max_tokens: baseMaxTokens,
     system: params.systemPrompt,
     messages: params.messages,
   };
 
-  if (params.extendedThinking) {
+  if (thinkingConfig.enabled && thinkingConfig.mode === "adaptive") {
+    requestParams.thinking = {
+      type: "adaptive",
+      display: "summarized",
+    };
+    requestParams.output_config = {
+      effort: thinkingConfig.effort || requestedEffort,
+    };
+  } else if (thinkingConfig.enabled && thinkingConfig.mode === "enabled") {
+    const budgetTokens = Math.max(1024, thinkingConfig.budgetTokens || 1024);
+    requestParams.max_tokens = Math.max(requestParams.max_tokens, budgetTokens + 512);
     requestParams.thinking = {
       type: "enabled",
-      budget_tokens: 6000,
+      budget_tokens: budgetTokens,
     };
-    requestParams.max_tokens = Math.max(requestParams.max_tokens, 12000);
   }
 
   let response: Awaited<ReturnType<typeof anthropic.messages.create>> | null = null;
@@ -1352,7 +1832,7 @@ async function callAnthropic(params: {
       const msg = String((error as any)?.message || error);
       console.error(`Anthropic attempt ${attempt + 1}/3 failed (${Math.round((deadline - Date.now()) / 1000)}s left):`, msg.slice(0, 120));
 
-      // Don't retry timeouts — just fail immediately
+      // Don't retry timeouts â€” just fail immediately
       const isTimeout = msg.includes("timed out") || msg.includes("timeout") || msg.includes("AbortError");
       if (isTimeout) break;
 
@@ -1383,7 +1863,8 @@ async function callAnthropic(params: {
   return {
     content,
     thinking: thinking || undefined,
-    thinkingDuration: params.extendedThinking ? thinkingDuration : undefined,
+    thinkingDuration: thinkingConfig.enabled ? thinkingDuration : undefined,
+    thinkingConfig,
     usage: {
       inputTokens: response.usage.input_tokens,
       outputTokens: response.usage.output_tokens,
@@ -1603,6 +2084,279 @@ async function callOpenRouter(params: {
   throw new Error("OpenRouter request failed after retries");
 }
 
+// ─── AGENTIC TOOL USE ─────────────────────────────────────────────────────────
+
+type AgentToolInput = Record<string, unknown>;
+type ToolExecutor = (toolName: string, input: AgentToolInput) => Promise<string>;
+
+const MARKETING_MANAGER_TOOLS: any[] = [
+  {
+    name: "search_web",
+    description:
+      "Busca informacoes atuais na internet via Perplexity Sonar. Use para: tendencias de mercado, dados de concorrentes, noticias recentes, estatisticas atualizadas, referencias reais. Retorna resultados com titulo, URL e resumo.",
+    input_schema: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description:
+            "Consulta de busca em portugues. Seja especifico sobre o tema, niche e contexto da usuaria.",
+        },
+        recency_filter: {
+          type: "string",
+          enum: ["day", "week", "month", "year"],
+          description: "Filtro de recencia. Padrao: 'month'. Use 'week' para tendencias muito recentes.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+  {
+    name: "retrieve_documents",
+    description:
+      "Recupera documentos da base de conhecimento da usuaria: Brand Book, pesquisa de mercado, ICP, pilares de conteudo, matriz de ideias, calendario, roteiro. SEMPRE use antes de gerar conteudo estrategico personalizado.",
+    input_schema: {
+      type: "object",
+      properties: {
+        topic: {
+          type: "string",
+          description: "Topico ou tema para buscar nos documentos.",
+        },
+        document_types: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["brand-book", "pesquisa", "icp", "pilares", "matriz", "calendario", "roteiro", "outro"],
+          },
+          description: "Tipos de documento para filtrar. Omita para buscar em todos.",
+        },
+      },
+      required: ["topic"],
+    },
+  },
+];
+
+async function callAnthropicWithTools(params: {
+  apiKey: string;
+  modelId: string;
+  maxTokens: number;
+  extendedThinking: boolean;
+  thinkingEffort?: ThinkingEffort;
+  systemPrompt: string;
+  messages: ChatMessage[];
+  tools: any[];
+  toolExecutor: ToolExecutor;
+  maxIterations?: number;
+  timeoutMs?: number;
+}): Promise<{
+  content: string;
+  thinking?: string;
+  thinkingDuration?: number;
+  thinkingConfig?: AnthropicThinkingResolution;
+  usage: { inputTokens: number; outputTokens: number };
+  provider: string;
+  toolCallCount: number;
+  ragDocsRetrieved: number;
+}> {
+  const anthropic = new Anthropic({ apiKey: params.apiKey });
+  const maxIter = Math.min(params.maxIterations ?? 6, 8);
+  const deadline = Date.now() + (params.timeoutMs ?? 200_000);
+
+  const thinkingConfig = resolveAnthropicThinkingConfig({
+    modelId: params.modelId,
+    requested: Boolean(params.extendedThinking),
+    maxTokens: params.maxTokens,
+    effort: normalizeThinkingEffort(params.thinkingEffort),
+  });
+
+  let totalInputTokens = 0;
+  let totalOutputTokens = 0;
+  let accumulatedThinking = "";
+  let thinkingDuration = 0;
+  let toolCallCount = 0;
+  let ragDocsRetrieved = 0;
+
+  // Convert ChatMessage[] to Anthropic API format (drop system role — goes in system param)
+  const apiMessages: any[] = params.messages
+    .filter((m) => m.role !== "system")
+    .map((m) => ({ role: m.role, content: String(m.content || "") }));
+
+  for (let iter = 0; iter < maxIter; iter++) {
+    const remaining = deadline - Date.now();
+    if (remaining <= 8000) {
+      throw new Error("Agentic loop: deadline exceeded before final response");
+    }
+
+    const requestParams: any = {
+      model: params.modelId,
+      max_tokens: Math.max(512, params.maxTokens),
+      system: params.systemPrompt,
+      messages: apiMessages,
+      tools: params.tools,
+    };
+
+    if (thinkingConfig.enabled && thinkingConfig.mode === "adaptive") {
+      requestParams.thinking = { type: "adaptive", display: "summarized" };
+      requestParams.output_config = { effort: thinkingConfig.effort || "medium" };
+    } else if (thinkingConfig.enabled && thinkingConfig.mode === "enabled") {
+      const budgetTokens = Math.max(1024, thinkingConfig.budgetTokens || 1024);
+      requestParams.max_tokens = Math.max(requestParams.max_tokens, budgetTokens + 512);
+      requestParams.thinking = { type: "enabled", budget_tokens: budgetTokens };
+    }
+
+    const startTime = Date.now();
+    let response: any;
+    try {
+      response = await Promise.race([
+        anthropic.messages.create(requestParams),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error("Agentic tool loop request timed out")), Math.min(remaining, 170_000))
+        ),
+      ]);
+    } catch (err) {
+      throw wrapProviderError("Anthropic", err);
+    }
+
+    thinkingDuration += (Date.now() - startTime) / 1000;
+    totalInputTokens += response.usage?.input_tokens ?? 0;
+    totalOutputTokens += response.usage?.output_tokens ?? 0;
+
+    // Accumulate thinking blocks
+    for (const block of response.content) {
+      if (block.type === "thinking" && block.thinking) {
+        accumulatedThinking = block.thinking;
+      }
+    }
+
+    const toolUseBlocks = (response.content as any[]).filter((b) => b.type === "tool_use");
+
+    if (response.stop_reason === "end_turn" || toolUseBlocks.length === 0) {
+      const content = (response.content as any[])
+        .filter((b) => b.type === "text")
+        .map((b) => b.text)
+        .join("");
+      return {
+        content,
+        thinking: accumulatedThinking || undefined,
+        thinkingDuration: thinkingConfig.enabled ? thinkingDuration : undefined,
+        thinkingConfig,
+        usage: { inputTokens: totalInputTokens, outputTokens: totalOutputTokens },
+        provider: "anthropic",
+        toolCallCount,
+        ragDocsRetrieved,
+      };
+    }
+
+    // Append assistant turn (full content array, including thinking blocks)
+    apiMessages.push({ role: "assistant", content: response.content });
+
+    // Execute each requested tool
+    const toolResults: any[] = [];
+    for (const toolBlock of toolUseBlocks) {
+      toolCallCount++;
+      console.log(`[AgentTool][iter=${iter}] ${toolBlock.name}:`, JSON.stringify(toolBlock.input).slice(0, 300));
+      let toolResult: string;
+      try {
+        toolResult = await params.toolExecutor(toolBlock.name, toolBlock.input as AgentToolInput);
+        console.log(`[AgentTool][iter=${iter}] ${toolBlock.name} => ${toolResult.length} chars`);
+        if (toolBlock.name === "retrieve_documents") {
+          const m = toolResult.match(/— (\d+) blocos de conteudo/);
+          if (m) ragDocsRetrieved += parseInt(m[1], 10);
+        }
+      } catch (toolErr) {
+        toolResult = `Erro na ferramenta ${toolBlock.name}: ${String(toolErr)}`;
+        console.error(`[AgentTool][iter=${iter}] ${toolBlock.name} error:`, String(toolErr));
+      }
+      toolResults.push({ type: "tool_result", tool_use_id: toolBlock.id, content: toolResult });
+    }
+
+    // Append tool results as a user turn
+    apiMessages.push({ role: "user", content: toolResults });
+  }
+
+  throw new Error(`Agentic loop: exceeded ${maxIter} iterations without final response`);
+}
+
+function buildMarketingToolExecutor(context: {
+  perplexityKey: string | null;
+  openaiKey: string | null;
+  embeddingModel: string;
+  pineconeApiKey: string | null;
+  pineconeIndexName: string | null;
+  pineconeNamespacePrefix: string;
+  supabase: ReturnType<typeof createClient>;
+  userId: string;
+  tenantId: string;
+  filterTypes: string[];
+}): ToolExecutor {
+  return async (toolName: string, toolInput: AgentToolInput): Promise<string> => {
+    if (toolName === "search_web") {
+      if (!context.perplexityKey) {
+        return "PERPLEXITY_API_KEY nao configurada. Busca web indisponivel. Informe o administrador.";
+      }
+      const query = String(toolInput.query || "");
+      const results = await callPerplexitySearch(context.perplexityKey, query, 5);
+      if (results.length === 0) {
+        return "Nenhum resultado encontrado para a busca. Tente reformular a consulta.";
+      }
+      return results
+        .map((r, i) => `## Resultado ${i + 1}: ${r.title}\nURL: ${r.url}\n\n${r.summary}`)
+        .join("\n\n---\n\n");
+    }
+
+    if (toolName === "retrieve_documents") {
+      const topic = String(toolInput.topic || "");
+      const requestedTypes = Array.isArray(toolInput.document_types) && toolInput.document_types.length > 0
+        ? (toolInput.document_types as string[])
+        : context.filterTypes;
+
+      let chunks: RetrievedDocumentChunk[] = [];
+
+      if (context.openaiKey) {
+        try {
+          const queryEmbedding = await buildQueryEmbedding(context.openaiKey, topic, context.embeddingModel);
+          chunks = await retrieveDocumentChunks({
+            queryEmbedding,
+            userId: context.userId,
+            tenantId: context.tenantId,
+            filterTypes: requestedTypes,
+            pineconeApiKey: context.pineconeApiKey,
+            pineconeIndexName: context.pineconeIndexName,
+            pineconeNamespacePrefix: context.pineconeNamespacePrefix,
+            supabase: context.supabase,
+          });
+        } catch (err) {
+          console.error("[AgentTool] retrieve_documents semantic error:", err);
+        }
+      }
+
+      // Always run backfill regardless of semantic retrieval result
+      const backfill = await backfillMissingRequiredDocumentTypes({
+        supabase: context.supabase,
+        tenantId: context.tenantId,
+        userId: context.userId,
+        requiredTypes: requestedTypes,
+        existingChunks: chunks,
+      });
+      chunks.push(...backfill);
+      console.log(`[AgentTool] retrieve_documents: ${chunks.length} chunks (backfill: ${backfill.length})`);
+
+      if (chunks.length === 0) {
+        return "Nenhum documento encontrado. A usuaria ainda nao fez upload dos documentos necessarios (Brand Book, ICP, pesquisa, etc.).";
+      }
+
+      const selected = selectMarketingChunksForPrompt(chunks);
+      const uniqueTypes = [...new Set(selected.map((c) => c.documentType || "outro"))].sort();
+      const docsHeader = `**Documentos recuperados:** ${uniqueTypes.map((t) => `[${t}]`).join(", ")} — ${selected.length} blocos de conteudo\n\n`;
+      return docsHeader + selected
+        .map((c) => `### [${(c.documentType || "documento").toUpperCase()}]\n${c.content}`)
+        .join("\n\n---\n\n");
+    }
+
+    return `Ferramenta desconhecida: ${toolName}`;
+  };
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -1622,6 +2376,7 @@ serve(async (req) => {
       modelId,
       modelProvider,
       extendedThinking,
+      thinkingEffort,
       maxTokens,
       contextDocuments,
       webSearchApproved,
@@ -1630,6 +2385,11 @@ serve(async (req) => {
     const messages = normalizeMessages(rawMessages);
     const selectedModelId = String(modelId || "claude-sonnet-4-20250514");
     const requestedProvider = normalizeModelProvider(modelProvider);
+    const effectiveProvider = resolveEffectiveProvider(
+      selectedModelId,
+      requestedProvider,
+    );
+    const requestedThinkingEffort = normalizeThinkingEffort(thinkingEffort);
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL");
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
@@ -1694,7 +2454,7 @@ serve(async (req) => {
 
     let fullSystemPrompt = String(systemPrompt ||
       "Voce e um assistente util e inteligente.");
-    fullSystemPrompt += "\n\nREGRA CRITICA: Voce NUNCA deve incluir tags XML, HTML ou qualquer markup de ferramentas na sua resposta. Nunca escreva <function_calls>, <invoke>, <parameter_name>, <parameter_value>, <function_calls>, <invoke>, <parameter> ou qualquer tag similar. Responda sempre em texto puro com markdown quando necessario. Se voce precisar pesquisar algo, os dados ja foram pesquisados e fornecidos no contexto — use-os diretamente. Nunca simule chamadas de ferramentas.";
+    fullSystemPrompt += "\n\nREGRA CRITICA: Voce NUNCA deve incluir tags XML, HTML ou qualquer markup de ferramentas na sua resposta. Nunca escreva <function_calls>, <invoke>, <parameter_name>, <parameter_value>, <function_calls>, <invoke>, <parameter> ou qualquer tag similar. Responda sempre em texto puro com markdown quando necessario. Se voce precisar pesquisar algo, os dados ja foram pesquisados e fornecidos no contexto â€” use-os diretamente. Nunca simule chamadas de ferramentas.";
     let agentPrompt: AgentPromptConfig | null = null;
     if (supabase && agentId) {
       const { data } = await supabase
@@ -1710,6 +2470,11 @@ serve(async (req) => {
           uses_documents_context: Boolean(data.uses_documents_context),
         };
         fullSystemPrompt = data.system_prompt;
+      } else {
+        throw new HttpError(
+          400,
+          `Prompt oficial nao configurado para o agente '${agentId}'. Atualize a tabela agent_prompts antes de usar este agente.`,
+        );
       }
     }
 
@@ -1725,6 +2490,7 @@ serve(async (req) => {
     );
     const selectedMarketingMode = normalizeMarketingMode(marketingMode);
     const filterTypes = resolveDocumentTypes(agentId || null, agentPrompt);
+    const useAgenticMode = agentId === "marketing-manager" && effectiveProvider === "anthropic";
 
     const fixedSystemDocsRaw = supabase
       ? await fetchSystemDocuments(supabase, agentId || null)
@@ -1732,34 +2498,88 @@ serve(async (req) => {
     const fixedSystemDocs = selectSystemDocumentsForPrompt(fixedSystemDocsRaw);
 
     let userDocumentChunks: RetrievedDocumentChunk[] = [];
-    if (shouldAttachDocuments && openaiKey && lastUserMessage?.content) {
-      try {
-        const queryEmbedding = await buildQueryEmbedding(
-          openaiKey,
-          lastUserMessage.content,
-          embeddingModel,
-        );
+    let documentsContextMeta: {
+      topic: string | null;
+      steps: Array<{ subject: string; query: string; chunkCount: number }>;
+    } = {
+      topic: null,
+      steps: [],
+    };
 
-        userDocumentChunks = await retrieveDocumentChunks({
-          queryEmbedding,
-          userId: String(effectiveUserId),
-          tenantId: String(tenantId),
-          filterTypes,
-          pineconeApiKey,
-          pineconeIndexName,
-          pineconeNamespacePrefix,
-          supabase,
-        });
+    if (!useAgenticMode && shouldAttachDocuments && openaiKey && lastUserMessage?.content) {
+      try {
+        if (agentId === "marketing-manager") {
+          const realTopic = extractConversationTopic(messages, lastUserMessage.content).slice(0, 420);
+          const retrievalPlan = buildMarketingDocumentRetrievalPlan(
+            realTopic,
+            selectedMarketingMode,
+          );
+
+          documentsContextMeta.topic = realTopic;
+          const mergedChunks: RetrievedDocumentChunk[] = [];
+
+          for (const step of retrievalPlan) {
+            const queryEmbedding = await buildQueryEmbedding(
+              openaiKey,
+              step.query,
+              embeddingModel,
+            );
+
+            const stepChunks = await retrieveDocumentChunks({
+              queryEmbedding,
+              userId: String(effectiveUserId),
+              tenantId: String(tenantId),
+              filterTypes,
+              pineconeApiKey,
+              pineconeIndexName,
+              pineconeNamespacePrefix,
+              supabase,
+            });
+
+            const selectedStepChunks = selectUserChunksForPrompt(stepChunks)
+              .slice(0, step.maxChunks)
+              .map((chunk) => ({
+                ...chunk,
+                subject: step.subject,
+              }));
+
+            mergedChunks.push(...selectedStepChunks);
+            documentsContextMeta.steps.push({
+              subject: step.subject,
+              query: step.query,
+              chunkCount: selectedStepChunks.length,
+            });
+          }
+
+          userDocumentChunks = mergedChunks;
+        } else {
+          const queryEmbedding = await buildQueryEmbedding(
+            openaiKey,
+            lastUserMessage.content,
+            embeddingModel,
+          );
+
+          userDocumentChunks = await retrieveDocumentChunks({
+            queryEmbedding,
+            userId: String(effectiveUserId),
+            tenantId: String(tenantId),
+            filterTypes,
+            pineconeApiKey,
+            pineconeIndexName,
+            pineconeNamespacePrefix,
+            supabase,
+          });
+        }
       } catch (error) {
         console.error("Failed to retrieve documentos context:", error);
       }
-    } else if (shouldAttachDocuments && !openaiKey) {
+    } else if (!useAgenticMode && shouldAttachDocuments && !openaiKey) {
       console.warn(
-        "OPENAI_API_KEY not available for semantic retrieval. Falling back to latest required documents.",
+        "[RAG] OPENAI_API_KEY ausente — semantic retrieval bloqueado. Usando backfill direto do banco.",
       );
     }
 
-    if (shouldAttachDocuments && supabase) {
+    if (!useAgenticMode && shouldAttachDocuments && supabase) {
       try {
         const requiredTypeFallbackChunks = await backfillMissingRequiredDocumentTypes({
           supabase,
@@ -1768,6 +2588,11 @@ serve(async (req) => {
           requiredTypes: filterTypes,
           existingChunks: userDocumentChunks,
         });
+        if (requiredTypeFallbackChunks.length > 0) {
+          console.log(`[RAG] backfill adicionou ${requiredTypeFallbackChunks.length} docs:`, requiredTypeFallbackChunks.map((c) => c.documentType));
+        } else {
+          console.warn("[RAG] backfill retornou 0 docs — verifique se documentos existem para tenantId:", tenantId, "userId:", effectiveUserId);
+        }
         userDocumentChunks.push(...requiredTypeFallbackChunks);
       } catch (fallbackError) {
         console.error(
@@ -1777,7 +2602,14 @@ serve(async (req) => {
       }
     }
 
-    userDocumentChunks = selectUserChunksForPrompt(userDocumentChunks);
+    if (!useAgenticMode) {
+      console.log(`[RAG] Total chunks após backfill: ${userDocumentChunks.length}, openaiKey disponível: ${Boolean(openaiKey)}, shouldAttachDocuments: ${shouldAttachDocuments}`);
+      userDocumentChunks = agentId === "marketing-manager"
+        ? selectMarketingChunksForPrompt(userDocumentChunks)
+        : selectUserChunksForPrompt(userDocumentChunks);
+    } else {
+      console.log(`[AgentMode] marketing-manager em modo agentico — RAG pre-fetching ignorado, tools ativas`);
+    }
 
     const promptAssembly = appendDocumentsContextToPrompt(
       fullSystemPrompt,
@@ -1791,8 +2623,10 @@ serve(async (req) => {
       mode: MarketingMode | null;
       searched: boolean;
       used: boolean;
+      topic: string | null;
       queryCount: number;
       resultCount: number;
+      steps: MarketingWebStepResult[];
       skippedReason?: string;
       error?: string;
       sources?: Array<{ title: string; url: string; summary: string }>;
@@ -1801,11 +2635,13 @@ serve(async (req) => {
       mode: null,
       searched: false,
       used: false,
+      topic: null,
       queryCount: 0,
       resultCount: 0,
+      steps: [],
     };
 
-    if (agentId === "marketing-manager" && lastUserText) {
+    if (!useAgenticMode && agentId === "marketing-manager" && lastUserText) {
       webContextMeta.enabled = true;
       webContextMeta.mode = selectedMarketingMode;
       const webSearchDecision = resolveMarketingWebSearchDecision(
@@ -1813,6 +2649,8 @@ serve(async (req) => {
         lastUserText,
         Boolean(webSearchApproved),
       );
+
+      console.log(`[WebSearch] decision=${webSearchDecision.shouldSearch} reason=${webSearchDecision.reason} perplexityKey=${Boolean(perplexityKey)} webSearchApproved=${Boolean(webSearchApproved)}`);
 
       if (!webSearchDecision.shouldSearch) {
         webContextMeta.skippedReason = webSearchDecision.reason;
@@ -1829,6 +2667,8 @@ serve(async (req) => {
           webContextMeta.queryCount = webContext.queryCount;
           webContextMeta.resultCount = webContext.resultCount;
           webContextMeta.sources = webContext.sources;
+          webContextMeta.steps = webContext.steps;
+          webContextMeta.topic = webContext.topic;
           if (webContext.resultCount > 0) {
             fullSystemPrompt += `\n\n${webContext.context}`;
             webContextMeta.used = true;
@@ -1866,9 +2706,11 @@ Voce NAO tem dados de pesquisa web nesta conversa ainda. Siga estas regras:
 ### PROIBICOES ABSOLUTAS:
 - NUNCA invente tags diferentes. A UNICA tag permitida e [SUGERIR_PESQUISA_WEB]. Nada mais.
 - NUNCA use [EXECUTAR_PESQUISA_WEB], [BUSCAR_WEB], [INICIAR_PESQUISA] ou qualquer variacao.
-- NUNCA finja estar buscando na web. Voce NAO tem acesso a internet. A busca e feita pelo sistema.
-- NUNCA escreva "Aguarde enquanto busco..." ou frases similares — isso e falso.
-- NUNCA coloque texto ou parametros dentro dos colchetes da tag.`;
+- NUNCA diga ao usuario “nao tenho acesso a internet” ou “nao consigo buscar na web” — o SISTEMA realiza buscas reais via API. Voce aciona isso com a tag [SUGERIR_PESQUISA_WEB].
+- NUNCA finja estar buscando enquanto escreve. A busca, quando ocorre, acontece ANTES desta resposta chegar ate voce.
+- NUNCA escreva “Aguarde enquanto busco...” — se precisar de dados, use a tag e o sistema busca na proxima interacao.
+- NUNCA coloque texto ou parametros dentro dos colchetes da tag.
+- CORRETO quando precisar de dados: explique que precisa de dados atuais e adicione [SUGERIR_PESQUISA_WEB] na ultima linha.`;
       }
 
       fullSystemPrompt += `\n\n## REGRAS DE FORMATACAO (OBRIGATORIO)
@@ -1914,6 +2756,106 @@ Texto aqui...
 - Links quebrados ou inventados sao PROIBIDOS.`;
     }
 
+    if (useAgenticMode) {
+      // Auto-detect calendar vs idea mode from user message keywords
+      const lowerMsg = lastUserText.toLowerCase();
+      const calendarKeywords = ["calendário", "calendario", "plano mensal", "editorial mensal", "programação", "programacao", "cronograma", "30 dias", "grade de conteudo", "grade de conteúdo"];
+      const hasCalendarKw = calendarKeywords.some((kw) => lowerMsg.includes(kw));
+      const agenticMarketingMode: MarketingMode = hasCalendarKw ? "calendar" : selectedMarketingMode;
+      const modeLabel = agenticMarketingMode === "calendar" ? "CALENDARIO EDITORIAL" : "IDEIA SOLTA";
+
+      fullSystemPrompt += `\n\n## MODO ATIVO: ${modeLabel}
+
+${agenticMarketingMode === "calendar"
+  ? "Gerar calendario editorial mensal completo, com cadencia semanal, distribuicao equilibrada de pilares e tabela final de execucao."
+  : "Transformar a solicitacao da usuaria em 5 ideias estrategicas estruturadas, cada uma com angulo diferente, narrativa clara e conexao com a oferta."}
+
+## FERRAMENTAS — PROTOCOLO OBRIGATORIO (SIGA ESTA ORDEM)
+
+**PASSO 1 — SEMPRE PRIMEIRO:** Chame \`retrieve_documents\`
+- ANTES de qualquer resposta estrategica, recupere os documentos da usuaria.
+- Use document_types: ["brand-book","icp","pesquisa","pilares","matriz","roteiro"]
+- OBRIGATORIO. NAO pule esta etapa mesmo que ache que ja tem o suficiente.
+
+**PASSO 2 — quando precisar de dados atuais:** Chame \`search_web\`
+- Para tendencias, estatisticas, noticias, dados de mercado, concorrentes.
+- Use query especifica em portugues com contexto do nicho da usuaria.
+
+**PASSO 3:** Gere a resposta estruturada com os dados obtidos nas ferramentas.
+
+**retrieve_documents** — recupera Brand Book, ICP, pesquisa de mercado, pilares de conteudo, matriz de ideias, roteiro, calendario.
+**search_web** — busca dados atuais via Perplexity Sonar.
+
+## REGRAS DE FORMATACAO (OBRIGATORIO)
+
+- Use headings markdown (##, ###) para separar cada topico/ideia principal.
+- Cada subsecao DEVE ser um bloco separado por linha em branco — NUNCA junte subsecoes no mesmo paragrafo.
+- Use **negrito** para labels de subsecao, seguido de quebra de linha e o texto abaixo.
+- Use listas (- ou 1.) quando houver multiplos itens.
+
+${agenticMarketingMode === "calendar"
+  ? `### ESTRUTURA DO CALENDARIO EDITORIAL:
+
+## Calendario Editorial — [Mes Ano]
+
+### Semana 1 — [datas]
+| Dia | Formato | Pilar | Tema Central | Angulo/Hook |
+|-----|---------|-------|--------------|-------------|
+| ... | ...     | ...   | ...          | ...         |
+
+(repita Semana 2, 3 e 4 no mesmo formato)
+
+### Tabela de Execucao Mensal
+| # | Semana | Formato | Pilar | Tema | CTA Principal |
+|---|--------|---------|-------|------|---------------|`
+  : `### ESTRUTURA POR IDEIA (repita para cada uma das 5 ideias):
+
+### 1. [Titulo da Ideia]
+
+**Tema (background do storytelling):**
+[texto]
+
+**Big Idea (a moral da historia):**
+[texto]
+
+**Crencas erradas do ICP que isso quebra:**
+[texto]
+
+**Valor de Entretenimento:**
+[texto]
+
+**Valor Informativo:**
+[texto]
+
+**Narrativa de Premissas (com dados reais):**
+1. [dado concreto] ([fonte])
+2. [dado concreto] ([fonte])
+
+**Quebra de Objecao Interna:**
+[texto]
+
+**Conexao Natural com Produto/Servico:**
+[texto]
+
+---`}
+
+## REGRAS DE LINKS (OBRIGATORIO)
+- NUNCA invente URLs. Use somente URLs exatas dos resultados de search_web.
+- Se nao tem URL, mencione apenas o nome da fonte em texto simples.
+
+## SECAO FINAL OBRIGATORIA — FONTES UTILIZADAS
+
+Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
+
+---
+
+**Documentos da Base de Conhecimento Consultados:**
+- [liste cada tipo retornado por retrieve_documents, ex: Brand Book, ICP, Pesquisa de Mercado, Pilares]
+
+**Fontes Web Pesquisadas:**
+- [se search_web foi chamado: lista nome da fonte e URL exata; se nao foi chamado: "Nenhuma busca web realizada nesta resposta"]`;
+    }
+
     fullSystemPrompt += buildConsultModeInstruction(
       agentId || null,
       consultIntentDetected,
@@ -1935,25 +2877,20 @@ Texto aqui...
           usage?: { inputTokens: number; outputTokens: number };
           thinking?: string;
           thinkingDuration?: number;
+          thinkingConfig?: AnthropicThinkingResolution;
           provider: string;
+          toolCallCount?: number;
         };
-    let routedPrimaryProvider = requestedProvider || (
-      isAnthropicModel(selectedModelId)
-        ? "anthropic"
-        : (isOpenAIModel(selectedModelId) ? "openai" : "openrouter")
-    );
-    let fallbackUsed = false;
-    let fallbackReason: string | null = null;
 
-    // wall_clock_limit = 400s (set in config.toml). Reserve 20s buffer → 380s total.
+    // wall_clock_limit = 400s (set in config.toml). Reserve 20s buffer â†’ 380s total.
     // AI gets whatever is left after web search and other pre-processing.
     const elapsedMs = Date.now() - requestStartMs;
     const remainingBudget = Math.max(0, 370_000 - elapsedMs);
     // Cap per-attempt timeout at 180s (generous, won't stack because timeouts don't retry)
     const aiTimeoutMs = Math.min(remainingBudget, 180_000);
 
-    // When web search was used, disable extended thinking to save time budget
-    const effectiveThinking = Boolean(extendedThinking) && !webContextMeta.used;
+    // Extended thinking always active when requested — web search doesn't disable it
+    const effectiveThinking = Boolean(extendedThinking);
 
     // When web search was executed, replace a trigger-only last message so the AI
     // doesn't respond with "I'll search now..." but instead generates the enriched content.
@@ -1966,7 +2903,7 @@ Texto aqui...
           ...finalMessages.slice(0, -1),
           {
             role: "user",
-            content: `Os dados da pesquisa web sobre "${realTopic}" já foram coletados e estão no contexto acima. GERE AGORA a resposta completa, enriquecida com os dados reais da pesquisa. Não diga que vai pesquisar — a busca já aconteceu. Use os dados fornecidos para construir o conteúdo de ${webContextMeta.mode === "calendar" ? "calendário editorial" : "ideia estratégica"} agora.`,
+            content: `Os dados da pesquisa web sobre "${realTopic}" jÃ¡ foram coletados e estÃ£o no contexto acima. GERE AGORA a resposta completa, enriquecida com os dados reais da pesquisa. NÃ£o diga que vai pesquisar â€” a busca jÃ¡ aconteceu. Use os dados fornecidos para construir o conteÃºdo de ${webContextMeta.mode === "calendar" ? "calendÃ¡rio editorial" : "ideia estratÃ©gica"} agora.`,
           },
         ];
         console.log(`[AI] Replaced search-trigger message with generation instruction`);
@@ -1977,99 +2914,65 @@ Texto aqui...
       `[AI] elapsed=${Math.round(elapsedMs / 1000)}s, aiTimeout=${Math.round(aiTimeoutMs / 1000)}s, thinking=${effectiveThinking}, webUsed=${webContextMeta.used}`,
     );
 
-    if (requestedProvider === "anthropic" || isAnthropicModel(selectedModelId)) {
-      if (anthropicKey) {
-        try {
-          result = await callAnthropic({
-            apiKey: anthropicKey,
-            modelId: selectedModelId,
-            maxTokens: Number(maxTokens || 8000),
-            extendedThinking: effectiveThinking,
-            systemPrompt: fullSystemPrompt,
-            messages: finalMessages,
-            timeoutMs: aiTimeoutMs,
-          });
-        } catch (anthropicError) {
-          if (!openRouterKey || !shouldFallbackToOpenRouter(anthropicError)) {
-            throw anthropicError;
-          }
-          fallbackUsed = true;
-          fallbackReason = `anthropic_error:${String((anthropicError as any)?.message || "unknown")}`;
-          result = await callOpenRouter({
-            apiKey: openRouterKey,
-            modelId: selectedModelId,
-            maxTokens: Number(maxTokens || 8000),
-            extendedThinking: effectiveThinking,
-            systemPrompt: fullSystemPrompt,
-            messages: finalMessages,
-            timeoutMs: aiTimeoutMs,
-          });
-        }
-      } else if (openRouterKey) {
-        result = await callOpenRouter({
-          apiKey: openRouterKey,
-          modelId: selectedModelId,
-          maxTokens: Number(maxTokens || 8000),
-          extendedThinking: effectiveThinking,
-          systemPrompt: fullSystemPrompt,
-          messages: finalMessages,
-          timeoutMs: aiTimeoutMs,
-        });
-      } else {
-        throw new Error("ANTHROPIC_API_KEY or OPENROUTER_API_KEY not configured");
+    if (useAgenticMode) {
+      if (!anthropicKey) {
+        throw new Error("ANTHROPIC_API_KEY not configured");
       }
-    } else if (requestedProvider === "openrouter") {
-      if (!openRouterKey) {
-        throw new Error("OPENROUTER_API_KEY not configured");
+      if (!supabase) {
+        throw new Error("Supabase client unavailable for agentic mode");
       }
-      result = await callOpenRouter({
-        apiKey: openRouterKey,
+      console.log(`[AgentMode] Iniciando agentic loop para marketing-manager`);
+      const toolExecutor = buildMarketingToolExecutor({
+        perplexityKey,
+        openaiKey,
+        embeddingModel,
+        pineconeApiKey,
+        pineconeIndexName,
+        pineconeNamespacePrefix,
+        supabase,
+        userId: String(effectiveUserId),
+        tenantId: String(tenantId),
+        filterTypes: filterTypes ?? [],
+      });
+      result = await callAnthropicWithTools({
+        apiKey: anthropicKey,
         modelId: selectedModelId,
         maxTokens: Number(maxTokens || 8000),
         extendedThinking: effectiveThinking,
+        thinkingEffort: requestedThinkingEffort,
+        systemPrompt: fullSystemPrompt,
+        messages: finalMessages,
+        tools: MARKETING_MANAGER_TOOLS,
+        toolExecutor,
+        maxIterations: 6,
+        timeoutMs: aiTimeoutMs,
+      });
+      console.log(`[AgentMode] Concluido: toolCallCount=${(result as any).toolCallCount}`);
+    } else if (effectiveProvider === "anthropic") {
+      if (!anthropicKey) {
+        throw new Error("ANTHROPIC_API_KEY not configured");
+      }
+      result = await callAnthropic({
+        apiKey: anthropicKey,
+        modelId: selectedModelId,
+        maxTokens: Number(maxTokens || 8000),
+        extendedThinking: effectiveThinking,
+        thinkingEffort: requestedThinkingEffort,
         systemPrompt: fullSystemPrompt,
         messages: finalMessages,
         timeoutMs: aiTimeoutMs,
       });
-    } else if (requestedProvider === "openai" || isOpenAIModel(selectedModelId)) {
-      if (openaiKey) {
-        try {
-          result = await callOpenAI({
-            apiKey: openaiKey,
-            modelId: selectedModelId,
-            maxTokens: Number(maxTokens || 8000),
-            systemPrompt: fullSystemPrompt,
-            messages: finalMessages,
-          });
-        } catch (openAiError) {
-          if (!openRouterKey || !shouldFallbackToOpenRouter(openAiError)) {
-            throw openAiError;
-          }
-          fallbackUsed = true;
-          fallbackReason = `openai_error:${String((openAiError as any)?.message || "unknown")}`;
-          result = await callOpenRouter({
-            apiKey: openRouterKey,
-            modelId: selectedModelId,
-            maxTokens: Number(maxTokens || 8000),
-            extendedThinking: effectiveThinking,
-            systemPrompt: fullSystemPrompt,
-            messages: finalMessages,
-            timeoutMs: aiTimeoutMs,
-          });
-        }
-      } else if (openRouterKey) {
-        result = await callOpenRouter({
-          apiKey: openRouterKey,
-          modelId: selectedModelId,
-          maxTokens: Number(maxTokens || 8000),
-          extendedThinking: effectiveThinking,
-          systemPrompt: fullSystemPrompt,
-          messages: finalMessages,
-          timeoutMs: aiTimeoutMs,
-        });
-      } else {
-        throw new Error("OPENAI_API_KEY or OPENROUTER_API_KEY not configured");
+    } else if (effectiveProvider === "openai") {
+      if (!openaiKey) {
+        throw new Error("OPENAI_API_KEY not configured");
       }
+      result = await callOpenAI({
+        apiKey: openaiKey,
+        modelId: selectedModelId,
+        maxTokens: Number(maxTokens || 8000),
+        systemPrompt: fullSystemPrompt,
+        messages: finalMessages,
+      });
     } else {
       if (!openRouterKey) {
         throw new Error("OPENROUTER_API_KEY not configured");
@@ -2087,12 +2990,16 @@ Texto aqui...
 
     const sanitizedContent = sanitizeLeakedToolCalls(result.content);
 
-    // ── Record token usage (fire-and-forget — does not block response) ────────
+    // â”€â”€ Record token usage (fire-and-forget â€” does not block response) â”€â”€â”€â”€â”€â”€â”€â”€
     if (supabase && result.usage && effectiveUserId && tenantId) {
       const { inputPerM, outputPerM } = getModelPricing(selectedModelId);
       const costUsd = (result.usage.inputTokens / 1_000_000) * inputPerM
                     + (result.usage.outputTokens / 1_000_000) * outputPerM;
-      void supabase.from("token_usage").insert({
+      const ragDocsCount = useAgenticMode
+        ? ((result as any).ragDocsRetrieved ?? 0)
+        : userDocumentChunks.length;
+      const toolCalls = (result as any).toolCallCount ?? 0;
+      supabase.from("token_usage").insert({
         tenant_id: tenantId,
         user_id: effectiveUserId,
         model_id: selectedModelId,
@@ -2101,6 +3008,11 @@ Texto aqui...
         input_tokens: result.usage.inputTokens,
         output_tokens: result.usage.outputTokens,
         cost_usd: Number(costUsd.toFixed(6)),
+        tool_call_count: toolCalls,
+        rag_docs_retrieved: ragDocsCount,
+      }).then(({ error }) => {
+        if (error) console.error("[TokenUsage] INSERT failed:", error.message, { tenantId, userId: effectiveUserId, model: selectedModelId });
+        else console.log(`[TokenUsage] Saved: in=${result.usage!.inputTokens} out=${result.usage!.outputTokens} cost=$${costUsd.toFixed(6)} tools=${toolCalls} rag=${ragDocsCount}`);
       });
     }
 
@@ -2109,6 +3021,7 @@ Texto aqui...
         content: sanitizedContent,
         thinking: result.thinking,
         thinkingDuration: result.thinkingDuration,
+        thinkingConfig: result.thinkingConfig || null,
         usage: result.usage,
         provider: result.provider,
         documentsContext: {
@@ -2119,14 +3032,15 @@ Texto aqui...
           userChunksUsed: promptAssembly.userChunksUsed,
           retrievalSources: promptAssembly.userChunkSources,
           usedDocumentTypes: promptAssembly.usedDocumentTypes,
+          topic: documentsContextMeta.topic,
+          retrievalSteps: documentsContextMeta.steps,
         },
         webContext: webContextMeta,
+        agenticMode: useAgenticMode ? { active: true, toolCallCount: result.toolCallCount ?? 0 } : null,
         routing: {
           requestedProvider: requestedProvider || null,
-          primaryProvider: routedPrimaryProvider,
+          effectiveProvider,
           finalProvider: result.provider,
-          fallbackUsed,
-          fallbackReason,
           selectedModelId,
         },
       }),
@@ -2146,12 +3060,16 @@ Texto aqui...
 
     if (status === 401 || status === 403) {
       userMessage = "Sua sessao expirou. Faca login novamente.";
+    } else if (status === 400 && rawMessage) {
+      userMessage = rawMessage;
+    } else if (rawMessage.toLowerCase().includes("authentication failed")) {
+      userMessage = "Falha de autenticacao no provedor de IA. Verifique as chaves da integracao.";
     } else if (rawMessage.includes("API_KEY") || rawMessage.includes("not configured")) {
       userMessage = "Configuracao do servidor incompleta. Entre em contato com o suporte.";
     } else if (rawMessage.includes("overloaded") || rawMessage.includes("529") || rawMessage.includes("capacity")) {
       userMessage = "O servico de IA esta sobrecarregado no momento. Aguarde alguns segundos e tente novamente.";
     } else if (rawMessage.includes("timeout") || rawMessage.includes("AbortError") || rawMessage.includes("deadline")) {
-      userMessage = "A resposta demorou mais que o esperado. Tente novamente — funciona melhor com perguntas mais curtas.";
+      userMessage = "A resposta demorou mais que o esperado. Tente novamente â€” funciona melhor com perguntas mais curtas.";
     } else if (rawMessage.includes("rate") || rawMessage.includes("429")) {
       userMessage = "Muitas requisicoes simultaneas. Aguarde alguns segundos e tente novamente.";
     } else if (status >= 500) {
@@ -2169,3 +3087,5 @@ Texto aqui...
     );
   }
 });
+
+

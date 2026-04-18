@@ -174,33 +174,54 @@ export default function AdminPage({ tab = "insights" }: Props) {
     const totalIn = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.input_tokens || 0), 0);
     const totalOut = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.output_tokens || 0), 0);
     const totalCost = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.cost_usd || 0), 0);
+    const totalToolCalls = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.tool_call_count || 0), 0);
+    const totalRagDocs = tokenUsageRows.reduce((s: number, r: any) => s + Number(r.rag_docs_retrieved || 0), 0);
+    const USD_TO_BRL = 5.75;
+    const totalCostBrl = totalCost * USD_TO_BRL;
 
-    const byModel = new Map<string, { input: number; output: number; cost: number; calls: number }>();
+    const byModel = new Map<string, { input: number; output: number; cost: number; calls: number; toolCalls: number; ragDocs: number }>();
     for (const r of tokenUsageRows) {
       const key = String(r.model_id || "unknown");
-      const e = byModel.get(key) || { input: 0, output: 0, cost: 0, calls: 0 };
+      const e = byModel.get(key) || { input: 0, output: 0, cost: 0, calls: 0, toolCalls: 0, ragDocs: 0 };
       e.input += Number(r.input_tokens || 0);
       e.output += Number(r.output_tokens || 0);
       e.cost += Number(r.cost_usd || 0);
+      e.toolCalls += Number(r.tool_call_count || 0);
+      e.ragDocs += Number(r.rag_docs_retrieved || 0);
       e.calls++;
       byModel.set(key, e);
     }
 
-    const byAgent = new Map<string, { input: number; output: number; cost: number; calls: number }>();
+    const byAgent = new Map<string, { input: number; output: number; cost: number; calls: number; toolCalls: number; ragDocs: number }>();
     for (const r of tokenUsageRows) {
       const key = String(r.agent_id || "(sem agente)");
-      const e = byAgent.get(key) || { input: 0, output: 0, cost: 0, calls: 0 };
+      const e = byAgent.get(key) || { input: 0, output: 0, cost: 0, calls: 0, toolCalls: 0, ragDocs: 0 };
       e.input += Number(r.input_tokens || 0);
       e.output += Number(r.output_tokens || 0);
       e.cost += Number(r.cost_usd || 0);
+      e.toolCalls += Number(r.tool_call_count || 0);
+      e.ragDocs += Number(r.rag_docs_retrieved || 0);
       e.calls++;
       byAgent.set(key, e);
     }
 
+    const byProvider = new Map<string, { cost: number; calls: number; input: number; output: number }>();
+    for (const r of tokenUsageRows) {
+      const key = String(r.provider || "unknown");
+      const e = byProvider.get(key) || { cost: 0, calls: 0, input: 0, output: 0 };
+      e.cost += Number(r.cost_usd || 0);
+      e.calls++;
+      e.input += Number(r.input_tokens || 0);
+      e.output += Number(r.output_tokens || 0);
+      byProvider.set(key, e);
+    }
+
     return {
-      totalIn, totalOut, totalCost, calls: tokenUsageRows.length,
+      totalIn, totalOut, totalCost, totalCostBrl, calls: tokenUsageRows.length,
+      totalToolCalls, totalRagDocs,
       byModel: Array.from(byModel.entries()).map(([model, v]) => ({ model, ...v })).sort((a, b) => b.cost - a.cost),
       byAgent: Array.from(byAgent.entries()).map(([agent, v]) => ({ agent, ...v })).sort((a, b) => b.cost - a.cost),
+      byProvider: Array.from(byProvider.entries()).map(([provider, v]) => ({ provider, ...v })).sort((a, b) => b.cost - a.cost),
     };
   }, [tokenUsageRows]);
 
@@ -314,7 +335,7 @@ export default function AdminPage({ tab = "insights" }: Props) {
         db.from("monthly_data_submissions").select("*").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("created_at", { ascending: false }).limit(6),
         db.from("market_research_saved_posts").select("id", { count: "exact", head: true }).eq("user_id", targetUser.userId),
         // Token usage (todos os registros do usuário neste tenant)
-        db.from("token_usage").select("model_id,provider,agent_id,input_tokens,output_tokens,cost_usd,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("created_at", { ascending: false }).limit(2000),
+        db.from("token_usage").select("model_id,provider,agent_id,input_tokens,output_tokens,cost_usd,tool_call_count,rag_docs_retrieved,created_at").eq("tenant_id", targetUser.tenantId).eq("user_id", targetUser.userId).order("created_at", { ascending: false }).limit(2000),
       ]);
 
       const checksIgnorable = checksRes.error && String(checksRes.error.message || "").toLowerCase().includes("implementation_task_checks");
@@ -330,6 +351,7 @@ export default function AdminPage({ tab = "insights" }: Props) {
       setWeeklyHistory(weeklyHistRes.data || []);
       setMonthlyHistory(monthlyHistRes.data || []);
       setMktResearchCount(Number(mktRes.count || 0));
+      if (tokenRes.error) console.error("[Admin] token_usage query failed:", tokenRes.error.message);
       setTokenUsageRows(tokenRes.data || []);
     } catch (error: any) {
       toast.error(error?.message || "Erro ao carregar metricas do usuario");
@@ -537,12 +559,53 @@ export default function AdminPage({ tab = "insights" }: Props) {
 
                 {tokenUsageRows.length > 0 && (
                   <>
-                    {/* Totais */}
+                    {/* Totais — linha 1 */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                       <MetricMini title="Chamadas de IA" value={tokenSummary.calls} />
                       <MetricMini title="Tokens de entrada" value={tokenSummary.totalIn.toLocaleString("pt-BR")} />
                       <MetricMini title="Tokens de saída" value={tokenSummary.totalOut.toLocaleString("pt-BR")} />
-                      <MetricMini title="Custo total (USD)" value={`$${tokenSummary.totalCost.toFixed(4)}`} />
+                      <div className="rounded-lg border border-border p-3 space-y-0.5">
+                        <p className="text-xs text-muted-foreground">Custo total</p>
+                        <p className="text-base font-bold text-green-400">R$ {tokenSummary.totalCostBrl.toFixed(2)}</p>
+                        <p className="text-xs text-muted-foreground">${tokenSummary.totalCost.toFixed(4)} USD</p>
+                      </div>
+                    </div>
+                    {/* Totais — linha 2 */}
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                      <MetricMini title="Chamadas de ferramentas (agentic)" value={tokenSummary.totalToolCalls} />
+                      <MetricMini title="Docs RAG recuperados" value={tokenSummary.totalRagDocs} />
+                      <MetricMini title="APIs utilizadas" value={tokenSummary.byProvider.length} />
+                    </div>
+
+                    {/* Por API / Provedor */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Por API / Provedor</p>
+                      <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-xs">
+                          <thead className="bg-secondary/40">
+                            <tr className="text-muted-foreground">
+                              <th className="text-left px-3 py-2 font-medium">Provedor</th>
+                              <th className="text-right px-3 py-2 font-medium">Chamadas</th>
+                              <th className="text-right px-3 py-2 font-medium">Tokens entrada</th>
+                              <th className="text-right px-3 py-2 font-medium">Tokens saída</th>
+                              <th className="text-right px-3 py-2 font-medium">Custo (BRL)</th>
+                              <th className="text-right px-3 py-2 font-medium">Custo (USD)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {tokenSummary.byProvider.map((row) => (
+                              <tr key={row.provider} className="hover:bg-secondary/20">
+                                <td className="px-3 py-2 font-semibold text-foreground capitalize">{row.provider}</td>
+                                <td className="px-3 py-2 text-right">{row.calls}</td>
+                                <td className="px-3 py-2 text-right">{row.input.toLocaleString("pt-BR")}</td>
+                                <td className="px-3 py-2 text-right">{row.output.toLocaleString("pt-BR")}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-green-400">R$ {(row.cost * 5.75).toFixed(2)}</td>
+                                <td className="px-3 py-2 text-right text-muted-foreground">${row.cost.toFixed(4)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
 
                     {/* Por modelo */}
@@ -556,17 +619,21 @@ export default function AdminPage({ tab = "insights" }: Props) {
                               <th className="text-right px-3 py-2 font-medium">Chamadas</th>
                               <th className="text-right px-3 py-2 font-medium">Tokens entrada</th>
                               <th className="text-right px-3 py-2 font-medium">Tokens saída</th>
-                              <th className="text-right px-3 py-2 font-medium">Custo (USD)</th>
+                              <th className="text-right px-3 py-2 font-medium">Tools</th>
+                              <th className="text-right px-3 py-2 font-medium">RAG docs</th>
+                              <th className="text-right px-3 py-2 font-medium">Custo (BRL)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border">
                             {tokenSummary.byModel.map((row) => (
                               <tr key={row.model} className="hover:bg-secondary/20">
-                                <td className="px-3 py-2 font-mono text-foreground max-w-[200px] truncate">{row.model}</td>
+                                <td className="px-3 py-2 font-mono text-foreground max-w-[180px] truncate">{row.model}</td>
                                 <td className="px-3 py-2 text-right">{row.calls}</td>
                                 <td className="px-3 py-2 text-right">{row.input.toLocaleString("pt-BR")}</td>
                                 <td className="px-3 py-2 text-right">{row.output.toLocaleString("pt-BR")}</td>
-                                <td className="px-3 py-2 text-right font-semibold text-violet-400">${row.cost.toFixed(4)}</td>
+                                <td className="px-3 py-2 text-right">{row.toolCalls}</td>
+                                <td className="px-3 py-2 text-right">{row.ragDocs}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-green-400">R$ {(row.cost * 5.75).toFixed(2)}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -584,7 +651,9 @@ export default function AdminPage({ tab = "insights" }: Props) {
                               <th className="text-left px-3 py-2 font-medium">Agente</th>
                               <th className="text-right px-3 py-2 font-medium">Chamadas</th>
                               <th className="text-right px-3 py-2 font-medium">Total tokens</th>
-                              <th className="text-right px-3 py-2 font-medium">Custo (USD)</th>
+                              <th className="text-right px-3 py-2 font-medium">Tools</th>
+                              <th className="text-right px-3 py-2 font-medium">RAG docs</th>
+                              <th className="text-right px-3 py-2 font-medium">Custo (BRL)</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-border">
@@ -593,9 +662,52 @@ export default function AdminPage({ tab = "insights" }: Props) {
                                 <td className="px-3 py-2 font-mono text-foreground">{row.agent}</td>
                                 <td className="px-3 py-2 text-right">{row.calls}</td>
                                 <td className="px-3 py-2 text-right">{(row.input + row.output).toLocaleString("pt-BR")}</td>
-                                <td className="px-3 py-2 text-right font-semibold text-violet-400">${row.cost.toFixed(4)}</td>
+                                <td className="px-3 py-2 text-right">{row.toolCalls}</td>
+                                <td className="px-3 py-2 text-right">{row.ragDocs}</td>
+                                <td className="px-3 py-2 text-right font-semibold text-green-400">R$ {(row.cost * 5.75).toFixed(2)}</td>
                               </tr>
                             ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* Últimas chamadas com timestamp */}
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">Últimas Chamadas</p>
+                      <div className="overflow-x-auto rounded-lg border border-border">
+                        <table className="w-full text-xs">
+                          <thead className="bg-secondary/40">
+                            <tr className="text-muted-foreground">
+                              <th className="text-left px-3 py-2 font-medium">Data / Hora</th>
+                              <th className="text-left px-3 py-2 font-medium">Agente</th>
+                              <th className="text-left px-3 py-2 font-medium">Modelo</th>
+                              <th className="text-right px-3 py-2 font-medium">Tokens</th>
+                              <th className="text-right px-3 py-2 font-medium">Tools</th>
+                              <th className="text-right px-3 py-2 font-medium">RAG</th>
+                              <th className="text-right px-3 py-2 font-medium">Custo (BRL)</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-border">
+                            {tokenUsageRows.slice(0, 20).map((row: any, i: number) => {
+                              const dt = row.created_at ? new Date(row.created_at) : null;
+                              const fmt = dt
+                                ? `${String(dt.getDate()).padStart(2, "0")}/${String(dt.getMonth() + 1).padStart(2, "0")}/${dt.getFullYear()} ${String(dt.getHours()).padStart(2, "0")}:${String(dt.getMinutes()).padStart(2, "0")}:${String(dt.getSeconds()).padStart(2, "0")}`
+                                : "—";
+                              const tokens = Number(row.input_tokens || 0) + Number(row.output_tokens || 0);
+                              const cost = Number(row.cost_usd || 0) * 5.75;
+                              return (
+                                <tr key={i} className="hover:bg-secondary/20">
+                                  <td className="px-3 py-2 font-mono whitespace-nowrap">{fmt}</td>
+                                  <td className="px-3 py-2 text-muted-foreground max-w-[120px] truncate">{row.agent_id || "—"}</td>
+                                  <td className="px-3 py-2 font-mono max-w-[150px] truncate">{row.model_id || "—"}</td>
+                                  <td className="px-3 py-2 text-right">{tokens.toLocaleString("pt-BR")}</td>
+                                  <td className="px-3 py-2 text-right">{Number(row.tool_call_count || 0)}</td>
+                                  <td className="px-3 py-2 text-right">{Number(row.rag_docs_retrieved || 0)}</td>
+                                  <td className="px-3 py-2 text-right font-semibold text-green-400">R$ {cost.toFixed(4)}</td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>

@@ -34,17 +34,17 @@ export default function ConversationStarters({
   }
 
   const marketingCalendarStarters = [
-    'Montar meu calend\u00e1rio editorial',
-    'Planejar pr\u00f3ximo m\u00eas de postagens',
-    'Criar calend\u00e1rio mensal de conte\u00fado',
-    'Organizar minha grade de conte\u00fado',
+    'Montar meu calendário editorial',
+    'Planejar próximo mês de postagens',
+    'Criar calendário mensal de conteúdo',
+    'Organizar minha grade de conteúdo',
   ];
 
   const marketingIdeaStarters = [
     'Tenho uma ideia, quero estruturar',
-    'Transformar uma ideia em pauta estrat\u00e9gica',
-    'Criar 5 varia\u00e7\u00f5es de \u00e2ngulo para minha ideia',
-    'Evoluir uma ideia solta para conte\u00fado de alta convers\u00e3o',
+    'Transformar uma ideia em pauta estratégica',
+    'Criar 5 variações de ângulo para minha ideia',
+    'Evoluir uma ideia solta para conteúdo de alta conversão',
   ];
 
   const startersToRender = agent.id === 'marketing-manager'

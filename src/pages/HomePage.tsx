@@ -144,8 +144,8 @@ export default function HomePage() {
         ? [
             'Analisando contexto...',
             marketingMode === 'calendar'
-              ? 'Montando calend\u00e1rio editorial...'
-              : 'Estruturando ideia estrat\u00e9gica...',
+              ? 'Montando calendário editorial...'
+              : 'Estruturando ideia estratégica...',
           ]
         : ['Analisando contexto...', 'Pensando...', 'Gerando resposta...'];
     let stageIndex = 0;
@@ -709,4 +709,3 @@ export default function HomePage() {
     </div>
   );
 }
-

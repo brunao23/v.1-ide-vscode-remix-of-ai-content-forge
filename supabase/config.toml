@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.public-signup]
 verify_jwt = false
+
+[functions.market-research-gemini-analyze]
+verify_jwt = false

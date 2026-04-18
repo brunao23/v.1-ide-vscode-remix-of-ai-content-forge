@@ -85,3 +85,36 @@ export interface SavedSearch {
   filters: SearchFilters;
   timestamp: Date;
 }
+
+export interface GeminiAnalysisData {
+  summary?: string;
+  hook?: string;
+  content_strategy?: string;
+  tone?: string;
+  emotional_triggers?: string[];
+  content_structure?: string;
+  cta?: string;
+  keywords?: string[];
+  recommendations?: string[];
+  virality_score?: number;
+}
+
+export interface GeminiAnalysis {
+  id: string;
+  post_id: string;
+  post_url: string;
+  platform: string;
+  status: 'pending' | 'processing' | 'completed' | 'error';
+  model_used?: string;
+  transcript?: string;
+  analysis: GeminiAnalysisData;
+  error_message?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface MyFeedConfig {
+  platform: Platform;
+  username: string;
+  periodDays: number;
+}

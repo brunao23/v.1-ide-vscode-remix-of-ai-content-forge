@@ -1,8 +1,18 @@
 import { useState, type ReactNode } from 'react';
-import { ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar, ListOrdered, Bookmark, Clock, Trash2 } from 'lucide-react';
+import {
+  ArrowLeft, Search, Loader2, AlertTriangle, User, Image, Calendar,
+  ListOrdered, Bookmark, Clock, Trash2, Target, Sparkles,
+} from 'lucide-react';
 import { PlatformIcon, PLATFORM_LIST } from '@/components/market-research/PlatformIcons';
 import { useMarketResearch } from '@/hooks/useMarketResearch';
-import { SearchFilters, SearchType, Platform, PostType, SortBy, SortOrder, Post } from '@/types/marketResearch';
+import { useMyFeedSearch } from '@/hooks/useMyFeedSearch';
+import { useCompetitors } from '@/hooks/useCompetitors';
+import { useGeminiAnalysis } from '@/hooks/useGeminiAnalysis';
+import GeminiAnalysisPanel from '@/components/market-research/GeminiAnalysisPanel';
+import type {
+  SearchFilters, SearchType, Platform, PostType, SortBy, SortOrder,
+  Post, ProfileMetadata, SearchResponse,
+} from '@/types/marketResearch';
 import PostCard from '@/components/market-research/PostCard';
 import PostDetailModal from '@/components/market-research/PostDetailModal';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -10,7 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import ResearchProgressBar from '@/components/market-research/ResearchProgressBar';
 import { proxyImageUrl } from '@/lib/utils';
 
-type PageView = 'search' | 'favorites';
+type PageView = 'feed' | 'favorites' | 'competitors';
 
 const PERIOD_OPTIONS = [
   { value: '1', label: 'Ultimo dia' },
@@ -62,16 +72,19 @@ export default function MarketResearchPage({ onBack }: Props) {
     hasMore,
   } = useMarketResearch();
 
-  const [pageView, setPageView] = useState<PageView>('search');
+  const [pageView, setPageView] = useState<PageView>('feed');
+  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
+
+  // Search form state (persists across tab switches, used in CompetitorsView)
   const [tab, setTab] = useState<SearchType>('profile');
   const [platform, setPlatform] = useState<Platform>('instagram');
   const [username, setUsername] = useState('');
   const [keyword, setKeyword] = useState('');
   const [postType, setPostType] = useState<PostType>('all');
   const [periodDays, setPeriodDays] = useState(30);
-  const [selectedPost, setSelectedPost] = useState<Post | null>(null);
   const [resultsLimit, setResultsLimit] = useState<string>('');
   const [isSearching, setIsSearching] = useState(false);
+  const [hasSearchedCompetitors, setHasSearchedCompetitors] = useState(false);
 
   const postTypeOptions = platform === 'instagram'
     ? [
@@ -106,6 +119,7 @@ export default function MarketResearchPage({ onBack }: Props) {
     if (!inputValue) return;
 
     setIsSearching(true);
+    setHasSearchedCompetitors(true);
     const limitNum = resultsLimit ? Math.min(limitMax, Math.max(1, parseInt(resultsLimit, 10) || 20)) : 20;
 
     const filters: SearchFilters = {
@@ -125,44 +139,50 @@ export default function MarketResearchPage({ onBack }: Props) {
     }
   };
 
-  const searched = posts.length > 0 || Boolean(error) || loading || isSearching;
+  const searched = hasSearchedCompetitors;
 
   return (
     <div className="flex-1 flex flex-col h-screen bg-background overflow-hidden">
       {/* Header */}
       <div className="px-6 py-5 border-b border-border/40 shrink-0">
         <div className="flex items-center gap-3">
-          <button onClick={onBack} className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors" aria-label="Voltar">
+          <button
+            onClick={onBack}
+            className="p-1.5 rounded-lg hover:bg-secondary/60 transition-colors"
+            aria-label="Voltar"
+          >
             <ArrowLeft className="w-5 h-5 text-foreground" strokeWidth={1.5} />
           </button>
           <div className="flex-1 min-w-0">
             <h1 className="text-lg font-semibold text-foreground">Pesquisa de Mercado</h1>
-            <p className="text-xs text-muted-foreground mt-0.5">Analise de posts de concorrentes e tendencias do seu nicho</p>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Analise seu perfil, favoritos e concorrentes do seu nicho
+            </p>
           </div>
         </div>
 
-        {/* Page tabs: Pesquisa | Favoritos */}
-        <div className="flex items-center gap-1 mt-4">
+        {/* Page tabs */}
+        <div className="flex items-center gap-1 mt-4 overflow-x-auto">
           <button
-            onClick={() => setPageView('search')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
-              pageView === 'search'
+            onClick={() => setPageView('feed')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${
+              pageView === 'feed'
                 ? 'bg-secondary text-foreground font-medium'
                 : 'text-muted-foreground hover:bg-secondary/50'
             }`}
           >
-            <Search className="w-4 h-4" strokeWidth={1.5} />
-            Pesquisa
+            <User className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            Meu Feed
           </button>
           <button
             onClick={() => setPageView('favorites')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors ${
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${
               pageView === 'favorites'
                 ? 'bg-secondary text-foreground font-medium'
                 : 'text-muted-foreground hover:bg-secondary/50'
             }`}
           >
-            <Bookmark className="w-4 h-4" strokeWidth={1.5} />
+            <Bookmark className="w-4 h-4 shrink-0" strokeWidth={1.5} />
             Favoritos
             {savedPosts.length > 0 && (
               <span className="ml-1 px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-medium">
@@ -170,13 +190,36 @@ export default function MarketResearchPage({ onBack }: Props) {
               </span>
             )}
           </button>
+          <button
+            onClick={() => setPageView('competitors')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm transition-colors whitespace-nowrap ${
+              pageView === 'competitors'
+                ? 'bg-secondary text-foreground font-medium'
+                : 'text-muted-foreground hover:bg-secondary/50'
+            }`}
+          >
+            <Target className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            Análise de Concorrentes
+          </button>
         </div>
       </div>
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto">
-        {pageView === 'search' ? (
-          <SearchView
+        {pageView === 'feed' && (
+          <FeedView isMobile={isMobile} setSelectedPost={setSelectedPost} />
+        )}
+        {pageView === 'favorites' && (
+          <FavoritesView
+            isMobile={isMobile}
+            savedPosts={savedPosts}
+            savedPostsLoading={savedPostsLoading}
+            setSelectedPost={setSelectedPost}
+            savePost={savePost}
+          />
+        )}
+        {pageView === 'competitors' && (
+          <CompetitorsView
             isMobile={isMobile}
             posts={posts}
             response={response}
@@ -209,7 +252,6 @@ export default function MarketResearchPage({ onBack }: Props) {
             setSelectedPost={setSelectedPost}
             postTypeOptions={postTypeOptions}
             isYouTube={isYouTube}
-            isTikTok={isTikTok}
             profileLabel={profileLabel}
             keywordLabel={keywordLabel}
             userFieldLabel={userFieldLabel}
@@ -219,14 +261,6 @@ export default function MarketResearchPage({ onBack }: Props) {
             limitLabel={limitLabel}
             limitDesc={limitDesc}
             limitMax={limitMax}
-          />
-        ) : (
-          <FavoritesView
-            isMobile={isMobile}
-            savedPosts={savedPosts}
-            savedPostsLoading={savedPostsLoading}
-            setSelectedPost={setSelectedPost}
-            savePost={savePost}
           />
         )}
       </div>
@@ -238,6 +272,160 @@ export default function MarketResearchPage({ onBack }: Props) {
         onSave={savePost}
         isSaved={selectedPost ? isPostSaved(selectedPost.id) : false}
       />
+    </div>
+  );
+}
+
+/* ─── Feed View ─── */
+function FeedView({
+  isMobile,
+  setSelectedPost,
+}: {
+  isMobile: boolean;
+  setSelectedPost: (p: Post) => void;
+}) {
+  const { posts, loading, error, hasSearched, config, saveConfig, search, metadata } = useMyFeedSearch();
+
+  const isYouTube = config.platform === 'youtube';
+  const isTikTok = config.platform === 'tiktok';
+  const contentLabel = isYouTube ? 'videos' : 'posts';
+
+  return (
+    <div className="max-w-[720px] mx-auto px-6 py-8 space-y-8">
+      <div className="rounded-xl border border-border bg-card p-6 space-y-3">
+        <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
+          Meu Feed
+        </h2>
+        <p className="text-sm text-muted-foreground leading-relaxed">
+          Analise o desempenho do seu proprio perfil com métricas e historico de publicações.
+        </p>
+      </div>
+
+      <div className="space-y-0">
+        <ConnectorRow
+          icon={<PlatformIcon platform={config.platform} size={36} />}
+          label="Plataforma"
+          description="Sua rede social principal"
+        >
+          <Select
+            value={config.platform}
+            onValueChange={(v) => saveConfig({ ...config, platform: v as Platform })}
+          >
+            <SelectTrigger className="h-9 w-auto min-w-[130px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent className="min-w-[220px]">
+              {PLATFORM_LIST.map((p) => (
+                <SelectItem key={p.value} value={p.value}>
+                  <div className="flex items-center gap-2.5">
+                    <PlatformIcon platform={p.value} size={24} />
+                    <span>{p.label}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </ConnectorRow>
+
+        <RowDivider />
+
+        <ConnectorRow
+          icon={<IconCircle><User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
+          label={isYouTube ? 'Seu Canal' : 'Seu Usuario'}
+          description={isYouTube ? 'Handle ou nome do canal' : isTikTok ? 'Seu usuario no TikTok' : 'Seu usuario ou URL do perfil'}
+        >
+          <input
+            type="text"
+            value={config.username}
+            onChange={(e) => saveConfig({ ...config, username: e.target.value })}
+            placeholder={isYouTube ? '@canal ou nome' : '@username'}
+            className="h-9 px-3 rounded-lg border border-border/60 bg-transparent text-sm text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-foreground/30 transition-colors w-[200px]"
+            onKeyDown={(e) => e.key === 'Enter' && void search()}
+          />
+        </ConnectorRow>
+
+        <RowDivider />
+
+        <ConnectorRow
+          icon={<IconCircle><Calendar className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} /></IconCircle>}
+          label="Periodo"
+          description="Intervalo de tempo do feed"
+        >
+          <Select
+            value={String(config.periodDays)}
+            onValueChange={(v) => saveConfig({ ...config, periodDays: Number(v) })}
+          >
+            <SelectTrigger className="h-9 w-auto min-w-[160px] rounded-lg border border-border/60 bg-transparent hover:bg-secondary/30 text-sm text-foreground focus:ring-0 focus:ring-offset-0 gap-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PERIOD_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </ConnectorRow>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={() => void search()}
+          disabled={loading || !config.username.trim()}
+          className="flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" strokeWidth={1.5} />}
+          {loading ? 'Carregando...' : 'Carregar Meu Feed'}
+        </button>
+      </div>
+
+      <ResearchProgressBar active={loading} />
+
+      {error && (
+        <div className="rounded-lg border border-destructive/20 bg-destructive/5 px-4 py-3">
+          <p className="text-sm text-destructive flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4" strokeWidth={1.5} />
+            {error}
+          </p>
+        </div>
+      )}
+
+      {!hasSearched && (
+        <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
+          <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
+            <User className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Configure seu usuario e clique em "Carregar Meu Feed"
+          </p>
+        </div>
+      )}
+
+      {posts.length > 0 && !loading && (
+        <>
+          {metadata && (
+            <ProfileMetadataCard metadata={metadata} isYouTube={isYouTube} contentLabel={contentLabel} />
+          )}
+
+          <p className="text-xs text-muted-foreground">
+            {posts.length} {contentLabel} encontrados
+          </p>
+
+          <div className="grid grid-cols-2 gap-3">
+            {posts.map((post) => (
+              <PostCard key={post.id} post={post} onClick={() => setSelectedPost(post)} />
+            ))}
+          </div>
+        </>
+      )}
+
+      {!loading && !error && hasSearched && posts.length === 0 && (
+        <div className="flex flex-col items-center justify-center py-12 text-center space-y-2">
+          <p className="text-sm text-foreground">Nenhum {isYouTube ? 'video' : 'post'} encontrado</p>
+          <p className="text-xs text-muted-foreground">
+            Tente aumentar o periodo da busca ou verificar o nome de usuario.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -256,17 +444,31 @@ function FavoritesView({
   setSelectedPost: (p: Post) => void;
   savePost: (p: Post) => void;
 }) {
+  const savedPostIds = savedPosts.map((p) => p.id);
+  const { analyzePost, getAnalysis, isAnalyzing, hasAnalysis } = useGeminiAnalysis(savedPostIds);
+  const [analysisPostId, setAnalysisPostId] = useState<string | null>(null);
+  const [analysisOpen, setAnalysisOpen] = useState(false);
+
+  const openAnalysis = (postId: string) => {
+    setAnalysisPostId(postId);
+    setAnalysisOpen(true);
+  };
+
+  const activeAnalysis = analysisPostId ? getAnalysis(analysisPostId) : null;
+
   return (
     <div className="max-w-[720px] mx-auto px-6 py-8 space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-medium text-foreground">Posts Salvos</h2>
           <p className="text-xs text-muted-foreground mt-0.5">
-            Posts ficam salvos por 7 dias e depois sao removidos automaticamente
+            Posts ficam salvos por 7 dias. Use o Gemini AI para analisar o conteudo de cada post.
           </p>
         </div>
         {savedPosts.length > 0 && (
-          <span className="text-xs text-muted-foreground">{savedPosts.length} salvo{savedPosts.length !== 1 ? 's' : ''}</span>
+          <span className="text-xs text-muted-foreground">
+            {savedPosts.length} salvo{savedPosts.length !== 1 ? 's' : ''}
+          </span>
         )}
       </div>
 
@@ -292,13 +494,16 @@ function FavoritesView({
         <div className="grid grid-cols-2 gap-3">
           {savedPosts.map((post) => {
             const days = daysRemaining(post.saved_at);
+            const analyzing = isAnalyzing(post.id);
+            const analyzed = hasAnalysis(post.id);
+            const a = getAnalysis(post.id);
+            const hasError = a?.status === 'error';
+
             return (
               <div key={post.id} className="relative group">
-                <PostCard
-                  post={post}
-                  onClick={() => setSelectedPost(post)}
-                />
-                {/* Expiry badge + remove button */}
+                <PostCard post={post} onClick={() => setSelectedPost(post)} />
+
+                {/* Expiry badge + remove */}
                 <div className="absolute top-2 left-2 right-2 flex items-center justify-between pointer-events-none">
                   <span className={`pointer-events-auto flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium backdrop-blur-sm ${
                     days <= 1 ? 'bg-destructive/80 text-white' : 'bg-background/80 text-muted-foreground'
@@ -307,10 +512,7 @@ function FavoritesView({
                     {days <= 0 ? 'Expirando' : days === 1 ? '1 dia' : `${days} dias`}
                   </span>
                   <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      void savePost(post);
-                    }}
+                    onClick={(e) => { e.stopPropagation(); void savePost(post); }}
                     className="pointer-events-auto p-1 rounded bg-background/80 backdrop-blur-sm hover:bg-destructive/80 hover:text-white text-muted-foreground transition-colors opacity-0 group-hover:opacity-100"
                     title="Remover dos salvos"
                     aria-label="Remover dos salvos"
@@ -318,17 +520,56 @@ function FavoritesView({
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
+
+                {/* Gemini analyze / view button */}
+                <div className="absolute bottom-2 right-2">
+                  {analyzing ? (
+                    <div className="p-1.5 rounded-lg bg-background/80 backdrop-blur-sm">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                    </div>
+                  ) : analyzed ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); openAnalysis(post.id); }}
+                      className="p-1.5 rounded-lg bg-primary/15 text-primary backdrop-blur-sm hover:bg-primary/25 transition-colors"
+                      title="Ver análise Gemini"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </button>
+                  ) : hasError ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); void analyzePost(post); }}
+                      className="p-1.5 rounded-lg bg-orange-500/15 text-orange-500 backdrop-blur-sm hover:bg-orange-500/25 transition-colors"
+                      title="Erro na análise — clique para tentar novamente"
+                    >
+                      <AlertTriangle className="w-3.5 h-3.5" />
+                    </button>
+                  ) : (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); void analyzePost(post); }}
+                      className="p-1.5 rounded-lg bg-primary/10 text-primary backdrop-blur-sm hover:bg-primary/25 transition-colors"
+                      title="Analisar com Gemini AI"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <GeminiAnalysisPanel
+        open={analysisOpen}
+        onClose={() => setAnalysisOpen(false)}
+        analysis={activeAnalysis}
+      />
     </div>
   );
 }
 
-/* ─── Search View ─── */
-function SearchView({
+/* ─── Competitors View ─── */
+function CompetitorsView({
   isMobile,
   posts,
   response,
@@ -361,7 +602,6 @@ function SearchView({
   setSelectedPost,
   postTypeOptions,
   isYouTube,
-  isTikTok,
   profileLabel,
   keywordLabel,
   userFieldLabel,
@@ -374,7 +614,7 @@ function SearchView({
 }: {
   isMobile: boolean;
   posts: Post[];
-  response: any;
+  response: SearchResponse | null;
   loading: boolean;
   loadingMore: boolean;
   error: string | null;
@@ -404,7 +644,6 @@ function SearchView({
   setSelectedPost: (p: Post) => void;
   postTypeOptions: { value: string; label: string }[];
   isYouTube: boolean;
-  isTikTok: boolean;
   profileLabel: string;
   keywordLabel: string;
   userFieldLabel: string;
@@ -415,15 +654,17 @@ function SearchView({
   limitDesc: string;
   limitMax: number;
 }) {
+  const { competitors, isCompetitor, markAsCompetitor } = useCompetitors();
+
   return (
     <div className="max-w-[720px] mx-auto px-6 py-8 space-y-8">
       <div className="rounded-xl border border-border bg-card p-6 space-y-4">
         <h2 className="text-2xl text-foreground" style={{ fontFamily: "'ITC Garamond Std Lt Cond', serif" }}>
-          Analise de Competidores
+          Análise de Concorrentes
         </h2>
         <div className="space-y-3">
           <p className="text-sm text-muted-foreground leading-relaxed">
-            Envie perfis ou palavras-chave e receba analise estruturada com dados raspados via Apify.
+            Pesquise perfis ou palavras-chave e marque os posts mais relevantes como concorrentes para referencia.
           </p>
           <ul className="space-y-1.5 text-sm text-muted-foreground">
             <li className="flex items-start gap-2">
@@ -438,6 +679,7 @@ function SearchView({
         </div>
       </div>
 
+      {/* Search sub-tabs */}
       <div className="flex items-center gap-6">
         <button
           onClick={() => setTab('profile')}
@@ -461,6 +703,7 @@ function SearchView({
         </button>
       </div>
 
+      {/* Search form */}
       <div className="space-y-0">
         <ConnectorRow
           icon={<PlatformIcon platform={platform} size={36} />}
@@ -530,7 +773,9 @@ function SearchView({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {postTypeOptions.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              {postTypeOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </ConnectorRow>
@@ -547,7 +792,9 @@ function SearchView({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {PERIOD_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+              {PERIOD_OPTIONS.map((o) => (
+                <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </ConnectorRow>
@@ -596,10 +843,10 @@ function SearchView({
       {!searched && (
         <div className="flex flex-col items-center justify-center py-14 text-center space-y-3">
           <div className="w-12 h-12 rounded-full bg-secondary/60 flex items-center justify-center">
-            <Search className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
+            <Target className="w-5 h-5 text-muted-foreground" strokeWidth={1.5} />
           </div>
           <p className="text-sm text-muted-foreground">
-            Pesquise perfis ou palavras-chave para analisar conteudo
+            Pesquise perfis ou palavras-chave para analisar concorrentes
           </p>
         </div>
       )}
@@ -607,32 +854,11 @@ function SearchView({
       {posts.length > 0 && !loading && (
         <>
           {response?.metadata && (
-            <div className="rounded-xl border border-border/50 bg-card/80 px-4 py-3">
-              <div className="flex items-center gap-3">
-                {response.metadata.profile_picture ? (
-                  <img
-                    src={proxyImageUrl(response.metadata.profile_picture)}
-                    alt={response.metadata.username}
-                    className="w-10 h-10 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
-                    <User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
-                  </div>
-                )}
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-foreground truncate">@{response.metadata.username}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {response.metadata.followers.toLocaleString('pt-BR')} {isYouTube ? 'inscritos' : 'seguidores'} • {response.metadata.total_posts.toLocaleString('pt-BR')} {contentLabel}
-                  </p>
-                  {response.metadata.bio && (
-                    <p className="text-xs text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap">
-                      {response.metadata.bio}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ProfileMetadataCard
+              metadata={response.metadata}
+              isYouTube={isYouTube}
+              contentLabel={contentLabel}
+            />
           )}
 
           <div className={`flex ${isMobile ? 'flex-col gap-3' : 'items-center justify-between'}`}>
@@ -645,7 +871,9 @@ function SearchView({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {SORT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
               <Select value={sortOrder} onValueChange={(v) => setSortOrder(v as SortOrder)}>
@@ -662,11 +890,21 @@ function SearchView({
 
           <div className="grid grid-cols-2 gap-3">
             {posts.map((post) => (
-              <PostCard
-                key={post.id}
-                post={post}
-                onClick={() => setSelectedPost(post)}
-              />
+              <div key={post.id} className="relative group">
+                <PostCard post={post} onClick={() => setSelectedPost(post)} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); void markAsCompetitor(post); }}
+                  className={`absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm transition-colors ${
+                    isCompetitor(post.id)
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-background/80 text-muted-foreground hover:bg-primary/20 hover:text-primary opacity-0 group-hover:opacity-100'
+                  }`}
+                  title={isCompetitor(post.id) ? 'Remover dos concorrentes' : 'Marcar como concorrente'}
+                >
+                  <Target className="w-3 h-3" />
+                  {isCompetitor(post.id) ? 'Concorrente' : 'Marcar'}
+                </button>
+              </div>
             ))}
           </div>
 
@@ -693,6 +931,75 @@ function SearchView({
           </p>
         </div>
       )}
+
+      {/* Saved competitors section */}
+      {competitors.length > 0 && (
+        <div className="space-y-4 pt-4 border-t border-border/30">
+          <div className="flex items-center gap-2">
+            <Target className="w-4 h-4 text-primary" strokeWidth={1.5} />
+            <h3 className="text-sm font-medium text-foreground">Concorrentes Marcados</h3>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {competitors.length} marcado{competitors.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            {competitors.map((post) => (
+              <div key={post.id} className="relative group">
+                <PostCard post={post} onClick={() => setSelectedPost(post)} />
+                <button
+                  onClick={(e) => { e.stopPropagation(); void markAsCompetitor(post); }}
+                  className="absolute bottom-2 right-2 flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium backdrop-blur-sm bg-primary text-primary-foreground transition-colors hover:bg-destructive hover:text-white"
+                  title="Remover dos concorrentes"
+                >
+                  <Target className="w-3 h-3" />
+                  Concorrente
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Profile Metadata Card ─── */
+function ProfileMetadataCard({
+  metadata,
+  isYouTube,
+  contentLabel,
+}: {
+  metadata: ProfileMetadata;
+  isYouTube: boolean;
+  contentLabel: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border/50 bg-card/80 px-4 py-3">
+      <div className="flex items-center gap-3">
+        {metadata.profile_picture ? (
+          <img
+            src={proxyImageUrl(metadata.profile_picture)}
+            alt={metadata.username}
+            className="w-10 h-10 rounded-full object-cover"
+          />
+        ) : (
+          <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center">
+            <User className="w-4 h-4 text-muted-foreground" strokeWidth={1.5} />
+          </div>
+        )}
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-medium text-foreground truncate">@{metadata.username}</p>
+          <p className="text-xs text-muted-foreground">
+            {metadata.followers.toLocaleString('pt-BR')} {isYouTube ? 'inscritos' : 'seguidores'} •{' '}
+            {metadata.total_posts.toLocaleString('pt-BR')} {contentLabel}
+          </p>
+          {metadata.bio && (
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed whitespace-pre-wrap">
+              {metadata.bio}
+            </p>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

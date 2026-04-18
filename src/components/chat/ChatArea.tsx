@@ -86,8 +86,8 @@ function buildAssistantStages(params: {
 
   const mode = params.mode || 'calendar';
   const buildStage = mode === 'calendar'
-    ? 'Montando calend\u00e1rio editorial...'
-    : 'Estruturando ideia estrat\u00e9gica...';
+    ? 'Montando calendário editorial...'
+    : 'Estruturando ideia estratégica...';
 
   return params.willSearchWeb
     ? ['Buscando na web...', 'Analisando contexto...', buildStage]
