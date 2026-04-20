@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect, KeyboardEvent, useCallback, useMemo } from 'react';
 import { useChatStore } from '@/stores/chatStore';
 import { sendChatMessage } from '@/services/chatService';
-import { AI_MODELS, Message, AGENTS, AGENT_AVATARS } from '@/types';
+import { persistConversation, persistMessage } from '@/services/chatPersistenceService';
+import { AI_MODELS, Message, Conversation, AGENTS, AGENT_AVATARS } from '@/types';
 import { Plus, ArrowUp, Square, Paperclip, ImagePlus, Search, Globe, Mic, AudioLines, ChevronDown, ChevronRight, Check, PanelLeft, Menu } from 'lucide-react';
 import gemzLogo from '@/assets/gemz-logo.png';
 import { AttachedFiles, UploadedFile } from '@/components/chat/FileUploadButton';
@@ -32,7 +33,7 @@ function normalizeSearch(text: string): string {
 
 
 export default function HomePage() {
-  const { selectedModel, setSelectedModel, thinkingMode, sidebarOpen, setSidebarOpen } = useChatStore();
+  const { selectedModel, setSelectedModel, thinkingMode, sidebarOpen, setSidebarOpen, createConversation, addMessage } = useChatStore();
   const { user, activeTenant } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -47,6 +48,7 @@ export default function HomePage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const conversationIdRef = useRef<string | null>(null);
   const isMobile = useIsMobile();
 
   const currentModel = AI_MODELS.find(m => m.id === selectedModel);
@@ -112,9 +114,27 @@ export default function HomePage() {
 
   const handleSend = useCallback(async () => {
     const { targetAgentId: mentionedAgentId, cleanedText } = resolveMentionedAgent(inputValue);
-    const targetAgentId = mentionedAgentId || 'brand-book';
+    const targetAgentId = mentionedAgentId || '';
     const promptText = cleanedText.trim();
     if (!promptText || isStreaming) return;
+
+    let convId = conversationIdRef.current;
+    if (!convId) {
+      const convAgentId = targetAgentId || 'free-chat';
+      convId = createConversation(convAgentId);
+      conversationIdRef.current = convId;
+      if (user?.id && activeTenant?.id) {
+        const convObj: Conversation = {
+          id: convId,
+          agentId: convAgentId,
+          title: 'Nova conversa',
+          messages: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        persistConversation({ conversation: convObj, userId: user.id, tenantId: activeTenant.id }).catch(() => {});
+      }
+    }
 
     const userMsg: Message = {
       id: crypto.randomUUID(),
@@ -134,6 +154,10 @@ export default function HomePage() {
     };
 
     setMessages(prev => [...prev, userMsg, assistantMsg]);
+    addMessage(convId, userMsg);
+    if (user?.id && activeTenant?.id) {
+      persistMessage({ conversationId: convId, message: userMsg, userId: user.id, tenantId: activeTenant.id }).catch(() => {});
+    }
     setInputValue('');
     setMention(null);
     setAttachedFiles([]);
@@ -197,12 +221,13 @@ export default function HomePage() {
         await new Promise((r) => setTimeout(r, 600));
       }
 
+      const finalContent = response?.content ?? '';
       setMessages(prev =>
         prev.map(m =>
           m.id === assistantId
             ? {
                 ...m,
-                content: response?.content ?? '',
+                content: finalContent,
                 isStreaming: false,
                 thinking: response?.thinking,
                 thinkingDuration: response?.thinkingDuration,
@@ -211,6 +236,22 @@ export default function HomePage() {
             : m
         )
       );
+      const finalAssistantMsg: Message = {
+        id: assistantId,
+        role: 'assistant',
+        content: finalContent,
+        timestamp: new Date(),
+        agentId: targetAgentId,
+        thinking: response?.thinking,
+        thinkingDuration: response?.thinkingDuration,
+        webSources: response?.webContext?.sources?.length ? response.webContext.sources : undefined,
+      };
+      if (conversationIdRef.current) {
+        addMessage(conversationIdRef.current, finalAssistantMsg);
+        if (user?.id && activeTenant?.id) {
+          persistMessage({ conversationId: conversationIdRef.current, message: finalAssistantMsg, userId: user.id, tenantId: activeTenant.id }).catch(() => {});
+        }
+      }
     } catch (err: any) {
       setMessages(prev =>
         prev.map(m =>
@@ -223,7 +264,7 @@ export default function HomePage() {
       window.clearInterval(stageTimer);
       setIsStreaming(false);
     }
-  }, [inputValue, isStreaming, messages, selectedModel, thinkingMode, marketingMode, user?.id, activeTenant?.id]);
+  }, [inputValue, isStreaming, messages, selectedModel, thinkingMode, marketingMode, user?.id, activeTenant?.id, createConversation, addMessage]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (mention && mentionCandidates.length > 0) {
@@ -577,7 +618,7 @@ export default function HomePage() {
           <div ref={scrollRef} className="flex-1 overflow-y-auto">
             <div className="max-w-3xl mx-auto px-6 py-4">
               {messages.map((msg) => (
-                <MessageBubble key={msg.id} message={msg} agentId={msg.agentId || 'brand-book'} />
+                <MessageBubble key={msg.id} message={msg} agentId={msg.agentId || ''} />
               ))}
             </div>
           </div>

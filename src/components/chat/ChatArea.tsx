@@ -4,6 +4,7 @@ import Header from '@/components/layout/Header';
 import ChatInput from '@/components/chat/ChatInput';
 import MessageBubble from '@/components/chat/MessageBubble';
 import ConversationStarters from '@/components/chat/ConversationStarters';
+import DocumentGateBlock from '@/components/agents/DocumentGateBlock';
 import { useChatStore } from '@/stores/chatStore';
 import { getAgentById, sendChatMessage } from '@/services/chatService';
 import { Message } from '@/types';
@@ -11,6 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { resolveMentionedAgent } from '@/lib/agentMentions';
 import { persistConversation, persistMessage, deletePersistedMessage } from '@/services/chatPersistenceService';
 import { toast } from 'sonner';
+import { useUserDocuments } from '@/hooks/useUserDocuments';
+import { getMissingDocTypes } from '@/lib/documentGate';
 
 type OutgoingMessage = { role: string; content: string };
 
@@ -117,6 +120,10 @@ export default function ChatArea() {
 
   const agent = getAgentById(activeAgentId);
   const conversation = conversations.find((item) => item.id === activeConversationId);
+
+  const { existingTypes, isLoading: docsLoading } = useUserDocuments();
+  const missingDocTypes = agent && !docsLoading ? getMissingDocTypes(agent, existingTypes) : [];
+  const isGated = missingDocTypes.length > 0;
 
   const persistConversationSnapshot = useCallback(
     async (conversationId: string) => {
@@ -545,7 +552,9 @@ export default function ChatArea() {
       <Header />
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
-        {!conversation || conversation.messages.length === 0 ? (
+        {isGated && agent ? (
+          <DocumentGateBlock agent={agent} missingDocTypes={missingDocTypes} />
+        ) : !conversation || conversation.messages.length === 0 ? (
           <div className="flex-1 overflow-y-auto" ref={scrollRef}>
             {agent && (
               <ConversationStarters

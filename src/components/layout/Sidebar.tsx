@@ -35,6 +35,7 @@ import SearchModal from "@/components/modals/SearchModal";
 import DocumentsModal from "@/components/modals/DocumentsModal";
 import ProfileSettingsModal from "@/components/profile/ProfileSettingsModal";
 import { deletePersistedConversation, loadPersistedConversations } from "@/services/chatPersistenceService";
+import { AGENT_AVATARS } from "@/types";
 
 export default function Sidebar() {
   const {
@@ -277,7 +278,7 @@ function ExpandedSidebar({
   isAdminMode: boolean;
   activePage: string;
   navigate: (page: string) => void;
-  recentConversations: { id: string; title: string }[];
+  recentConversations: { id: string; title: string; agentId?: string }[];
   activeConversationId: string | null;
   setActiveConversation: (id: string | null) => void;
   deleteConversation: (id: string) => void;
@@ -404,7 +405,11 @@ function ExpandedSidebar({
                     className="min-w-0 flex-1 flex items-center gap-2 px-1 py-1 text-left"
                     aria-label={`Abrir conversa ${conversation.title}`}
                   >
-                    <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
+                    {conversation.agentId && conversation.agentId !== 'free-chat' && AGENT_AVATARS[conversation.agentId] ? (
+                      <img src={AGENT_AVATARS[conversation.agentId]} alt="" className="w-5 h-5 rounded-full object-cover shrink-0" />
+                    ) : (
+                      <MessageSquare className="w-4 h-4 text-muted-foreground shrink-0" />
+                    )}
                     <span className="text-sm text-foreground truncate">{conversation.title}</span>
                   </button>
                   <button

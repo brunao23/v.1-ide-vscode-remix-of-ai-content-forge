@@ -46,6 +46,7 @@ const AGENT_SYSTEM_PROMPTS: Record<string, string> = {
 };
 
 export function getSystemPrompt(agentId: string): string {
+  if (!agentId) return '';
   return AGENT_SYSTEM_PROMPTS[agentId] || AGENT_SYSTEM_PROMPTS['brand-book'];
 }
 

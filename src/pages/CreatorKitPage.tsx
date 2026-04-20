@@ -1,8 +1,10 @@
 import { useState, useMemo } from 'react';
 import { AGENTS, AGENT_AVATARS } from '@/types';
 import { useChatStore } from '@/stores/chatStore';
-import { ChevronDown, Search } from 'lucide-react';
+import { ChevronDown, Search, Lock } from 'lucide-react';
 import Header from '@/components/layout/Header';
+import { useUserDocuments } from '@/hooks/useUserDocuments';
+import { getMissingDocTypes } from '@/lib/documentGate';
 
 const SECTIONS = [
   {
@@ -24,6 +26,7 @@ const SECTIONS = [
 
 export default function CreatorKitPage() {
   const { setActiveAgent } = useChatStore();
+  const { existingTypes, isLoading: docsLoading } = useUserDocuments();
   const [searchQuery, setSearchQuery] = useState('');
   const [openSections, setOpenSections] = useState<Record<string, boolean>>(
     Object.fromEntries(SECTIONS.map(s => [s.title, true]))
@@ -101,30 +104,40 @@ export default function CreatorKitPage() {
                   {/* Agent list */}
                   {isOpen && (
                     <div className="border-t border-border">
-                      {sectionAgents.map((agent, idx) => (
-                        <button
-                          key={agent!.id}
-                          onClick={() => setActiveAgent(agent!.id)}
-                          className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors cursor-pointer text-left ${
-                            idx < sectionAgents.length - 1 ? 'border-b border-border' : ''
-                          }`}
-                        >
-                          <img
-                            src={AGENT_AVATARS[agent!.id]}
-                            alt={agent!.name}
-                            className="w-10 h-10 rounded-full object-cover shrink-0"
-                          />
-                          <div className="min-w-0 flex-1">
-                            <p className="text-sm font-medium text-foreground">{agent!.name}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                              {agent!.description}
-                            </p>
-                          </div>
-                          <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
-                            {agent!.recommendedModel}
-                          </span>
-                        </button>
-                      ))}
+                      {sectionAgents.map((agent, idx) => {
+                        const isLocked = !docsLoading && getMissingDocTypes(agent!, existingTypes).length > 0;
+                        return (
+                          <button
+                            key={agent!.id}
+                            onClick={() => setActiveAgent(agent!.id)}
+                            className={`w-full flex items-center gap-4 px-5 py-4 hover:bg-secondary/50 transition-colors cursor-pointer text-left ${
+                              idx < sectionAgents.length - 1 ? 'border-b border-border' : ''
+                            } ${isLocked ? 'opacity-60' : ''}`}
+                          >
+                            <div className="relative shrink-0">
+                              <img
+                                src={AGENT_AVATARS[agent!.id]}
+                                alt={agent!.name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                              {isLocked && (
+                                <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-background border border-border flex items-center justify-center">
+                                  <Lock className="w-2.5 h-2.5 text-muted-foreground" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-foreground">{agent!.name}</p>
+                              <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
+                                {agent!.description}
+                              </p>
+                            </div>
+                            <span className="text-xs text-muted-foreground shrink-0 hidden sm:block">
+                              {agent!.recommendedModel}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>

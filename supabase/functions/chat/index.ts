@@ -3153,10 +3153,11 @@ Texto aqui...
 - Links quebrados ou inventados sao PROIBIDOS.`;
     }
 
+    // agenticWebSearchEnabled precisa estar fora dos dois blocos if(useAgenticMode) para manter o escopo
+    const agenticWebSearchEnabled =
+      useAgenticMode && (Boolean(webSearchApproved) || userExplicitlyRequestsWebSearch(lastUserText || ""));
+
     if (useAgenticMode) {
-      // Web search só é ativada quando o usuário aprovou via botão ou pediu explicitamente
-      const agenticWebSearchEnabled =
-        Boolean(webSearchApproved) || userExplicitlyRequestsWebSearch(lastUserText || "");
 
       // Auto-detect calendar vs idea mode from user message keywords
       const lowerMsg = lastUserText.toLowerCase();

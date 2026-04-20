@@ -2,6 +2,7 @@ import Sidebar from '@/components/layout/Sidebar';
 import ChatArea from '@/components/chat/ChatArea';
 import MarketResearchPage from '@/pages/MarketResearchPage';
 import HomePage from '@/pages/HomePage';
+import OnboardingModal from '@/components/onboarding/OnboardingModal';
 import CreatorKitPage from '@/pages/CreatorKitPage';
 import ImplementationPage from '@/pages/ImplementationPage';
 import AulasPage from '@/pages/AulasPage';
@@ -78,6 +79,7 @@ export default function Index() {
       <div className="flex-1 min-w-0 overflow-hidden">
         {renderPage()}
       </div>
+      <OnboardingModal />
     </div>
   );
 }
