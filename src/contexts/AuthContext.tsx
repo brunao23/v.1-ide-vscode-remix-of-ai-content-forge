@@ -184,7 +184,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setLoading(false);
+      if (!data.session) {
+        setLoading(false);
+      }
+      // Se há sessão, o segundo effect cuida do loading após carregar o perfil
     });
 
     return () => {
@@ -202,7 +205,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setTenants([]);
           setActiveTenant(null);
           setIsAdmin(false);
-          setLoading(false);
+          // loading já tratado pelo primeiro effect via getSession quando não há sessão
         }
         return;
       }

@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import AuthPage from "./pages/AuthPage";
+import SharedConversationPage from "./pages/SharedConversationPage";
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ function AppRoutes() {
 
   return (
     <Routes>
+      <Route path="/share/:token" element={<SharedConversationPage />} />
       <Route path="/login" element={isAuthenticated ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/" element={isAuthenticated ? <Index /> : <Navigate to="/login" replace />} />
       <Route path="*" element={<NotFound />} />

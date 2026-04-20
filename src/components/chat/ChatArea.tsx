@@ -9,7 +9,7 @@ import { getAgentById, sendChatMessage } from '@/services/chatService';
 import { Message } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { resolveMentionedAgent } from '@/lib/agentMentions';
-import { persistConversation, persistMessage } from '@/services/chatPersistenceService';
+import { persistConversation, persistMessage, deletePersistedMessage } from '@/services/chatPersistenceService';
 import { toast } from 'sonner';
 
 type OutgoingMessage = { role: string; content: string };
@@ -104,6 +104,7 @@ export default function ChatArea() {
     addMessage,
     updateMessage,
     finishStreaming,
+    deleteMessage,
     setActiveAgentContext,
     selectedModel,
     thinkingMode,
@@ -297,6 +298,32 @@ export default function ChatArea() {
           });
         };
 
+        const handleStep = (step: any) => {
+          if (!stageCleared) {
+            window.clearInterval(stageTimer);
+            stageCleared = true;
+          }
+          const store = useChatStore.getState();
+          const conv = store.conversations.find((item) => item.id === convId);
+          if (!conv) return;
+          const msgIdx = conv.messages.findIndex((item) => item.id === assistantId);
+          if (msgIdx === -1) return;
+          const updatedMsgs = [...conv.messages];
+          const currentLiveSteps = updatedMsgs[msgIdx].liveSteps || [];
+          const existingIdx = currentLiveSteps.findIndex(
+            (s) => s.type === step.type && s.status === 'searching' && s.query === step.query,
+          );
+          const newLiveSteps = existingIdx !== -1 && step.status === 'done'
+            ? currentLiveSteps.map((s, i) => (i === existingIdx ? step : s))
+            : [...currentLiveSteps, step];
+          updatedMsgs[msgIdx] = { ...updatedMsgs[msgIdx], liveSteps: newLiveSteps };
+          useChatStore.setState({
+            conversations: store.conversations.map((item) =>
+              item.id === convId ? { ...item, messages: updatedMsgs } : item,
+            ),
+          });
+        };
+
         const response = await sendChatMessage({
           messages: historyMessages,
           agentId: targetAgentId,
@@ -308,6 +335,7 @@ export default function ChatArea() {
           webSearchApproved: options?.webSearchApproved || false,
           onDelta: handleDelta,
           onThinkingDelta: handleThinkingDelta,
+          onStep: handleStep,
         });
 
         if (!response) throw new Error('Resposta invalida do servidor. Tente novamente.');
@@ -337,6 +365,81 @@ export default function ChatArea() {
               }
               if (response.webContext?.sources?.length) {
                 extras.webSources = response.webContext.sources;
+              }
+              const liveStepsSnapshot = updatedMessages[msgIndex].liveSteps || [];
+              const detailedMemSteps = (response.documentsContext?.retrievalSteps || []).map((s) => {
+                const matchingLive = liveStepsSnapshot.find((ls) => ls.type === 'memory' && ls.query === s.query);
+                return {
+                  type: 'memory' as const,
+                  query: s.query,
+                  label: s.subject,
+                  resultCount: s.chunkCount,
+                  chunks: matchingLive?.chunks,
+                };
+              });
+              const memSteps = detailedMemSteps.length > 0
+                ? detailedMemSteps
+                : response.documentsContext?.topic
+                  ? [{ type: 'memory' as const, query: response.documentsContext.topic, label: 'Contexto dos documentos' }]
+                  : [];
+
+              const allWebSources = (response.webContext?.sources || [])
+                .slice(0, 5)
+                .map((src) => ({ title: src.title, url: src.url }));
+              const detailedWebSteps = (response.webContext?.steps || []).map((s, idx) => ({
+                type: 'web' as const,
+                query: s.query,
+                label: s.label,
+                resultCount: s.resultCount,
+                domains: s.domains,
+                results: idx === 0 ? allWebSources : [],
+              }));
+              const webSteps = detailedWebSteps.length > 0
+                ? detailedWebSteps
+                : response.webContext?.used
+                  ? [{
+                      type: 'web' as const,
+                      query: 'Pesquisa na web',
+                      resultCount: response.webContext.resultCount || (response.webContext.sources?.length ?? 0),
+                      domains: (response.webContext.sources || []).slice(0, 5).map((src) => {
+                        try { return new URL(src.url).hostname.replace('www.', ''); } catch { return ''; }
+                      }).filter(Boolean),
+                      results: allWebSources,
+                    }]
+                  : [];
+
+              const RAG_AGENTS = new Set([
+                'icp-architect', 'arquiteta-perfil-icp', 'pillar-strategist',
+                'matrix-generator', 'marketing-manager', 'scriptwriter',
+                'copywriter-campanhas', 'expert-social-selling', 'criador-documento-oferta',
+                'estrategias-sprint-20k', 'arquiteta-workshops', 'feedback-conteudo',
+                'vsl-invisivel', 'amanda-ai', 'voz-de-marca',
+              ]);
+
+              const allSteps = [...memSteps, ...webSteps];
+              if (allSteps.length > 0) {
+                extras.agentSteps = allSteps;
+              } else {
+                // Fallback 1: copy SSE live steps so they persist after streaming ends
+                const currentLiveSteps = updatedMessages[msgIndex].liveSteps || [];
+                if (currentLiveSteps.length > 0) {
+                  let webResultsAssigned = false;
+                  extras.agentSteps = currentLiveSteps.map((ls) => {
+                    if (ls.type === 'web' && !webResultsAssigned) {
+                      webResultsAssigned = true;
+                      const webResultsToUse = ls.results && ls.results.length > 0 ? ls.results : allWebSources.length > 0 ? allWebSources : undefined;
+                      return { type: ls.type, query: ls.query, label: ls.label, resultCount: ls.resultCount, domains: ls.domains, results: webResultsToUse, chunks: ls.chunks };
+                    }
+                    return { type: ls.type, query: ls.query, label: ls.label, resultCount: ls.resultCount, domains: ls.domains, results: ls.results, chunks: ls.chunks };
+                  });
+                } else if (RAG_AGENTS.has(targetAgentId)) {
+                  // Fallback 2: synthetic step for RAG agents when no SSE events were received
+                  extras.agentSteps = [{
+                    type: 'memory' as const,
+                    query: promptText.slice(0, 120),
+                    label: 'Documentos da memória',
+                  }];
+                }
               }
               if (Object.keys(extras).length > 0) {
                 updatedMessages[msgIndex] = {
@@ -414,6 +517,19 @@ export default function ChatArea() {
     [activeConversationId, conversations, isStreaming, marketingMode, handleSend],
   );
 
+  const handleDeleteMessage = useCallback(
+    async (messageId: string) => {
+      if (!activeConversationId) return;
+      deleteMessage(activeConversationId, messageId);
+      if (user?.id && activeTenant?.id) {
+        await deletePersistedMessage({ messageId, userId: user.id, tenantId: activeTenant.id }).catch((err) => {
+          console.error('Falha ao excluir mensagem:', err);
+        });
+      }
+    },
+    [activeConversationId, deleteMessage, user?.id, activeTenant?.id],
+  );
+
   const handleStop = () => {
     setIsStreaming(false);
     if (!conversation) return;
@@ -453,6 +569,7 @@ export default function ChatArea() {
                       ? handleWebSearchRequest
                       : undefined
                   }
+                  onDeleteMessage={handleDeleteMessage}
                 />
               ))}
             </div>

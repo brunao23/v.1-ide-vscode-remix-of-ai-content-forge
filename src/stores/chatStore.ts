@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { Message, Conversation } from '@/types';
 import { getModelById } from '@/config/models';
 
@@ -53,9 +54,12 @@ interface ChatState {
   updateMessage: (conversationId: string, messageId: string, content: string) => void;
   finishStreaming: (conversationId: string, messageId: string) => void;
   deleteConversation: (conversationId: string) => void;
+  deleteMessage: (conversationId: string, messageId: string) => void;
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>()(
+  persist(
+    (set, get) => ({
   conversations: [],
   activeConversationId: null,
   activeAgentId: 'brand-book',
@@ -183,4 +187,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
         activeConversationId: isActiveConversation ? null : s.activeConversationId,
       };
     }),
-}));
+
+  deleteMessage: (conversationId, messageId) =>
+    set((s) => ({
+      conversations: s.conversations.map((c) =>
+        c.id === conversationId
+          ? { ...c, messages: c.messages.filter((m) => m.id !== messageId) }
+          : c
+      ),
+    })),
+    }),
+    {
+      name: 'chat-preferences',
+      partialize: (state) => ({
+        selectedModel: state.selectedModel,
+        thinkingMode: state.thinkingMode,
+      }),
+    },
+  ),
+);

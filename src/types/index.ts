@@ -17,6 +17,27 @@ export interface WebSource {
   summary: string;
 }
 
+export interface AgentStep {
+  type: 'memory' | 'web';
+  query: string;
+  label?: string;
+  resultCount?: number;
+  domains?: string[];
+  results?: Array<{ title: string; url: string }>;
+  chunks?: Array<{ content: string; title?: string }>;
+}
+
+export interface LiveStep {
+  type: 'memory' | 'web';
+  status: 'searching' | 'done';
+  query: string;
+  label?: string;
+  resultCount?: number;
+  domains?: string[];
+  results?: Array<{ title: string; url: string }>;
+  chunks?: Array<{ content: string; title?: string }>;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -27,6 +48,8 @@ export interface Message {
   thinkingDuration?: number;
   isStreaming?: boolean;
   webSources?: WebSource[];
+  agentSteps?: AgentStep[];
+  liveSteps?: LiveStep[];
 }
 
 export interface Conversation {

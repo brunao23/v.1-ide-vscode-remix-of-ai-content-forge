@@ -147,6 +147,24 @@ export async function persistMessage(params: {
   }
 }
 
+export async function deletePersistedMessage(params: {
+  messageId: string;
+  userId: string;
+  tenantId: string;
+}): Promise<void> {
+  const { messageId, userId, tenantId } = params;
+  const { error } = await (supabase as any)
+    .from('chat_messages')
+    .delete()
+    .eq('id', messageId)
+    .eq('user_id', userId)
+    .eq('tenant_id', tenantId);
+
+  if (error) {
+    throw new Error(error.message || 'Falha ao excluir mensagem.');
+  }
+}
+
 export async function deletePersistedConversation(params: {
   conversationId: string;
   userId: string;

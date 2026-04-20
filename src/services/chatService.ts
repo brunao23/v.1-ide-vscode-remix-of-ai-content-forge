@@ -61,6 +61,7 @@ interface SendMessageParams {
   webSearchApproved?: boolean;
   onDelta?: (text: string) => void;
   onThinkingDelta?: (text: string) => void;
+  onStep?: (step: { type: 'memory' | 'web'; status: 'searching' | 'done'; query: string; label?: string; resultCount?: number; domains?: string[] }) => void;
 }
 
 type ChatApiResponse = {
@@ -79,6 +80,11 @@ type ChatApiResponse = {
     skippedReason?: string;
     error?: string;
     sources?: Array<{ title: string; url: string; summary: string }>;
+    steps?: Array<{ label: string; query: string; resultCount: number; domains: string[] }>;
+  };
+  documentsContext?: {
+    topic: string | null;
+    retrievalSteps?: Array<{ subject: string; query: string; chunkCount: number }>;
   };
   error?: string;
 };
@@ -119,6 +125,7 @@ async function callChatFunction(
   payload: Record<string, unknown>,
   onDelta?: (text: string) => void,
   onThinkingDelta?: (text: string) => void,
+  onStep?: (step: any) => void,
 ) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 300_000);
@@ -171,6 +178,11 @@ async function callChatFunction(
             try {
               const { text } = JSON.parse(data);
               if (text && onThinkingDelta) onThinkingDelta(text);
+            } catch {}
+          } else if (eventType === 'step') {
+            try {
+              const step = JSON.parse(data);
+              if (step && onStep) onStep(step);
             } catch {}
           } else if (eventType === 'done') {
             try { parsed = JSON.parse(data); } catch {}
@@ -234,7 +246,7 @@ export async function sendChatMessage(params: SendMessageParams): Promise<ChatAp
   let parsed: any;
 
   try {
-    ({ response, parsed } = await callChatFunction(accessToken, payload, params.onDelta, params.onThinkingDelta));
+    ({ response, parsed } = await callChatFunction(accessToken, payload, params.onDelta, params.onThinkingDelta, params.onStep));
   } catch (err: any) {
     // Network/timeout errors from callChatFunction
     throw err;
@@ -246,7 +258,7 @@ export async function sendChatMessage(params: SendMessageParams): Promise<ChatAp
       const refreshed = await supabase.auth.refreshSession();
       if (refreshed.data.session?.access_token) {
         accessToken = refreshed.data.session.access_token;
-        ({ response, parsed } = await callChatFunction(accessToken, payload, params.onDelta, params.onThinkingDelta));
+        ({ response, parsed } = await callChatFunction(accessToken, payload, params.onDelta, params.onThinkingDelta, params.onStep));
       }
     } catch {
       throw new Error('Sua sessao expirou. Faca login novamente.');
