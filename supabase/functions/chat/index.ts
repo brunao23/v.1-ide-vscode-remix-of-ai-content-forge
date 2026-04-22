@@ -1829,7 +1829,7 @@ async function callOpenAI(params: {
     },
     body: JSON.stringify({
       model: params.modelId,
-      max_tokens: params.maxTokens || 8000,
+      max_completion_tokens: params.maxTokens || 8000,
       messages: [
         { role: "system", content: params.systemPrompt },
         ...params.messages,
@@ -1917,7 +1917,7 @@ async function callOpenAIWithTools(params: {
 
     const reqBody: any = {
       model: params.modelId,
-      max_tokens: params.maxTokens || 8000,
+      max_completion_tokens: params.maxTokens || 8000,
       messages: apiMessages,
     };
     if (openAITools.length > 0) {
