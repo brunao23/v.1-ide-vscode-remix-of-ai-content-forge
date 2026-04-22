@@ -1897,7 +1897,23 @@ async function callOpenAIWithTools(params: {
   const openAITools = params.tools
     .map((t) => {
       if (t.type === "web_search_20260209" || t.name === "web_search") {
-        return { type: "web_search" };
+        return {
+          type: "function" as const,
+          function: {
+            name: "web_search",
+            description: "Busca informacoes atuais na web.",
+            parameters: {
+              type: "object",
+              properties: {
+                query: {
+                  type: "string",
+                  description: "A consulta de busca em portugues."
+                }
+              },
+              required: ["query"]
+            }
+          }
+        };
       }
       return {
         type: "function" as const,
@@ -3324,6 +3340,23 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
           }
           _sse("step", { type: "memory", status: "done", query: q, resultCount, chunks: chunkMatches.length > 0 ? chunkMatches.slice(0, 6) : undefined });
           return out;
+        }
+        if (toolName === "web_search") {
+          const q = String((toolInput as any).query || (toolInput as any).topic || "").slice(0, 120);
+          _sse("step", { type: "web", status: "searching", query: q });
+          if (!anthropicKey) return "Erro: API da Anthropic nao configurada para resolver busca web nativa.";
+          try {
+            const out = await runNativeWebSearch({
+              apiKey: anthropicKey,
+              modelId: "claude-3-5-haiku-20241022",
+              userMessage: q,
+              onStep: (s) => _sse("step", s),
+            });
+            return out;
+          } catch (e: any) {
+            console.error("Erro na busca web:", e);
+            return `Falha na busca web: ${e.message}`;
+          }
         }
         return toolExecutor(toolName, toolInput);
       };
