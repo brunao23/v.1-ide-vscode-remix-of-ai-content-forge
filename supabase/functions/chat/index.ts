@@ -2119,7 +2119,19 @@ Sintetize os resultados em um resumo direto, útil e em português brasileiro, c
   if (!synthesisText) return "";
   if (synthesisText.trim().startsWith("NAO_NECESSARIO")) return "";
 
-  return `\n\n## Contexto de Pesquisa Web (dados atuais pesquisados antes desta resposta)\n${synthesisText}`;
+  const allLinks: string[] = [];
+  for (const stb of serverToolBlocks) {
+    const resultBlock = webResultBlocks.find((r: any) => r.tool_use_id === stb.id);
+    if (resultBlock && Array.isArray(resultBlock.content)) {
+      for (const item of resultBlock.content as any[]) {
+        if (item.url) allLinks.push(`- ${item.title || item.url}: ${item.url}`);
+      }
+    }
+  }
+
+  const linksSection = allLinks.length > 0 ? `\n\n**Links da Pesquisa (FONTES):**\n${allLinks.join("\n")}` : "";
+
+  return `\n\n## Contexto de Pesquisa Web (dados atuais pesquisados antes desta resposta)\n${synthesisText}${linksSection}`;
 }
 
 async function callAnthropicWithTools(params: {
