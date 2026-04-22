@@ -113,8 +113,14 @@ export default function Header() {
                           isSelected ? 'bg-secondary' : 'hover:bg-[hsl(0_0%_23%)]'
                         }`}
                       >
-                        <span className="text-foreground">{model.name}</span>
-                        {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                        <div>
+                          <span className="block font-medium">{model.name}</span>
+                          <span className="block text-xs text-muted-foreground">{model.description}</span>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                          {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                        </div>
                       </button>
                     );
                   })}
@@ -131,8 +137,14 @@ export default function Header() {
                           isSelected ? 'bg-secondary' : 'hover:bg-[hsl(0_0%_23%)]'
                         }`}
                       >
-                        <span className="text-foreground">{model.name}</span>
-                        {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                        <div>
+                          <span className="block font-medium">{model.name}</span>
+                          <span className="block text-xs text-muted-foreground">{model.description}</span>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                          {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                        </div>
                       </button>
                     );
                   })}
@@ -164,8 +176,14 @@ export default function Header() {
                                 isSelected ? 'bg-secondary' : 'hover:bg-[hsl(0_0%_23%)]'
                               }`}
                             >
-                              <span className="text-foreground">{model.name}</span>
-                              {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                              <div>
+                                <span className="block font-medium">{model.name}</span>
+                                <span className="block text-xs text-muted-foreground">{model.description}</span>
+                              </div>
+                              <div className="flex items-center gap-2 ml-2 shrink-0">
+                                {model.badge && <span className="text-xs text-muted-foreground">{model.badge}</span>}
+                                {isSelected && <Check className="w-4 h-4 text-muted-foreground shrink-0" />}
+                              </div>
                             </button>
                           );
                         })}
