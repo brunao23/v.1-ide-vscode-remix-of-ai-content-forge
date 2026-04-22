@@ -9,6 +9,7 @@ import AulasPage from '@/pages/AulasPage';
 import MetricsDashboard from '@/pages/MetricsDashboard';
 import CalendarPage from '@/pages/CalendarPage';
 import NewsFeedPage from '@/pages/NewsFeedPage';
+import GemzAIPage from '@/pages/GemzAIPage';
 import AdminPage from '@/pages/AdminPage';
 import SuaJornadaPage from '@/pages/SuaJornadaPage';
 import { useChatStore } from '@/stores/chatStore';
@@ -52,6 +53,8 @@ export default function Index() {
         return <CalendarPage />;
       case 'news-feed':
         return <NewsFeedPage />;
+      case 'gemz-ai':
+        return <GemzAIPage />;
       case 'admin':
       case 'admin-insights':
         return <AdminPage tab="insights" />;

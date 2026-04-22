@@ -302,6 +302,53 @@ export default function MetricsDashboard() {
             })()}
           </>
         )}
+
+        {/* Glossário de Métricas */}
+        <div className="mt-10">
+          <h2 className="text-lg font-semibold mb-4">Glossário de Métricas</h2>
+          <div className="rounded-xl border border-border overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-muted/50">
+                  <th className="text-left px-4 py-3 font-semibold w-1/3">Métrica</th>
+                  <th className="text-left px-4 py-3 font-semibold">O que é</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Total Faturamento', 'Valor total de novos contratos fechados no mês'],
+                  ['Total de Cash Collected', 'Dinheiro que efetivamente entrou na conta (pode incluir parcelas de contratos antigos)'],
+                  ['Receita Recorrente Mensal (MRR)', 'Receita previsível que entra todo mês de assinaturas/contratos ativos'],
+                  ['Investimento em Anúncios', 'Quanto foi gasto com tráfego pago no mês'],
+                  ['Alcance de Anúncios (Instagram)', 'Número de pessoas únicas que viram os anúncios no Instagram'],
+                  ['Impressões de Anúncios (Instagram)', 'Número total de vezes que os anúncios foram exibidos (inclui repetições)'],
+                  ['CPM (Custo por Mil Impressões)', 'Custo para atingir 1.000 impressões — quanto menor, mais eficiente o anúncio'],
+                  ['Gasto Diário com Anúncios', 'Média de investimento em ads por dia (mensal dividido por 30)'],
+                  ['ROAS (Retorno sobre Anúncios)', 'Retorno sobre o investimento em anúncios — quantos reais voltam para cada real investido'],
+                  ['Novos Clientes', 'Quantidade de clientes que fecharam no mês'],
+                  ['Seguidores Instagram', 'Total de seguidores no canal de conteúdo curto (Instagram)'],
+                  ['Alcance Total (Instagram)', 'Alcance orgânico no Instagram ou impressões no LinkedIn'],
+                  ['Total de Posts Publicados', 'Quantidade de publicações feitas no mês'],
+                  ['Inscritos no Canal Youtube', 'Total de inscritos no YouTube'],
+                  ['Audiência Mensal Youtube', 'Espectadores únicos que assistiram ao canal no mês'],
+                  ['Visualizações no YouTube', 'Total de views nos vídeos do canal'],
+                  ['Horas Assistidas no YouTube', 'Tempo total de exibição (watch time) — métrica crucial para o algoritmo'],
+                  ['Vídeos/Podcasts Produzidos', 'Quantidade de conteúdos longos criados no mês'],
+                  ['Tamanho da Lista de E-mail', 'Total de contatos na base de e-mail marketing'],
+                  ['Novos Inscritos (E-mail)', 'Pessoas que entraram na lista no mês'],
+                  ['Novos Inscritos Líquidos', 'Novos inscritos menos descadastros — crescimento real da lista'],
+                  ['Despesas', 'Custos operacionais do mês'],
+                  ['Lucro', 'Receita menos despesas'],
+                ].map(([metric, description], i) => (
+                  <tr key={metric} className={i % 2 === 0 ? 'bg-background' : 'bg-muted/20'}>
+                    <td className="px-4 py-3 font-medium">{metric}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{description}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
   );

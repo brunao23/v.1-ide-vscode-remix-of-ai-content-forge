@@ -65,7 +65,7 @@ function shouldSearchWebPreview(
   historyMessages: OutgoingMessage[],
   latestUserText: string,
 ): boolean {
-  if (targetAgentId !== 'marketing-manager') return false;
+  if (targetAgentId !== 'diretora-criativa') return false;
   if (!latestUserText.trim()) return false;
   if (disablesWebSearch(latestUserText)) return false;
   if (containsResearchSignals(latestUserText)) return false;
@@ -83,7 +83,7 @@ function buildAssistantStages(params: {
   mode?: 'calendar' | 'idea';
   willSearchWeb: boolean;
 }): string[] {
-  if (params.targetAgentId !== 'marketing-manager') {
+  if (params.targetAgentId !== 'diretora-criativa') {
     return ['Analisando contexto...', 'Pensando...', 'Gerando resposta...'];
   }
 
@@ -97,7 +97,7 @@ function buildAssistantStages(params: {
     : ['Analisando contexto...', buildStage];
 }
 
-export default function ChatArea() {
+export default function ChatArea({ embedded = false }: { embedded?: boolean }) {
   const { user, activeTenant } = useAuth();
   const {
     activeAgentId,
@@ -227,7 +227,7 @@ export default function ChatArea() {
       });
 
       const currentMarketingMode =
-        targetAgentId === 'marketing-manager'
+        targetAgentId === 'diretora-criativa'
           ? (options?.marketingMode || marketingMode || 'calendar')
           : undefined;
 
@@ -275,13 +275,19 @@ export default function ChatArea() {
           .map((item) => ({ role: item.role, content: item.content }));
 
         let streamedContent = '';
+        let updateTimer: number | null = null;
         const handleDelta = (text: string) => {
           if (!stageCleared) {
             window.clearInterval(stageTimer);
             stageCleared = true;
           }
           streamedContent += text;
-          updateMessage(convId, assistantId, streamedContent);
+          if (!updateTimer) {
+            updateTimer = window.setTimeout(() => {
+              updateMessage(convId, assistantId, streamedContent);
+              updateTimer = null;
+            }, 30);
+          }
         };
 
         let streamingThinking = '';
@@ -347,6 +353,7 @@ export default function ChatArea() {
 
         if (!response) throw new Error('Resposta invalida do servidor. Tente novamente.');
 
+        if (updateTimer !== null) { window.clearTimeout(updateTimer); updateTimer = null; }
         if (!stageCleared) window.clearInterval(stageTimer);
 
         if (!stageCleared && response.webContext?.searched && response.webContext?.used) {
@@ -374,6 +381,7 @@ export default function ChatArea() {
                 extras.webSources = response.webContext.sources;
               }
               const liveStepsSnapshot = updatedMessages[msgIndex].liveSteps || [];
+              const hadLiveMemorySteps = liveStepsSnapshot.some((ls) => ls.type === 'memory');
               const detailedMemSteps = (response.documentsContext?.retrievalSteps || []).map((s) => {
                 const matchingLive = liveStepsSnapshot.find((ls) => ls.type === 'memory' && ls.query === s.query);
                 return {
@@ -384,11 +392,13 @@ export default function ChatArea() {
                   chunks: matchingLive?.chunks,
                 };
               });
-              const memSteps = detailedMemSteps.length > 0
-                ? detailedMemSteps
-                : response.documentsContext?.topic
-                  ? [{ type: 'memory' as const, query: response.documentsContext.topic, label: 'Contexto dos documentos' }]
-                  : [];
+              const memSteps = hadLiveMemorySteps
+                ? detailedMemSteps.length > 0
+                  ? detailedMemSteps
+                  : response.documentsContext?.topic
+                    ? [{ type: 'memory' as const, query: response.documentsContext.topic, label: 'Contexto dos documentos' }]
+                    : []
+                : [];
 
               const allWebSources = (response.webContext?.sources || [])
                 .slice(0, 5)
@@ -415,19 +425,11 @@ export default function ChatArea() {
                     }]
                   : [];
 
-              const RAG_AGENTS = new Set([
-                'icp-architect', 'arquiteta-perfil-icp', 'pillar-strategist',
-                'matrix-generator', 'marketing-manager', 'scriptwriter',
-                'copywriter-campanhas', 'expert-social-selling', 'criador-documento-oferta',
-                'estrategias-sprint-20k', 'arquiteta-workshops', 'feedback-conteudo',
-                'vsl-invisivel', 'amanda-ai', 'voz-de-marca',
-              ]);
-
               const allSteps = [...memSteps, ...webSteps];
               if (allSteps.length > 0) {
                 extras.agentSteps = allSteps;
               } else {
-                // Fallback 1: copy SSE live steps so they persist after streaming ends
+                // Fallback 1: copia SSE live steps para que persistam após o streaming
                 const currentLiveSteps = updatedMessages[msgIndex].liveSteps || [];
                 if (currentLiveSteps.length > 0) {
                   let webResultsAssigned = false;
@@ -439,8 +441,8 @@ export default function ChatArea() {
                     }
                     return { type: ls.type, query: ls.query, label: ls.label, resultCount: ls.resultCount, domains: ls.domains, results: ls.results, chunks: ls.chunks };
                   });
-                } else if (RAG_AGENTS.has(targetAgentId)) {
-                  // Fallback 2: synthetic step for RAG agents when no SSE events were received
+                } else if (hadLiveMemorySteps) {
+                  // Fallback 2: step sintético para qualquer agente que buscou memória via SSE
                   extras.agentSteps = [{
                     type: 'memory' as const,
                     query: promptText.slice(0, 120),
@@ -471,6 +473,7 @@ export default function ChatArea() {
           console.error('Falha ao salvar resposta do assistente:', error);
         });
       } catch (error: any) {
+        if (updateTimer !== null) { window.clearTimeout(updateTimer); updateTimer = null; }
         if (!stageCleared) window.clearInterval(stageTimer);
         const errMsg = String(error?.message || '');
         console.error('Chat error:', errMsg);
@@ -548,8 +551,8 @@ export default function ChatArea() {
   };
 
   return (
-    <div className="flex-1 flex flex-col min-w-0 h-screen">
-      <Header />
+    <div className={`flex-1 flex flex-col min-w-0 ${embedded ? 'overflow-hidden' : 'h-screen'}`}>
+      {!embedded && <Header />}
 
       <div className="flex-1 overflow-hidden relative flex flex-col">
         {isGated && agent ? (

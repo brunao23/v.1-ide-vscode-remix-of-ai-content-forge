@@ -46,7 +46,7 @@ const UI_TO_DB_TYPE: Record<string, string> = {
   'icp-architect': 'icp',
   'pillar-strategist': 'pilares',
   'matrix-generator': 'matriz',
-  'marketing-manager': 'calendario',
+  'diretora-criativa': 'calendario',
   'scriptwriter': 'roteiro',
   'voz-de-marca': 'outro',
   'other': 'outro',

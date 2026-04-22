@@ -86,7 +86,7 @@ export default function ChatInput({
   const handleSend = () => {
     if (!value.trim() || isStreaming) return;
     onSend(value.trim(), {
-      marketingMode: activeAgentId === 'marketing-manager' ? (marketingMode || undefined) : undefined,
+      marketingMode: activeAgentId === 'diretora-criativa' ? (marketingMode || undefined) : undefined,
     });
     setValue('');
     setAttachedFiles([]);
@@ -160,7 +160,7 @@ export default function ChatInput({
   return (
     <div className="px-4 pt-2 w-full max-w-3xl mx-auto pb-6" style={{ paddingBottom: 'max(24px, env(safe-area-inset-bottom))' }}>
       <div className="bg-secondary border border-border rounded-3xl px-4 py-3 focus-within:border-muted-foreground/40 transition-colors">
-        {activeAgentId === 'marketing-manager' && (
+        {activeAgentId === 'diretora-criativa' && (
           <div className="flex flex-wrap items-center gap-2 mb-3">
             <span className="text-xs text-muted-foreground">Modo:</span>
             <button

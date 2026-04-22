@@ -59,6 +59,7 @@ export interface Conversation {
   messages: Message[];
   createdAt: Date;
   updatedAt: Date;
+  conversationType?: string;
 }
 
 export interface Document {
@@ -76,7 +77,7 @@ export const AGENT_AVATARS: Record<string, string> = {
   'icp-architect': '/assets/agents/arquiteto-icp.png',
   'pillar-strategist': '/assets/agents/estrategista-pilares.png',
   'matrix-generator': '/assets/agents/gerador-matriz.png',
-  'marketing-manager': '/assets/agents/gerente-marketing.png',
+  'diretora-criativa': '/assets/agents/gerente-marketing.png',
   'scriptwriter': '/assets/agents/roteirista.png',
   'expert-social-selling': '/assets/agents/gerente-marketing.png',
   'criador-documento-oferta': '/assets/agents/brand-book.png',
@@ -178,8 +179,8 @@ export const AGENTS: Agent[] = [
     order: 5,
   },
   {
-    id: 'marketing-manager',
-    name: 'Gerente de Marketing',
+    id: 'diretora-criativa',
+    name: 'GABBY Diretora Criativa',
     description: 'Cria calendários mensais e estrutura ideias no padrão profissional',
     emoji: '📅',
     color: '#10B981',
@@ -196,12 +197,12 @@ export const AGENTS: Agent[] = [
   },
   {
     id: 'scriptwriter',
-    name: 'Roteirista de Infotainment',
+    name: 'GABBY Copywriter',
     description: 'Escreve roteiros de vídeo prontos para gravação no estilo infotainment',
     emoji: '🎬',
     color: '#EC4899',
     recommendedModel: 'Claude Opus 4.5',
-    requires: ['brand-book', 'market-research', 'icp-architect', 'pillar-strategist', 'matrix-generator', 'marketing-manager'],
+    requires: ['brand-book', 'market-research', 'icp-architect', 'pillar-strategist', 'matrix-generator', 'diretora-criativa'],
     outputDocument: 'Roteiro de Vídeo',
     starters: [
       'Escrever roteiro para minha ideia',
@@ -297,7 +298,7 @@ export const AGENTS: Agent[] = [
   },
   {
     id: 'feedback-conteudo',
-    name: 'Feedback de Conteúdo | Revisão Amanda AI',
+    name: 'GABBY Sombra',
     description: 'Analisa e fornece feedback detalhado sobre seu conteúdo com revisão inteligente',
     emoji: '✅',
     color: '#22C55E',

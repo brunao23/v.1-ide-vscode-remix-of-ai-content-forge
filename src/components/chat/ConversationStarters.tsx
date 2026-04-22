@@ -47,7 +47,7 @@ export default function ConversationStarters({
     'Evoluir uma ideia solta para conteúdo de alta conversão',
   ];
 
-  const startersToRender = agent.id === 'marketing-manager'
+  const startersToRender = agent.id === 'diretora-criativa'
     ? (marketingMode === 'idea' ? marketingIdeaStarters : marketingCalendarStarters)
     : agent.starters;
 
@@ -96,7 +96,7 @@ export default function ConversationStarters({
           {agent.description}
         </p>
 
-        {agent.id === 'marketing-manager' && (
+        {agent.id === 'diretora-criativa' && (
           <div className="mb-6">
             <p className="text-xs text-muted-foreground mb-2">Escolha o modo</p>
             <div className="flex flex-wrap justify-center gap-2.5">

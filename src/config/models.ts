@@ -1,8 +1,8 @@
 export interface AIModel {
   id: string;
   name: string;
-  provider: 'anthropic' | 'openai' | 'google';
-  runtimeProvider?: 'anthropic' | 'openai' | 'openrouter';
+  provider: 'anthropic' | 'openai';
+  runtimeProvider?: 'anthropic' | 'openai';
   apiModelId: string;
   description: string;
   supportsExtendedThinking: boolean;
@@ -13,35 +13,46 @@ export interface AIModel {
 
 export const AI_MODELS: AIModel[] = [
   {
-    id: 'gpt-4.1-nano',
-    name: 'GPT-4.1 Nano',
+    id: 'gpt-5.4-nano',
+    name: 'GPT-5.4 Nano',
     provider: 'openai',
     runtimeProvider: 'openai',
-    apiModelId: 'gpt-4.1-nano',
-    description: 'Mais rapido para tarefas simples',
+    apiModelId: 'gpt-5.4-nano',
+    description: 'Mais rapido para tarefas simples (2026)',
     supportsExtendedThinking: false,
-    maxTokens: 4000,
+    maxTokens: 8000,
     badge: 'Rapido',
   },
   {
-    id: 'gpt-4.1-mini',
-    name: 'GPT-4.1 Mini',
+    id: 'gpt-5.4-mini',
+    name: 'GPT-5.4 Mini',
     provider: 'openai',
     runtimeProvider: 'openai',
-    apiModelId: 'gpt-4.1-mini',
-    description: 'Equilibrio entre velocidade e qualidade',
+    apiModelId: 'gpt-5.4-mini',
+    description: 'Equilibrio ideal (2026)',
     supportsExtendedThinking: false,
-    maxTokens: 8000,
+    maxTokens: 16000,
   },
   {
-    id: 'gpt-4.1',
-    name: 'GPT-4.1',
+    id: 'gpt-5.4',
+    name: 'GPT-5.4',
     provider: 'openai',
     runtimeProvider: 'openai',
-    apiModelId: 'gpt-4.1',
-    description: 'Modelo de alta qualidade para tarefas complexas',
-    supportsExtendedThinking: false,
-    maxTokens: 12000,
+    apiModelId: 'gpt-5.4',
+    description: 'Alta capacidade de raciocinio',
+    supportsExtendedThinking: true,
+    maxTokens: 32000,
+  },
+  {
+    id: 'gpt-5.4-pro',
+    name: 'GPT-5.4 Pro',
+    provider: 'openai',
+    runtimeProvider: 'openai',
+    apiModelId: 'gpt-5.4-pro',
+    description: 'O mais avancado e poderoso da OpenAI',
+    supportsExtendedThinking: true,
+    maxTokens: 64000,
+    badge: 'Novo 2026',
   },
   {
     id: 'claude-opus-4-7',
@@ -118,38 +129,6 @@ export const AI_MODELS: AIModel[] = [
     supportsExtendedThinking: false,
     maxTokens: 4000,
     badge: 'Rapido',
-  },
-  {
-    id: 'gemini-2.5-pro',
-    name: 'Gemini 2.5 Pro',
-    provider: 'google',
-    runtimeProvider: 'openrouter',
-    apiModelId: 'google/gemini-2.5-pro',
-    description: 'Raciocinio complexo e contexto longo',
-    supportsExtendedThinking: true,
-    maxTokens: 12000,
-  },
-  {
-    id: 'gemini-2.5-flash',
-    name: 'Gemini 2.5 Flash',
-    provider: 'google',
-    runtimeProvider: 'openrouter',
-    apiModelId: 'google/gemini-2.5-flash',
-    description: 'Equilibrio entre velocidade e qualidade',
-    supportsExtendedThinking: true,
-    maxTokens: 8000,
-    badge: 'Rapido',
-  },
-  {
-    id: 'gemini-2.5-flash-lite',
-    name: 'Gemini 2.5 Flash Lite',
-    provider: 'google',
-    runtimeProvider: 'openrouter',
-    apiModelId: 'google/gemini-2.5-flash-lite',
-    description: 'Ultra rapido para tarefas simples',
-    supportsExtendedThinking: true,
-    maxTokens: 4000,
-    badge: 'Mais rapido',
   },
 ];
 

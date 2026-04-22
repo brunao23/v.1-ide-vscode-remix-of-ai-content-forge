@@ -16,6 +16,7 @@ import {
   Moon,
   Newspaper,
   PanelLeft,
+  Sparkles,
   Pencil,
   Search,
   Settings,
@@ -175,6 +176,7 @@ export default function Sidebar() {
                 <SlimNavItem icon={<ClipboardCheck className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Implementação" active={activePage === "implementation"} onClick={() => setActivePage("implementation")} />
                 <SlimNavItem icon={<BarChart3 className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Métricas" active={activePage === "metrics"} onClick={() => setActivePage("metrics")} />
                 <SlimNavItem icon={<Newspaper className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="News Feed" active={activePage === "news-feed"} onClick={() => setActivePage("news-feed")} />
+                <SlimNavItem icon={<Sparkles className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="GEMZ AI" active={activePage === "gemz-ai"} onClick={() => setActivePage("gemz-ai")} />
               </>
             )}
             {isAdminMode && (
@@ -342,6 +344,7 @@ function ExpandedSidebar({
             <NavItem icon={<ClipboardCheck className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Implementação" active={activePage === "implementation"} onClick={() => navigate("implementation")} />
             <NavItem icon={<BarChart3 className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="Métricas" active={activePage === "metrics"} onClick={() => navigate("metrics")} />
             <NavItem icon={<Newspaper className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="News Feed" active={activePage === "news-feed"} onClick={() => navigate("news-feed")} />
+            <NavItem icon={<Sparkles className="w-[18px] h-[18px]" strokeWidth={1.5} />} label="GEMZ AI" active={activePage === "gemz-ai"} onClick={() => navigate("gemz-ai")} />
           </>
         )}
         {isAdminMode && (

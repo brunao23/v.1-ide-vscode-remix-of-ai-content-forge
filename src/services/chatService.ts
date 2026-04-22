@@ -17,7 +17,7 @@ const AGENT_SYSTEM_PROMPTS: Record<string, string> = {
     'Voce e o Estrategista de Pilares. Defina pilares e subpilares de conteudo alinhados a marca e ao publico.',
   'matrix-generator':
     'Voce e o Gerador de Matriz. Crie combinacoes de big ideas cruzando pilares, formatos e angulos.',
-  'marketing-manager':
+  'diretora-criativa':
     'Voce e o Gerente de Marketing. Monte calendario de conteudo com objetivos, formatos e cadencia claros.',
   'scriptwriter':
     'Voce e o Roteirista de Infotainment. Escreva roteiros curtos, longos e newsletter com ganchos, narrativa e CTA.',
@@ -215,10 +215,7 @@ async function callChatFunction(
 export async function sendChatMessage(params: SendMessageParams): Promise<ChatApiResponse> {
   const model = getModelById(params.modelId);
   const actualThinking = Boolean(model?.supportsExtendedThinking && params.extendedThinking);
-  const modelProvider =
-    model?.runtimeProvider ||
-    (model?.provider === 'google' ? 'openrouter' : model?.provider) ||
-    'anthropic';
+  const modelProvider = model?.runtimeProvider || model?.provider || 'anthropic';
 
   const payload = {
     messages: params.messages,

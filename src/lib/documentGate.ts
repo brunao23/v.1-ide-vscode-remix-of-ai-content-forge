@@ -7,7 +7,7 @@ export const AGENT_TO_DOC_TYPE: Record<string, string> = {
   'icp-architect': 'icp',
   'pillar-strategist': 'pilares',
   'matrix-generator': 'matriz',
-  'marketing-manager': 'calendario',
+  'diretora-criativa': 'calendario',
   'scriptwriter': 'roteiro',
 };
 
@@ -18,7 +18,7 @@ export const DOC_TYPE_TO_AGENT: Record<string, string> = {
   'icp': 'icp-architect',
   'pilares': 'pillar-strategist',
   'matriz': 'matrix-generator',
-  'calendario': 'marketing-manager',
+  'calendario': 'diretora-criativa',
   'roteiro': 'scriptwriter',
 };
 

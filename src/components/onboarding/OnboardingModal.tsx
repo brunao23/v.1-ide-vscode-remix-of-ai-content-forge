@@ -13,7 +13,7 @@ const FOUNDATION_STEPS = [
   { id: 'icp-architect',    label: 'Mapa do ICP',         sub: 'Cliente ideal detalhado',      color: '#DCD6C8' },
   { id: 'pillar-strategist', label: 'Pilares de Conteúdo', sub: 'Temas estratégicos',          color: '#DCD6C8' },
   { id: 'matrix-generator', label: 'Matriz de Conteúdo',  sub: '1000 Big Ideas',               color: '#DCD6C8' },
-  { id: 'marketing-manager', label: 'Calendário Editorial', sub: 'Planejamento mensal',        color: '#DCD6C8' },
+  { id: 'diretora-criativa', label: 'Calendário Editorial', sub: 'Planejamento mensal',        color: '#DCD6C8' },
 ];
 
 const slideVariants = {
@@ -231,7 +231,7 @@ function StepAgents() {
         {[
           { label: 'Vendas e Produto',       agents: ['brand-book', 'icp-architect'] },
           { label: 'Estratégia e Sistemas',  agents: ['market-research', 'pillar-strategist'] },
-          { label: 'Conteúdo',               agents: ['matrix-generator', 'marketing-manager', 'scriptwriter'] },
+          { label: 'Conteúdo',               agents: ['matrix-generator', 'diretora-criativa', 'scriptwriter'] },
         ].map(({ label, agents }, gi) => (
           <motion.div
             key={label}

@@ -23,10 +23,13 @@ interface ChatState {
     | 'admin'
     | 'admin-insights'
     | 'admin-global'
-    | 'admin-access';
+    | 'admin-access'
+    | 'gemz-ai'
+    | 'jornada';
 
   setActiveAgent: (agentId: string) => void;
   setActiveAgentContext: (agentId: string) => void;
+  setGemzAgent: (agentId: string) => void;
   setSidebarOpen: (open: boolean) => void;
   setSelectedModel: (model: string) => void;
   setThinkingMode: (on: boolean) => void;
@@ -45,6 +48,8 @@ interface ChatState {
       | 'admin-insights'
       | 'admin-global'
       | 'admin-access'
+      | 'gemz-ai'
+      | 'jornada'
   ) => void;
   createConversation: (agentId: string) => string;
   setActiveConversation: (id: string | null) => void;
@@ -70,7 +75,8 @@ export const useChatStore = create<ChatState>()(
 
   setActiveAgent: (agentId) => set({ activeAgentId: agentId, activeConversationId: null, activePage: 'chat' }),
   setActiveAgentContext: (agentId) => set({ activeAgentId: agentId, activePage: 'chat' }),
-  setActivePage: (page) => set({ activePage: page, ...(page !== 'chat' ? { activeAgentId: '' } : {}) }),
+  setGemzAgent: (agentId) => set({ activeAgentId: agentId, activeConversationId: null, activePage: 'gemz-ai' }),
+  setActivePage: (page) => set({ activePage: page, ...(page !== 'chat' && page !== 'gemz-ai' ? { activeAgentId: '' } : {}) }),
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
   setSelectedModel: (model) =>
     set((state) => {

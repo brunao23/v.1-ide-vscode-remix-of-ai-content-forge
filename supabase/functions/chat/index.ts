@@ -21,7 +21,7 @@ const DOCUMENT_CONTEXT_AGENT_FALLBACK = new Set([
   "arquiteta-perfil-icp",
   "pillar-strategist",
   "matrix-generator",
-  "marketing-manager",
+  "diretora-criativa",
   "scriptwriter",
   "copywriter-campanhas",
   "expert-social-selling",
@@ -40,7 +40,7 @@ const DEFAULT_DOCUMENT_TYPES_BY_AGENT: Record<string, string[]> = {
   "arquiteta-perfil-icp": ["brand-book", "pesquisa", "icp"],
   "pillar-strategist": ["brand-book", "pesquisa", "icp", "pilares"],
   "matrix-generator": ["brand-book", "pesquisa", "icp", "pilares", "matriz"],
-  "marketing-manager": ["brand-book", "pesquisa", "icp", "pilares", "matriz"],
+  "diretora-criativa": ["brand-book", "pesquisa", "icp", "pilares", "matriz"],
   "scriptwriter": [
     "brand-book",
     "pesquisa",
@@ -116,7 +116,7 @@ const AGENT_TO_DOCUMENT_TYPE: Record<string, string> = {
   "icp-architect": "icp",
   "pillar-strategist": "pilares",
   "matrix-generator": "matriz",
-  "marketing-manager": "calendario",
+  "diretora-criativa": "calendario",
   "scriptwriter": "roteiro",
   "copywriter-campanhas": "roteiro",
   "voz-de-marca": "outro",
@@ -128,7 +128,7 @@ const DOCUMENT_TYPE_ALIASES: Record<string, string[]> = {
   "icp": ["icp", "icp-architect", "arquiteto-icp", "mapa do icp"],
   "pilares": ["pilares", "pillar-strategist", "pilar"],
   "matriz": ["matriz", "matrix-generator", "matriz de ideias"],
-  "calendario": ["calendario", "calendar", "marketing-manager", "gerente de marketing"],
+  "calendario": ["calendario", "calendar", "diretora-criativa", "gerente de marketing"],
   "roteiro": ["roteiro", "scriptwriter", "copywriter-campanhas", "copywriter campanhas"],
   "outro": ["outro", "other", "voz-de-marca", "voz de marca", "voice-profile"],
 };
@@ -169,7 +169,7 @@ type AgentPromptConfig = {
   uses_documents_context: boolean;
 };
 
-type RuntimeModelProvider = "anthropic" | "openai" | "openrouter";
+type RuntimeModelProvider = "anthropic" | "openai";
 type MarketingMode = "calendar" | "idea";
 type ThinkingEffort = "low" | "medium" | "high" | "xhigh" | "max";
 type AnthropicThinkingResolution = {
@@ -230,49 +230,12 @@ function isOpenAIModel(modelId: string): boolean {
   return normalized.startsWith("gpt-") || normalized.startsWith("o");
 }
 
-function mapModelToOpenRouter(modelId: string): string {
-  if (!modelId) return "openrouter/auto";
-
-  const normalized = String(modelId).trim();
-  const lower = normalized.toLowerCase();
-
-  const knownMappings: Record<string, string> = {
-    "claude-opus-4-7": "anthropic/claude-opus-4.7",
-    "claude-opus-4-6": "anthropic/claude-opus-4.6",
-    "claude-sonnet-4-6": "anthropic/claude-sonnet-4.6",
-    "claude-haiku-4-5-20251001": "anthropic/claude-haiku-4.5",
-    "claude-haiku-4-5": "anthropic/claude-haiku-4.5",
-    "claude-opus-4-20250514": "anthropic/claude-opus-4",
-    "claude-sonnet-4-20250514": "anthropic/claude-sonnet-4",
-    "claude-3-5-haiku-20241022": "anthropic/claude-3.5-haiku",
-    // backward compatibility with previous ids used in the app
-    "claude-opus-4-5-20250514": "anthropic/claude-opus-4",
-    "claude-sonnet-4-5-20250514": "anthropic/claude-sonnet-4",
-    "claude-haiku-4-5-20250514": "anthropic/claude-3.5-haiku",
-  };
-
-  if (knownMappings[lower]) {
-    return knownMappings[lower];
-  }
-
-  if (lower.startsWith("anthropic/") || lower.includes("/")) {
-    return normalized;
-  }
-
-  if (lower.startsWith("claude-")) {
-    return `anthropic/${lower}`;
-  }
-
-  return normalized || "openrouter/auto";
-}
-
 function inferProviderFromModelId(modelId: string): RuntimeModelProvider {
   const normalized = String(modelId || "").trim().toLowerCase();
   if (!normalized) return "anthropic";
-  if (normalized.includes("/")) return "openrouter";
   if (isAnthropicModel(normalized)) return "anthropic";
   if (isOpenAIModel(normalized)) return "openai";
-  return "openrouter";
+  return "anthropic";
 }
 
 function resolveEffectiveProvider(
@@ -442,13 +405,6 @@ function isTransientUpstreamError(error: any): boolean {
   );
 }
 
-function shouldFallbackToOpenRouter(error: any): boolean {
-  if (isAuthenticationError(error)) return true;
-  if (isTransientUpstreamError(error)) return true;
-  const status = getProviderErrorStatus(error);
-  return status >= 500;
-}
-
 function wrapProviderError(provider: string, error: any): Error {
   const status = getProviderErrorStatus(error);
   const message = String(
@@ -468,41 +424,7 @@ async function waitForRetry(ms: number): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function extractAffordableTokensFromOpenRouterError(rawErrorText: string): number | null {
-  const errorText = String(rawErrorText || "");
-  const match = errorText.match(/can only afford\s+(\d+)/i);
-  if (!match) return null;
-  const parsed = Number(match[1]);
-  if (!Number.isFinite(parsed) || parsed <= 0) return null;
-  return Math.floor(parsed);
-}
-
-function extractPromptTokenLimitFromOpenRouterError(
-  rawErrorText: string,
-): { promptTokens: number; promptLimit: number } | null {
-  const errorText = String(rawErrorText || "");
-  const match = errorText.match(/prompt tokens limit exceeded:\s*(\d+)\s*>\s*(\d+)/i);
-  if (!match) return null;
-
-  const promptTokens = Number(match[1]);
-  const promptLimit = Number(match[2]);
-
-  if (
-    !Number.isFinite(promptTokens) ||
-    !Number.isFinite(promptLimit) ||
-    promptTokens <= 0 ||
-    promptLimit <= 0
-  ) {
-    return null;
-  }
-
-  return {
-    promptTokens: Math.floor(promptTokens),
-    promptLimit: Math.floor(promptLimit),
-  };
-}
-
-// â"€â"€â"€ Model pricing (USD per million tokens) â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
+// ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ Model pricing (USD per million tokens) ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬
 
 function getModelPricing(modelId: string): { inputPerM: number; outputPerM: number } {
   const id = (modelId || "").toLowerCase();
@@ -524,6 +446,10 @@ function getModelPricing(modelId: string): { inputPerM: number; outputPerM: numb
   if (id.includes("gpt-4.1-nano")) return { inputPerM: 0.10, outputPerM: 0.40 };
   if (id.includes("gpt-4.1-mini")) return { inputPerM: 0.40, outputPerM: 1.60 };
   if (id.includes("gpt-4.1")) return { inputPerM: 2.00, outputPerM: 8.00 };
+  if (id.includes("gpt-5.4-nano")) return { inputPerM: 0.10, outputPerM: 0.40 };
+  if (id.includes("gpt-5.4-mini")) return { inputPerM: 0.40, outputPerM: 1.60 };
+  if (id.includes("gpt-5.4-pro")) return { inputPerM: 5.00, outputPerM: 20.00 };
+  if (id.includes("gpt-5.4")) return { inputPerM: 2.00, outputPerM: 8.00 };
   // Gemini
   if (id.includes("gemini-2.5-pro")) return { inputPerM: 1.25, outputPerM: 10 };
   if (id.includes("gemini-2.5-flash")) return { inputPerM: 0.15, outputPerM: 0.60 };
@@ -598,11 +524,7 @@ function trimMessagesToTokenBudget(
 
 function normalizeModelProvider(value: unknown): RuntimeModelProvider | null {
   const provider = String(value || "").trim().toLowerCase();
-  if (
-    provider === "anthropic" ||
-    provider === "openai" ||
-    provider === "openrouter"
-  ) {
+  if (provider === "anthropic" || provider === "openai") {
     return provider;
   }
   return null;
@@ -809,15 +731,25 @@ function hasRecentResearchInConversation(messages: ChatMessage[]): boolean {
 
 function marketingResearchAutoTrigger(text: string): boolean {
   const n = normalizeIntentText(text);
-  // Only auto-trigger for substantive messages
-  if (n.length < 40) return false;
+  if (n.length < 8) return false;
+
+  // "sobre X" pattern — user responding with a concrete topic
+  if (/^sobre\s+\w/.test(n) && n.length >= 10) return true;
+
+  // Short topic messages (≥15 chars) with high-signal keywords
+  const highSignalKeywords = [
+    "ia", "inteligencia artificial", "agente", "agentes", "chatgpt", "llm",
+    "tendencia", "tendencias", "mercado", "viral", "o que bomba", "o que funciona",
+    "temas quentes", "o que ta em alta", "recente", "atualmente",
+  ];
+  if (n.length >= 15 && highSignalKeywords.some((s) => n.includes(s))) return true;
+
+  // Longer messages with broader research signals (original logic, lowered to 25 chars)
+  if (n.length < 25) return false;
   const signals = [
-    "tendencia", "tendencias", "mercado", "concorrente", "concorrencia",
-    "competidor", "dado", "dados", "estatistica", "estatisticas",
-    "pesquisa de mercado", "analise de mercado",
-    "o que esta", "como esta", "atualmente", "hoje em dia", "recente",
-    "ultimos meses", "viral", "o que bomba", "o que funciona",
-    "temas quentes", "assuntos quentes", "o que ta em alta",
+    "concorrente", "concorrencia", "competidor", "dado", "dados",
+    "estatistica", "estatisticas", "pesquisa de mercado", "analise de mercado",
+    "o que esta", "como esta", "hoje em dia", "ultimos meses",
     "estrategia de conteudo", "planejamento de conteudo",
     "ideias de conteudo", "roteiro", "campanha", "lancamento",
   ];
@@ -882,10 +814,25 @@ function isSearchTriggerMessage(text: string): boolean {
     "enriquecer com alguma busca", "enriquecer com busca",
     "preciso de mais dados", "buscar mais informacoes",
     "pesquisar mais", "buscar na web", "pesquisar na web",
+    "busque na web", "busque novamente", "busca novamente",
+    "pesquise na web", "pesquise novamente", "faz busca",
+    "faca a busca", "faca busca", "faz a busca",
+    "tente novamente", "tenta novamente", "tente buscar",
+    "isso na web", "isso ai na web", "pesquisa isso",
+    "busca isso", "pesquise isso", "busque isso",
+    "faz isso na web", "faz essa busca", "faz essa pesquisa",
   ];
-  const hasOnlySearchRequest = searchPhrases.some((p) => n.includes(p));
-  // If it's a short sentence (< 60 chars) that's mainly asking for search, treat as trigger
-  return hasOnlySearchRequest && n.length < 80;
+  const matchedPhrase = searchPhrases.find((p) => n.includes(p));
+  if (!matchedPhrase) return false;
+
+  // Strip the trigger phrase and check if substantial topic content remains.
+  // "busca na web" → remainder="" → pure trigger ✓
+  // "preciso que voce busque na web uma ideia sobre IA" → remainder has 6 words → NOT a trigger
+  const remainder = n.replace(matchedPhrase, "").replace(/\s+/g, " ").trim();
+  const remainderWords = remainder.split(/\s+/).filter((w) => w.length > 2);
+  if (remainderWords.length >= 3) return false;
+
+  return n.length < 80;
 }
 
 /**
@@ -918,221 +865,61 @@ function extractConversationTopic(messages: ChatMessage[], latestUserText: strin
   return latestUserText;
 }
 
-async function callPerplexitySearch(
-  apiKey: string,
-  query: string,
-  maxResults = 4,
-): Promise<Array<{ title: string; url: string; summary: string }>> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 25000);
 
-  try {
-    const response = await fetch("https://api.perplexity.ai/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "sonar-pro",
-        messages: [{ role: "user", content: query }],
-        max_tokens: 1200,
-        return_citations: true,
-        search_recency_filter: "month",
-      }),
-      signal: controller.signal,
-    });
+function extractMarketResearchContext(messages: ChatMessage[], fallback: string): string {
+  const userMessages = messages
+    .filter((m) => m.role === "user")
+    .map((m) => String(m.content || "").trim())
+    .filter((t) => t.length >= 5);
 
-    const rawText = await response.text();
-    if (!response.ok) {
-      console.error(`Perplexity /chat/completions failed (${response.status}): ${rawText?.slice(0, 300)}`);
-      return [];
-    }
+  if (userMessages.length === 0) return fallback;
+  if (userMessages.length === 1) return userMessages[0];
 
-    let parsed: any = null;
-    try {
-      parsed = rawText ? JSON.parse(rawText) : {};
-    } catch {
-      return [];
-    }
+  // Filter out purely vague generic messages that carry no topical content
+  const businessKeywords =
+    /mercado|nicho|setor|industria|segmento|curso|mentoria|coaching|consultoria|ecommerce|loja|produto|servico|marca|negocio|empresa|cliente|publico|audiencia|vendo|vender|ofere[ÃƒÂ§c]o|atendo|trabalh/i;
 
-    // sonar-pro returns { choices: [{message:{content}}], citations: ["url1","url2",...] }
-    const content = String(parsed?.choices?.[0]?.message?.content || "").trim();
-    const citations: string[] = Array.isArray(parsed?.citations) ? parsed.citations : [];
-
-    if (!content) return [];
-
-    const results: Array<{ title: string; url: string; summary: string }> = [];
-
-    // Split content into paragraphs to create structured results
-    const paragraphs = content.split(/\n+/).filter((p: string) => p.trim().length > 40);
-    const usedParagraphs = paragraphs.slice(0, maxResults);
-
-    // Map paragraphs to results, attaching citations when available
-    for (let i = 0; i < Math.max(usedParagraphs.length, Math.min(citations.length, maxResults)); i++) {
-      const url = citations[i] || "";
-      const summary = usedParagraphs[i] || (i === 0 ? content.slice(0, 800) : "");
-      if (!summary && !url) continue;
-      results.push({
-        title: url ? url.replace(/^https?:\/\/(www\.)?/, "").split("/")[0] : `Resultado ${i + 1}`,
-        url,
-        summary: summary.slice(0, 700),
-      });
-    }
-
-    // If we have only 1 result but multiple citations, add remaining citations as sources
-    if (results.length <= 1 && citations.length > 1) {
-      for (let i = results.length; i < Math.min(citations.length, maxResults); i++) {
-        results.push({
-          title: citations[i].replace(/^https?:\/\/(www\.)?/, "").split("/")[0],
-          url: citations[i],
-          summary: content.slice(0, 500),
-        });
-      }
-    }
-
-    console.log(`[Perplexity sonar-pro] query="${query.slice(0, 80)}" → ${results.length} results, ${citations.length} citations`);
-    return results;
-  } catch (err: any) {
-    const msg = err?.name === "AbortError"
-      ? `Perplexity timeout: ${query.slice(0, 60)}`
-      : `Perplexity error: ${String(err?.message || err).slice(0, 150)}`;
-    console.error(msg);
-    return [];
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-async function buildMarketingManagerWebContext(params: {
-  apiKey: string;
-  userPrompt: string;
-  messages: ChatMessage[];
-  mode: MarketingMode;
-}): Promise<{
-  context: string;
-  queryCount: number;
-  resultCount: number;
-  sources: Array<{ title: string; url: string; summary: string }>;
-  steps: MarketingWebStepResult[];
-  topic: string;
-}> {
-  const realTopic = extractConversationTopic(params.messages, params.userPrompt).slice(0, 420);
-  const searchPlan = buildMarketingWebSearchPlan(realTopic, params.mode);
-
-  const budgetMs = 30_000;
-  const startedAt = Date.now();
-  const rawResults: Array<{ title: string; url: string; summary: string; query: string; label: string }> = [];
-  const stepResults: MarketingWebStepResult[] = [];
-
-  for (const step of searchPlan) {
-    if (Date.now() - startedAt > budgetMs) {
-      console.warn(`[WebSearch] budget exceeded (${budgetMs}ms), stopping at step: ${step.label}`);
-      break;
-    }
-
-    const results = await callPerplexitySearch(params.apiKey, step.query, step.maxResults);
-    const uniqueDomains = Array.from(
-      new Set(
-        results
-          .map((item) => parseDomain(item.url))
-          .filter((domain) => Boolean(domain)),
-      ),
-    ).slice(0, 6);
-
-    stepResults.push({
-      label: step.label,
-      query: step.query,
-      resultCount: results.length,
-      domains: uniqueDomains,
-    });
-
-    rawResults.push(
-      ...results.map((item) => ({
-        ...item,
-        query: step.query,
-        label: step.label,
-      })),
-    );
-  }
-
-  // Deduplicate by URL first
-  const dedupedByUrl = Array.from(
-    new Map(rawResults.filter((item) => item.url).map((item) => [item.url.toLowerCase(), item])).values(),
+  const substantive = userMessages.filter(
+    (t) => t.length > 40 || businessKeywords.test(t),
   );
 
-  // Keep source diversity (max 2 entries per domain)
-  const selected: Array<{ title: string; url: string; summary: string; query: string; label: string }> = [];
-  const perDomain = new Map<string, number>();
-  for (const item of dedupedByUrl) {
-    if (selected.length >= 14) break;
-    const domain = parseDomain(item.url);
-    const current = perDomain.get(domain) || 0;
-    if (domain && current >= 2) continue;
-    selected.push(item);
-    if (domain) {
-      perDomain.set(domain, current + 1);
-    }
-  }
-
-  let context = "## PESQUISA WEB PARCELADA\n";
-  context += `Topico pesquisado: "${realTopic}"\n`;
-  context += `Modo selecionado: ${params.mode === "calendar" ? "calendario" : "ideia solta"}.\n\n`;
-  context += "### INSTRUCOES DE USO DOS DADOS (OBRIGATORIO)\n";
-  context += "- Use os dados abaixo como premissas factuais da resposta.\n";
-  context += "- Conecte cada insight diretamente ao pedido do usuario.\n";
-  context += "- Cite fonte real sempre que usar dado numerico ou afirmacao objetiva.\n";
-  context += "- Nunca invente URL. Se nao houver URL exata, cite apenas o nome da fonte.\n\n";
-
-  if (stepResults.length > 0) {
-    context += "### ETAPAS EXECUTADAS\n";
-    stepResults.forEach((step, index) => {
-      context += `- Etapa ${index + 1}: ${step.label} | resultados: ${step.resultCount}\n`;
-      context += `  consulta: ${step.query}\n`;
-    });
-    context += "\n";
-  }
-
-  if (selected.length === 0) {
-    context += "### DADOS ENCONTRADOS\nNenhum resultado confiavel retornado pela pesquisa web nesta tentativa.\n";
-  } else {
-    context += "### DADOS ENCONTRADOS (POR ETAPA)\n";
-    const byLabel = new Map<string, Array<{ title: string; url: string; summary: string; query: string; label: string }>>();
-    for (const item of selected) {
-      const list = byLabel.get(item.label) || [];
-      list.push(item);
-      byLabel.set(item.label, list);
-    }
-
-    let globalIndex = 1;
-    for (const [label, items] of byLabel.entries()) {
-      context += `\n#### ${label}\n`;
-      for (const item of items) {
-        context += `\n[${globalIndex}] ${item.title}\n`;
-        context += `URL: ${item.url}\n`;
-        context += `Resumo: ${item.summary || "Sem resumo"}\n`;
-        globalIndex += 1;
-      }
-    }
-  }
-
-  const sources = selected
-    .filter((item) => item.url)
-    .map((item) => ({
-      title: item.title,
-      url: item.url,
-      summary: item.summary,
-    }));
-
-  return {
-    context,
-    queryCount: stepResults.length,
-    resultCount: selected.length,
-    sources,
-    steps: stepResults,
-    topic: realTopic,
-  };
+  const toUse = substantive.length > 0 ? substantive : userMessages;
+  return toUse.join(" | ").slice(0, 420);
 }
+
+function extractTopicFromDocContent(content: string): string {
+  // Strategy 1: extract value from labeled fields (e.g. "Setor: educaÃƒÂ§ÃƒÂ£o digital")
+  const fieldRe = /(?:setor|mercado|nicho|segmento|area de atuacao|industria|produto principal|servico principal)\s*[:Ã¢â‚¬â€œ\-]\s*([^\n]{5,160})/gi;
+  const fieldMatches: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = fieldRe.exec(content)) !== null) {
+    const val = m[1].replace(/\*\*/g, "").replace(/\*/g, "").trim();
+    if (val.length > 4) fieldMatches.push(val);
+  }
+  if (fieldMatches.length > 0) return fieldMatches.slice(0, 2).join(", ").slice(0, 220);
+
+  // Strategy 2: clean lines that are substantive but not document titles
+  const stripped = content
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/\*\*/g, "")
+    .replace(/\*/g, "")
+    .replace(/`/g, "")
+    .replace(/\[.*?\]\(.*?\)/g, "")
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) =>
+      l.length > 20 &&
+      l.length < 130 &&
+      !/^(mapeamento|perfil do cliente|arquiteto|criado por|elaborado|documento de|icp -|brand book -)/i.test(l),
+    );
+
+  const businessRe =
+    /mercado|nicho|setor|industria|atua|trabalha|produto|servico|publico|vende|negocio|mentor|coach|consult|curso|treinam|segmento|oferta/i;
+  const businessLines = stripped.filter((l) => businessRe.test(l));
+  const toUse = businessLines.length > 0 ? businessLines : stripped;
+  return toUse.slice(0, 3).join(", ").replace(/\s+/g, " ").trim().slice(0, 220);
+}
+
 function normalizeTypeToken(value: string): string {
   return normalizeIntentText(value).replace(/[\s_]+/g, "-").trim();
 }
@@ -1169,7 +956,7 @@ function isDocumentConsultIntent(text: string): boolean {
     normalized.includes("revisar") ||
     normalized.includes("revisao") ||
     normalized.includes("rever") ||
-    normalized.includes("revisÃ£o") ||
+    normalized.includes("revisÃƒÆ’Ã‚Â£o") ||
     normalized.includes("consultar") ||
     normalized.includes("analisar") ||
     normalized.includes("existente") ||
@@ -1179,7 +966,7 @@ function isDocumentConsultIntent(text: string): boolean {
     normalized.includes("meu brand book") ||
     normalized.includes("meu brandbook") ||
     normalized.includes("ja tenho") ||
-    normalized.includes("jÃ¡ tenho") ||
+    normalized.includes("jÃƒÆ’Ã‚Â¡ tenho") ||
     normalized.includes("com base no meu")
   );
 }
@@ -1759,7 +1546,7 @@ async function callAnthropic(params: {
   messages: ChatMessage[];
   timeoutMs?: number;
 }) {
-  // Single hard deadline covering ALL retries combined  -  prevents 3Ã—timeout blowup
+  // Single hard deadline covering ALL retries combined  -  prevents 3ÃƒÆ’Ã¢â‚¬â€timeout blowup
   const deadlineMs = params.timeoutMs ?? 90_000;
   const deadline = Date.now() + deadlineMs;
 
@@ -1832,7 +1619,7 @@ async function callAnthropic(params: {
       const msg = String((error as any)?.message || error);
       console.error(`Anthropic attempt ${attempt + 1}/3 failed (${Math.round((deadline - Date.now()) / 1000)}s left):`, msg.slice(0, 120));
 
-      // Don't retry timeouts — just fail immediately (another attempt would also timeout)
+      // Don't retry timeouts Ã¢â‚¬â€ just fail immediately (another attempt would also timeout)
       const isTimeout = msg.includes("timed out") || msg.includes("timeout") || msg.includes("AbortError");
       if (isTimeout) break;
 
@@ -1887,7 +1674,8 @@ async function callAnthropicStream(params: {
   timeoutMs?: number;
   onDelta: (text: string) => void;
   onThinkingDelta?: (text: string) => void;
-}) {
+}, _retryCount = 0) {
+  const MAX_CONTINUATION_RETRIES = 2;
   const deadlineMs = params.timeoutMs ?? 90_000;
   const anthropic = new Anthropic({ apiKey: params.apiKey });
   const baseModelId = params.modelId || "claude-sonnet-4-20250514";
@@ -1920,29 +1708,100 @@ async function callAnthropicStream(params: {
   const stream = anthropic.messages.stream(requestParams);
   const abortTimeout = setTimeout(() => stream.abort(), deadlineMs);
 
+  let accumulatedContent = "";
+  let accumulatedThinking = "";
+  let streamLoopError: any = null;
+
   try {
     for await (const event of stream) {
       if (event.type === "content_block_delta") {
         const delta = event.delta as any;
         if (delta.type === "text_delta") {
+          accumulatedContent += delta.text;
           params.onDelta(delta.text);
         } else if (delta.type === "thinking_block_delta" && params.onThinkingDelta) {
+          accumulatedThinking += delta.thinking;
           params.onThinkingDelta(delta.thinking);
         }
       }
     }
+  } catch (loopErr) {
+    streamLoopError = loopErr;
+    console.warn("[AnthropicStream] stream loop error (accumulated chars:", accumulatedContent.length, "):", String(loopErr).slice(0, 200));
   } finally {
     clearTimeout(abortTimeout);
   }
 
-  const finalMsg = await stream.finalMessage();
-  const thinkingDuration = (Date.now() - startTime) / 1000;
-  let content = "";
-  let thinking = "";
+  if (streamLoopError) {
+    // Assistant prefill continuation: re-invoke with the partial content as last assistant turn.
+    // The same onDelta callback keeps firing — the client sees a seamless stream.
+    // Only works for non-thinking models (Anthropic does not support prefill with extended thinking).
+    if (accumulatedContent && _retryCount < MAX_CONTINUATION_RETRIES && !thinkingConfig.enabled) {
+      console.warn(
+        `[AnthropicStream] Continuation attempt ${_retryCount + 1}/${MAX_CONTINUATION_RETRIES}` +
+        ` (${accumulatedContent.length} chars accumulated, error: ${String(streamLoopError).slice(0, 120)})`
+      );
+      await new Promise((r) => setTimeout(r, 800));
+      try {
+        const continuationResult = await callAnthropicStream(
+          {
+            ...params,
+            messages: [
+              ...params.messages,
+              { role: "assistant" as const, content: accumulatedContent },
+            ],
+          },
+          _retryCount + 1
+        );
+        return {
+          ...continuationResult,
+          content: accumulatedContent + continuationResult.content,
+        };
+      } catch (continuationErr) {
+        console.warn("[AnthropicStream] Continuation failed, returning partial content:", String(continuationErr).slice(0, 200));
+        return {
+          content: accumulatedContent,
+          thinking: accumulatedThinking || undefined,
+          thinkingDuration: thinkingConfig.enabled ? (Date.now() - startTime) / 1000 : undefined,
+          thinkingConfig,
+          usage: { inputTokens: 0, outputTokens: 0 },
+          provider: "anthropic",
+        };
+      }
+    }
 
-  for (const block of finalMsg.content) {
-    if (block.type === "text") content += block.text;
-    else if (block.type === "thinking") thinking = (block as any).thinking || (block as any).thinking_summary || "";
+    if (accumulatedContent) {
+      console.warn("[AnthropicStream] Returning partial content (thinking mode or retries exhausted)");
+      return {
+        content: accumulatedContent,
+        thinking: accumulatedThinking || undefined,
+        thinkingDuration: thinkingConfig.enabled ? (Date.now() - startTime) / 1000 : undefined,
+        thinkingConfig,
+        usage: { inputTokens: 0, outputTokens: 0 },
+        provider: "anthropic",
+      };
+    }
+    throw streamLoopError;
+  }
+
+  const thinkingDuration = (Date.now() - startTime) / 1000;
+  let content = accumulatedContent;
+  let thinking = accumulatedThinking;
+  let inputTokens = 0;
+  let outputTokens = 0;
+
+  try {
+    const finalMsg = await stream.finalMessage();
+    inputTokens = finalMsg.usage.input_tokens;
+    outputTokens = finalMsg.usage.output_tokens;
+    if (!content) {
+      for (const block of finalMsg.content) {
+        if (block.type === "text") content += block.text;
+        else if (block.type === "thinking") thinking = (block as any).thinking || (block as any).thinking_summary || "";
+      }
+    }
+  } catch (finalMsgErr) {
+    console.warn("[AnthropicStream] finalMessage() failed, using accumulated content:", String(finalMsgErr).slice(0, 200));
   }
 
   return {
@@ -1950,10 +1809,7 @@ async function callAnthropicStream(params: {
     thinking: thinking || undefined,
     thinkingDuration: thinkingConfig.enabled ? thinkingDuration : undefined,
     thinkingConfig,
-    usage: {
-      inputTokens: finalMsg.usage.input_tokens,
-      outputTokens: finalMsg.usage.output_tokens,
-    },
+    usage: { inputTokens, outputTokens },
     provider: "anthropic",
   };
 }
@@ -2039,20 +1895,24 @@ async function callOpenAIWithTools(params: {
   ];
 
   const openAITools = params.tools
-    .filter((t) => t.type !== "web_search_20260209")
-    .map((t) => ({
-      type: "function" as const,
-      function: {
-        name: t.name,
-        description: t.description || "",
-        parameters: t.input_schema || { type: "object", properties: {}, required: [] },
-      },
-    }));
+    .map((t) => {
+      if (t.type === "web_search_20260209" || t.name === "web_search") {
+        return { type: "web_search" };
+      }
+      return {
+        type: "function" as const,
+        function: {
+          name: t.name,
+          description: t.description || "",
+          parameters: t.input_schema || { type: "object", properties: {}, required: [] },
+        },
+      };
+    });
 
   for (let iter = 0; iter < maxIter; iter++) {
     const remaining = deadline - Date.now();
     if (remaining <= 8000) {
-      throw new Error("timeout: deadline exceeded — A resposta demorou mais que o esperado. Tente novamente com uma pergunta mais curta.");
+      throw new Error("timeout: deadline exceeded Ã¢â‚¬â€ A resposta demorou mais que o esperado. Tente novamente com uma pergunta mais curta.");
     }
 
     const reqBody: any = {
@@ -2107,6 +1967,10 @@ async function callOpenAIWithTools(params: {
     apiMessages.push({ role: "assistant", content: message.content || null, tool_calls: message.tool_calls });
 
     for (const toolCall of message.tool_calls) {
+      if (toolCall.type !== "function") {
+        apiMessages.push({ role: "tool", tool_call_id: toolCall.id, content: "Native tool executed by provider" });
+        continue;
+      }
       toolCallCount++;
       const toolName = toolCall.function.name;
       let toolInput: any = {};
@@ -2132,201 +1996,21 @@ async function callOpenAIWithTools(params: {
     ragDocsRetrieved,
   };
 }
+const WEB_SEARCH_CAPABLE_MODELS = new Set([
+  "claude-opus-4-7",
+  "claude-opus-4-6",
+  "claude-sonnet-4-6",
+  "gpt-5.4",
+  "gpt-5.4-pro",
+  "gpt-5.4-mini",
+  "gpt-5.4-nano",
+]);
 
-async function callOpenRouter(params: {
-  apiKey: string;
-  modelId: string;
-  maxTokens: number;
-  extendedThinking: boolean;
-  systemPrompt: string;
-  messages: ChatMessage[];
-  timeoutMs?: number;
-}) {
-  const mappedModelId = mapModelToOpenRouter(params.modelId);
-  const requestedMaxTokens = Number(params.maxTokens || 8000);
-  let requestMaxTokens = requestedMaxTokens;
-  let requestSystemPrompt = String(params.systemPrompt || "");
-  let requestMessages = [...params.messages];
-  const fetchTimeout = params.timeoutMs ?? 100_000;
-
-  const makeRequest = async (
-    maxTokens: number,
-    systemPrompt: string,
-    messages: ChatMessage[],
-  ) => {
-    const reasoningBudget = Math.max(
-      256,
-      Math.min(4096, Math.floor(maxTokens * 0.35)),
-    );
-    const reasoning = params.extendedThinking
-      ? {
-          enabled: true,
-          max_tokens: reasoningBudget,
-          exclude: false,
-        }
-      : {
-          enabled: false,
-          exclude: true,
-        };
-
-    const ctl = new AbortController();
-    const t = setTimeout(() => ctl.abort(), fetchTimeout);
-    return fetch("https://openrouter.ai/api/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${params.apiKey}`,
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://storybot-workbench.lovable.app",
-        "X-Title": "AI Content Forge",
-      },
-      body: JSON.stringify({
-        model: mappedModelId,
-        max_tokens: maxTokens,
-        reasoning,
-        messages: [
-          { role: "system", content: systemPrompt },
-          ...messages,
-        ],
-      }),
-      signal: ctl.signal,
-    }).finally(() => clearTimeout(t));
-  };
-
-  const extractOpenRouterThinking = (data: any): string | undefined => {
-    const message = data?.choices?.[0]?.message || {};
-    const direct = message?.reasoning ?? data?.choices?.[0]?.reasoning ?? data?.reasoning;
-
-    if (typeof direct === "string" && direct.trim()) {
-      return direct.trim();
-    }
-
-    if (Array.isArray(direct)) {
-      const flattened = direct
-        .map((item: any) => {
-          if (typeof item === "string") return item;
-          return String(item?.text || item?.reasoning || item?.summary || "");
-        })
-        .filter(Boolean)
-        .join("\n");
-      if (flattened) return flattened;
-    }
-
-    const details = message?.reasoning_details ?? data?.choices?.[0]?.reasoning_details;
-    if (Array.isArray(details)) {
-      const flattened = details
-        .map((item: any) => {
-          if (typeof item === "string") return item;
-          return String(item?.text || item?.reasoning || item?.summary || "");
-        })
-        .filter(Boolean)
-        .join("\n");
-      if (flattened) return flattened;
-    }
-
-    return undefined;
-  };
-
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const startedAt = Date.now();
-    const response = await makeRequest(
-      requestMaxTokens,
-      requestSystemPrompt,
-      requestMessages,
-    );
-
-    if (response.ok) {
-      const data = await response.json();
-      const content = String(data?.choices?.[0]?.message?.content || "");
-      const thinking = extractOpenRouterThinking(data);
-      const thinkingDuration = (Date.now() - startedAt) / 1000;
-
-      return {
-        content,
-        thinking: params.extendedThinking ? thinking : undefined,
-        thinkingDuration: params.extendedThinking ? thinkingDuration : undefined,
-        usage: {
-          inputTokens: Number(data?.usage?.prompt_tokens || 0),
-          outputTokens: Number(data?.usage?.completion_tokens || 0),
-        },
-        provider: "openrouter",
-      };
-    }
-
-    const errText = await response.text();
-
-    if (response.status === 401 || response.status === 403) {
-      throw new Error("OpenRouter authentication failed. Verifique OPENROUTER_API_KEY.");
-    }
-
-    let adjusted = false;
-
-    if (response.status === 402) {
-      const affordableTokens = extractAffordableTokensFromOpenRouterError(errText);
-      if (affordableTokens && affordableTokens < requestMaxTokens) {
-        requestMaxTokens = Math.max(64, affordableTokens - 8);
-        adjusted = true;
-      }
-
-      const promptLimit = extractPromptTokenLimitFromOpenRouterError(errText);
-      if (promptLimit) {
-        const safeInputBudget = Math.max(
-          256,
-          promptLimit.promptLimit - requestMaxTokens - 96,
-        );
-
-        const promptBudget = Math.max(96, Math.floor(safeInputBudget * 0.45));
-        const messagesBudget = Math.max(96, safeInputBudget - promptBudget);
-
-        requestSystemPrompt = truncateTextToTokenBudget(
-          requestSystemPrompt,
-          promptBudget,
-        );
-        requestMessages = trimMessagesToTokenBudget(
-          requestMessages,
-          messagesBudget,
-        );
-        adjusted = true;
-      }
-    }
-
-    if (!adjusted || attempt === 2) {
-      throw new Error(`OpenRouter request failed (${response.status}): ${errText}`);
-    }
-  }
-
-  throw new Error("OpenRouter request failed after retries");
+function resolveWebSearchModel(selectedModelId: string): string {
+  return WEB_SEARCH_CAPABLE_MODELS.has(selectedModelId)
+    ? selectedModelId
+    : "claude-sonnet-4-6";
 }
-
-// ─── AGENTIC TOOL USE ─────────────────────────────────────────────────────────
-
-type AgentToolInput = Record<string, unknown>;
-type ToolExecutor = (toolName: string, input: AgentToolInput) => Promise<string>;
-
-const MARKETING_MANAGER_TOOLS: any[] = [
-  {
-    name: "retrieve_documents",
-    description:
-      "Recupera documentos da base de conhecimento: Brand Book, pesquisa de mercado, ICP, pilares de conteudo, matriz de ideias, calendario, roteiro, briefings e qualquer outro material enviado pela usuaria. Use SEMPRE que a resposta exigir informacoes personalizadas, contexto da marca, tom de voz, estrategia ou dados especificos do negocio.",
-    input_schema: {
-      type: "object",
-      properties: {
-        topic: {
-          type: "string",
-          description: "Topico ou tema para buscar nos documentos.",
-        },
-        document_types: {
-          type: "array",
-          items: {
-            type: "string",
-            enum: ["brand-book", "pesquisa", "icp", "pilares", "matriz", "calendario", "roteiro", "outro"],
-          },
-          description: "Tipos de documento para filtrar. Omita para buscar em todos.",
-        },
-      },
-      required: ["topic"],
-    },
-  },
-];
 
 async function runNativeWebSearch(params: {
   apiKey: string;
@@ -2338,7 +2022,7 @@ async function runNativeWebSearch(params: {
 }): Promise<string> {
   const anthropic = new Anthropic({ apiKey: params.apiKey });
   const timeout = params.timeoutMs ?? 45_000;
-  const scope = params.agentScope || "assistente de marketing de conteúdo digital brasileiro";
+  const scope = params.agentScope || "assistente de marketing de conteÃƒÂºdo digital brasileiro";
 
   let response: any;
   try {
@@ -2348,18 +2032,21 @@ async function runNativeWebSearch(params: {
         max_tokens: 1500,
         system: `Você é um pesquisador especializado atuando como suporte para: ${scope}
 
-Sua tarefa: dado o pedido do usuário, formule UMA busca web em português altamente relevante para esse contexto e sintetize os resultados encontrados.
+Sua tarefa: formule UMA query de pesquisa web em português e sintetize os resultados encontrados.
 
-Exemplos de boas queries para este escopo:
-- "variações de ângulo narrativo para conteúdo de marketing digital"
-- "estratégias de conteúdo para redes sociais 2025 Brasil"
-- "técnicas de storytelling para criadores de conteúdo"
-- "tendências de marketing de conteúdo mercado brasileiro"
+REGRA CRÍTICA: A query deve ser uma BUSCA DE PESQUISA, não uma tarefa ou descrição de ação.
+- ERRADO: "Criar 5 variações de ângulo para minha ideia"
+- ERRADO: "Fazer calendário editorial para instagram"
+- CERTO: "ângulos narrativos criativos para conteúdo de marketing digital 2025"
+- CERTO: "estratégias de conteúdo para redes sociais Brasil tendências"
+- CERTO: "técnicas de storytelling engajamento instagram criadores"
+
+Extraia do contexto o TEMA/ASSUNTO central e transforme em uma query de pesquisa de mercado, tendências ou exemplos reais sobre esse tema.
 
 Sintetize os resultados em um resumo direto, útil e em português brasileiro, citando as fontes com URLs quando disponíveis.`,
         messages: [{
           role: "user",
-          content: `Pedido do usuário: ${params.userMessage.slice(0, 600)}`,
+          content: `Pedido do usuÃƒÂ¡rio: ${params.userMessage.slice(0, 600)}`,
         }],
         tools: [{ type: "web_search_20260209", name: "web_search", max_uses: 1 } as any],
       }),
@@ -2379,6 +2066,7 @@ Sintetize os resultados em um resumo direto, útil e em português brasileiro, c
     (b: any) => b.type === "web_search_tool_result"
   );
 
+  let totalResultCount = 0;
   for (const stb of serverToolBlocks) {
     const query = String(stb.input?.query || "");
     params.onStep({ type: "web", status: "searching", query });
@@ -2390,8 +2078,21 @@ Sintetize os resultados em um resumo direto, útil e em português brasileiro, c
         if (item.url) results.push({ title: String(item.title || item.url), url: String(item.url) });
       }
     }
+    totalResultCount += results.length;
     params.onStep({ type: "web", status: "done", query, resultCount: results.length, results });
     console.log(`[NativeWebSearch] query="${query}" results=${results.length}`);
+  }
+
+  // If the search tool was never invoked, discard — the synthesis would be the model
+  // talking about its inability to search, not actual research.
+  if (serverToolBlocks.length === 0) return "";
+
+  // If the tool was invoked but returned 0 URL results (service down / blocked),
+  // the synthesis text will describe the failure — discard it to avoid injecting
+  // "Não consigo acessar a pesquisa" into the system prompt.
+  if (totalResultCount === 0) {
+    console.warn("[NativeWebSearch] Tool invoked but 0 results returned — discarding synthesis to prevent failure propagation");
+    return "";
   }
 
   const synthesisText = (response.content as any[])
@@ -2399,12 +2100,10 @@ Sintetize os resultados em um resumo direto, útil e em português brasileiro, c
     .map((b: any) => b.text)
     .join("\n");
 
-  if (!synthesisText && serverToolBlocks.length === 0) return "";
+  if (!synthesisText) return "";
   if (synthesisText.trim().startsWith("NAO_NECESSARIO")) return "";
 
-  return synthesisText
-    ? `\n\n## Contexto de Pesquisa Web (dados atuais pesquisados antes desta resposta)\n${synthesisText}`
-    : "";
+  return `\n\n## Contexto de Pesquisa Web (dados atuais pesquisados antes desta resposta)\n${synthesisText}`;
 }
 
 async function callAnthropicWithTools(params: {
@@ -2450,7 +2149,7 @@ async function callAnthropicWithTools(params: {
   let toolCallCount = 0;
   let ragDocsRetrieved = 0;
 
-  // Convert ChatMessage[] to Anthropic API format (drop system role — goes in system param)
+  // Convert ChatMessage[] to Anthropic API format (drop system role Ã¢â‚¬â€ goes in system param)
   const apiMessages: any[] = params.messages
     .filter((m) => m.role !== "system")
     .map((m) => ({ role: m.role, content: String(m.content || "") }));
@@ -2466,7 +2165,7 @@ async function callAnthropicWithTools(params: {
   for (let iter = 0; iter < maxIter; iter++) {
     const remaining = deadline - Date.now();
     if (remaining <= 8000) {
-      const deadlineErr = new Error("timeout: deadline exceeded — A resposta demorou mais que o esperado. Tente novamente com uma pergunta mais curta.") as Error & { status: number };
+      const deadlineErr = new Error("timeout: deadline exceeded Ã¢â‚¬â€ A resposta demorou mais que o esperado. Tente novamente com uma pergunta mais curta.") as Error & { status: number };
       deadlineErr.status = 503;
       throw deadlineErr;
     }
@@ -2478,13 +2177,12 @@ async function callAnthropicWithTools(params: {
       messages: apiMessages,
     };
 
-    // Always pass tools — model decides when to stop calling them; maxIterations is the safety net.
+    // Always pass tools Ã¢â‚¬â€ model decides when to stop calling them; maxIterations is the safety net.
     requestParams.tools = params.tools;
     console.log(`[AgentMode] iter=${iter} toolCallCount=${toolCallCount}`);
 
     if (thinkingConfig.enabled && thinkingConfig.mode === "adaptive") {
-      requestParams.thinking = { type: "adaptive", display: "summarized" };
-      requestParams.output_config = { effort: thinkingConfig.effort || "medium" };
+      requestParams.thinking = { type: "adaptive" };
     } else if (thinkingConfig.enabled && thinkingConfig.mode === "enabled") {
       const budgetTokens = Math.max(1024, thinkingConfig.budgetTokens || 1024);
       requestParams.max_tokens = Math.max(requestParams.max_tokens, budgetTokens + 512);
@@ -2567,11 +2265,11 @@ async function callAnthropicWithTools(params: {
 
       // Safety net: if final response is empty (model only output thinking), retry without tools
       if (!content && toolCallCount > 0) {
-        console.log(`[AgentMode] iter=${iter} — resposta vazia na iteração final, tentando novamente sem tools`);
+        console.log(`[AgentMode] iter=${iter} Ã¢â‚¬â€ resposta vazia na iteraÃƒÂ§ÃƒÂ£o final, tentando novamente sem tools`);
         const retryMessages = [
           ...apiMessages,
           { role: "assistant" as const, content: (response.content as any[]).filter((b: any) => !["thinking", "server_tool_use", "web_search_tool_result", "code_execution_tool_result"].includes(b.type)) },
-          { role: "user" as const, content: "Com base nas pesquisas realizadas acima, gere agora a resposta completa em português brasileiro." },
+          { role: "user" as const, content: "Com base nas pesquisas realizadas acima, gere agora a resposta completa em portuguÃƒÂªs brasileiro." },
         ];
         const retryParams: any = {
           model: params.modelId,
@@ -2613,7 +2311,7 @@ async function callAnthropicWithTools(params: {
       };
     }
 
-    // Append assistant turn — strip thinking + server tool blocks from history.
+    // Append assistant turn Ã¢â‚¬â€ strip thinking + server tool blocks from history.
     // server_tool_use / web_search_tool_result / code_execution_tool_result blocks cause 400
     // errors in subsequent iterations if not perfectly paired, so we drop them all.
     const SERVER_BLOCK_TYPES = new Set(["thinking", "thinking_summary", "redacted_thinking", "server_tool_use", "web_search_tool_result", "code_execution_tool_result"]);
@@ -2630,7 +2328,7 @@ async function callAnthropicWithTools(params: {
         toolResult = await params.toolExecutor(toolBlock.name, toolBlock.input as AgentToolInput);
         console.log(`[AgentTool][iter=${iter}] ${toolBlock.name} => ${toolResult.length} chars`);
         if (toolBlock.name === "retrieve_documents") {
-          const m = toolResult.match(/— (\d+) blocos de conteudo/);
+          const m = toolResult.match(/Ã¢â‚¬â€ (\d+) blocos de conteudo/);
           if (m) ragDocsRetrieved += parseInt(m[1], 10);
         }
       } catch (toolErr) {
@@ -2721,7 +2419,7 @@ function buildMarketingToolExecutor(context: {
 
       const selected = selectMarketingChunksForPrompt(chunks);
       const uniqueTypes = [...new Set(selected.map((c) => c.documentType || "outro"))].sort();
-      const docsHeader = `**Documentos recuperados:** ${uniqueTypes.map((t) => `[${t}]`).join(", ")} — ${selected.length} blocos de conteudo\n\n`;
+      const docsHeader = `**Documentos recuperados:** ${uniqueTypes.map((t) => `[${t}]`).join(", ")} Ã¢â‚¬â€ ${selected.length} blocos de conteudo\n\n`;
       return docsHeader + selected
         .map((c) => `### [${(c.documentType || "documento").toUpperCase()}]\n${c.content}`)
         .join("\n\n---\n\n");
@@ -2731,6 +2429,28 @@ function buildMarketingToolExecutor(context: {
   };
 }
 
+const MARKETING_MANAGER_TOOLS = [
+  {
+    name: "retrieve_documents",
+    description: "Recupera documentos estratégicos da usuária (Brand Book, ICP, pesquisa de mercado, pilares, matriz, etc.) para embasar a resposta com dados reais da marca.",
+    input_schema: {
+      type: "object",
+      properties: {
+        topic: {
+          type: "string",
+          description: "Tópico ou assunto para buscar nos documentos da usuária.",
+        },
+        document_types: {
+          type: "array",
+          items: { type: "string" },
+          description: "Tipos de documento para filtrar (ex: brand-book, icp, market-research). Deixe vazio para buscar em todos.",
+        },
+      },
+      required: ["topic"],
+    },
+  },
+];
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -2739,7 +2459,7 @@ serve(async (req) => {
   // Track wall-clock time so AI calls get the remaining budget
   const requestStartMs = Date.now();
 
-  // ── SSE streaming setup ──────────────────────────────────────────────────
+  // Ã¢â€â‚¬Ã¢â€â‚¬ SSE streaming setup Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬Ã¢â€â‚¬
   let _ctrl: ReadableStreamDefaultController<Uint8Array> | null = null;
   const _enc = new TextEncoder();
   const _sseStream = new ReadableStream<Uint8Array>({ start(c) { _ctrl = c; } });
@@ -2782,18 +2502,14 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const runtimeSecrets = await resolveRuntimeSecrets([
       "OPENAI_API_KEY",
-      "OPENROUTER_API_KEY",
       "ANTHROPIC_API_KEY",
-      "PERPLEXITY_API_KEY",
       "OPENAI_EMBEDDING_MODEL",
       "PINECONE_API_KEY",
       "PINECONE_INDEX",
       "PINECONE_NAMESPACE",
     ]);
     const openaiKey = runtimeSecrets.OPENAI_API_KEY || null;
-    const openRouterKey = runtimeSecrets.OPENROUTER_API_KEY || null;
     const anthropicKey = runtimeSecrets.ANTHROPIC_API_KEY || null;
-    const perplexityKey = runtimeSecrets.PERPLEXITY_API_KEY || null;
     const embeddingModel = runtimeSecrets.OPENAI_EMBEDDING_MODEL ||
       "text-embedding-3-small";
     const pineconeApiKey = runtimeSecrets.PINECONE_API_KEY || null;
@@ -2839,10 +2555,20 @@ serve(async (req) => {
       effectiveUserId = requestedTargetUserId;
     }
 
-    let fullSystemPrompt = String(systemPrompt ||
-      "Voce e um assistente util e inteligente.");
-    fullSystemPrompt += "\n\nINSTRUÇÃO OBRIGATÓRIA DE IDIOMA: Pense sempre em português brasileiro. Todo o seu raciocínio interno (thinking) e todas as respostas devem ser em português brasileiro. Nunca pense ou responda em inglês.";
-    fullSystemPrompt += "\n\nREGRA CRITICA: Voce NUNCA deve incluir tags XML, HTML ou qualquer markup de ferramentas na sua resposta. Nunca escreva <function_calls>, <invoke>, <parameter_name>, <parameter_value>, <function_calls>, <invoke>, <parameter> ou qualquer tag similar. Responda sempre em texto puro com markdown quando necessario. Se voce precisar pesquisar algo, os dados ja foram pesquisados e fornecidos no contexto  -  use-os diretamente. Nunca simule chamadas de ferramentas.";
+    // Language instruction prepended Ã¢â‚¬â€ thinking models (claude-3-5/3-7) read system prompt from the top
+    const _PTBR = "IDIOMA OBRIGATÃƒâ€œRIO (PRIORIDADE MÃƒÂXIMA): Pense, raciocine e responda SEMPRE em portuguÃƒÂªs brasileiro. Seu raciocÃƒÂ­nio interno (thinking) deve ser EXCLUSIVAMENTE em portuguÃƒÂªs brasileiro. NUNCA escreva em inglÃƒÂªs Ã¢â‚¬â€ nem no pensamento interno nem na resposta.\n\n";
+    const _XML_RULE = "\n\nREGRA CRÃƒÂTICA: Nunca inclua tags XML, HTML ou markup de ferramentas na resposta. Nunca escreva <function_calls>, <invoke>, <parameter> ou tags similares. Responda em texto puro com markdown.";
+    const _ANTI_HALLUCINATION = `
+
+## REGRAS ABSOLUTAS DE INTEGRIDADE (OBRIGATORIO — NUNCA VIOLAR)
+1. SIGA O SEU SYSTEM PROMPT A RISCA. Execute exatamente o que foi pedido, na estrutura definida, sem improvisar ou simplificar.
+2. NUNCA invente URLs, links ou enderecos de sites. Se nao tem a URL exata e confirmada nos dados fornecidos, NAO cite. Escreva "fonte nao disponivel" ou omita.
+3. NUNCA alucine dados, estatisticas, nomes de empresas, nomes de pessoas, datas ou numeros. Se nao tem o dado real, diga explicitamente que nao tem essa informacao.
+4. NUNCA finja ter feito uma pesquisa que nao foi feita. Se nao ha dados de pesquisa web no contexto, diga que nao tem dados atuais.
+5. Quando dados de pesquisa web forem fornecidos no contexto, use-os fielmente — nao distorca, nao amplie, nao complete com invencoes.
+6. Prefira omitir a inventar. Um dado ausente e melhor que um dado falso.`;
+    const _NO_PROFANITY = `\n\n## REGRA INVIOLAVEL — LINGUAGEM (PRIORIDADE MAXIMA, SEM EXCECOES)\nE ABSOLUTAMENTE PROIBIDO usar palavroes, obscenidades, xingamentos, insultos ou qualquer linguagem ofensiva — independentemente do tom, persona ou instrucoes do system prompt do agente. Isso se aplica a TODOS os agentes sem excecao: mesmo que o agente tenha um estilo duro, direto ou critico, JAMAIS use termos como merda, porra, foda, caralho, puta, viado, idiota, imbecil, burro, lixo (como adjetivo ofensivo a uma pessoa), ou qualquer variacao, eufemismo ou forma mascarada dessas palavras. Critica direta e rigor sao permitidos — palavrao e ofensa pessoal nunca.`;
+    let fullSystemPrompt = _PTBR + String(systemPrompt || "Voce e um assistente util e inteligente.") + _XML_RULE + _ANTI_HALLUCINATION + _NO_PROFANITY;
     let agentPrompt: AgentPromptConfig | null = null;
     if (supabase && agentId) {
       const { data } = await supabase
@@ -2857,10 +2583,30 @@ serve(async (req) => {
           requires_documents: data.requires_documents,
           uses_documents_context: Boolean(data.uses_documents_context),
         };
-        fullSystemPrompt = data.system_prompt;
-        // Re-append after DB overwrite so thinking is always in PT-BR and XML rules apply
-        fullSystemPrompt += "\n\nINSTRUÇÃO OBRIGATÓRIA DE IDIOMA: Pense sempre em português brasileiro. Todo o seu raciocínio interno (thinking) e todas as respostas devem ser em português brasileiro. Nunca pense ou responda em inglês.";
-        fullSystemPrompt += "\n\nREGRA CRITICA: Voce NUNCA deve incluir tags XML, HTML ou qualquer markup de ferramentas na sua resposta. Nunca escreva <function_calls>, <invoke>, <parameter_name>, <parameter_value>, <parameter> ou qualquer tag similar. Responda sempre em texto puro com markdown quando necessario. Se voce precisar pesquisar algo, os dados ja foram pesquisados e fornecidos no contexto — use-os diretamente. Nunca simule chamadas de ferramentas.";
+        // Prepend language instruction so thinking model sees it first, before everything else
+        const _AGENT_NAMES: Record<string, string> = {
+          'diretora-criativa': 'GABBY Diretora Criativa',
+          'scriptwriter': 'GABBY Copywriter',
+          'feedback-conteudo': 'GABBY Sombra',
+          'brand-book': 'Construtor de Brand Book',
+          'market-research': 'Pesquisador de Mercado',
+          'icp-architect': 'Arquiteto do ICP',
+          'pillar-strategist': 'Estrategista de Pilares',
+          'matrix-generator': 'Gerador de Matriz',
+          'expert-social-selling': 'Expert Social Selling',
+          'criador-documento-oferta': 'Criador de Documento da Oferta',
+          'amanda-ai': 'Amanda AI',
+          'arquiteta-perfil-icp': 'Arquiteta de Perfil do Cliente Ideal',
+          'programa-rivotril': 'Programa Rivotril',
+          'estrategias-sprint-20k': 'Estrategias Sprint R$20k',
+          'arquiteta-workshops': 'Arquiteta de Workshops/Webinars',
+          'copywriter-campanhas': 'Copywriter de Campanhas',
+          'vsl-invisivel': 'VSL Invisivel',
+          'voz-de-marca': 'Voz de Marca',
+        };
+        const _agentDisplayName = _AGENT_NAMES[agentId] || agentId;
+        const _IDENTITY = `IDENTIDADE OBRIGATORIA: Seu nome e "${_agentDisplayName}". Ao iniciar a conversa, sempre se apresente com este nome. Quando perguntado quem voce e, sempre responda com este nome. NUNCA use outro nome ou descricao generica como identificacao principal.\n\n`;
+        fullSystemPrompt = _PTBR + _IDENTITY + data.system_prompt + _XML_RULE + _ANTI_HALLUCINATION + _NO_PROFANITY;
       } else {
         throw new HttpError(
           400,
@@ -2881,7 +2627,12 @@ serve(async (req) => {
     );
     const selectedMarketingMode = normalizeMarketingMode(marketingMode);
     const filterTypes = resolveDocumentTypes(agentId || null, agentPrompt);
-    const useAgenticMode = (effectiveProvider === "anthropic" || effectiveProvider === "openai");
+    // market-research tem fluxo próprio (backfill + Perplexity), agentic causaria dupla busca
+    // Chats sem agentId (modo direto) não precisam buscar documentos via ferramentas
+    const isFollowUpMessage = messages.some((m: any) => m.role === "assistant");
+    // Modo agentico sempre ativo para agentes com ID — permite retrieve_documents + web_search em TODOS os turnos.
+    // isFollowUpMessage mantido para outros usos (ex: SSE steps de memória) mas não bloqueia mais o modo agentico.
+    const useAgenticMode = !!agentId && (effectiveProvider === "anthropic" || effectiveProvider === "openai") && agentId !== "market-research";
 
     const fixedSystemDocsRaw = supabase
       ? await fetchSystemDocuments(supabase, agentId || null)
@@ -2899,7 +2650,7 @@ serve(async (req) => {
 
     if (!useAgenticMode && shouldAttachDocuments && openaiKey && lastUserMessage?.content) {
       try {
-        if (agentId === "marketing-manager") {
+        if (agentId === "diretora-criativa") {
           const realTopic = extractConversationTopic(messages, lastUserMessage.content).slice(0, 420);
           const retrievalPlan = buildMarketingDocumentRetrievalPlan(
             realTopic,
@@ -2910,7 +2661,7 @@ serve(async (req) => {
           const mergedChunks: RetrievedDocumentChunk[] = [];
 
           for (const step of retrievalPlan) {
-            _sse("step", { type: "memory", status: "searching", query: step.query, label: step.subject });
+            if (!isFollowUpMessage) _sse("step", { type: "memory", status: "searching", query: step.query, label: step.subject });
             const queryEmbedding = await buildQueryEmbedding(
               openaiKey,
               step.query,
@@ -2941,12 +2692,12 @@ serve(async (req) => {
               query: step.query,
               chunkCount: selectedStepChunks.length,
             });
-            _sse("step", { type: "memory", status: "done", query: step.query, label: step.subject, resultCount: selectedStepChunks.length, chunks: selectedStepChunks.slice(0, 6).map((c) => ({ content: c.content.slice(0, 400), title: c.documentType || step.subject || undefined })) });
+            if (!isFollowUpMessage) _sse("step", { type: "memory", status: "done", query: step.query, label: step.subject, resultCount: selectedStepChunks.length, chunks: selectedStepChunks.slice(0, 6).map((c) => ({ content: c.content.slice(0, 400), title: c.documentType || step.subject || undefined })) });
           }
 
           userDocumentChunks = mergedChunks;
         } else {
-          _sse("step", { type: "memory", status: "searching", query: String(lastUserMessage.content).slice(0, 120) });
+          if (!isFollowUpMessage) _sse("step", { type: "memory", status: "searching", query: String(lastUserMessage.content).slice(0, 120) });
           const queryEmbedding = await buildQueryEmbedding(
             openaiKey,
             lastUserMessage.content,
@@ -2963,14 +2714,14 @@ serve(async (req) => {
             pineconeNamespacePrefix,
             supabase,
           });
-          _sse("step", { type: "memory", status: "done", query: String(lastUserMessage.content).slice(0, 120), resultCount: userDocumentChunks.length, chunks: userDocumentChunks.slice(0, 6).map((c) => ({ content: c.content.slice(0, 400), title: c.documentType || undefined })) });
+          if (!isFollowUpMessage) _sse("step", { type: "memory", status: "done", query: String(lastUserMessage.content).slice(0, 120), resultCount: userDocumentChunks.length, chunks: userDocumentChunks.slice(0, 6).map((c) => ({ content: c.content.slice(0, 400), title: c.documentType || undefined })) });
         }
       } catch (error) {
         console.error("Failed to retrieve documentos context:", error);
       }
     } else if (!useAgenticMode && shouldAttachDocuments && !openaiKey) {
       console.warn(
-        "[RAG] OPENAI_API_KEY ausente — semantic retrieval bloqueado. Usando backfill direto do banco.",
+        "[RAG] OPENAI_API_KEY ausente Ã¢â‚¬â€ semantic retrieval bloqueado. Usando backfill direto do banco.",
       );
     }
 
@@ -2986,7 +2737,7 @@ serve(async (req) => {
         if (requiredTypeFallbackChunks.length > 0) {
           console.log(`[RAG] backfill adicionou ${requiredTypeFallbackChunks.length} docs:`, requiredTypeFallbackChunks.map((c) => c.documentType));
         } else {
-          console.warn("[RAG] backfill retornou 0 docs — verifique se documentos existem para tenantId:", tenantId, "userId:", effectiveUserId);
+          console.warn("[RAG] backfill retornou 0 docs Ã¢â‚¬â€ verifique se documentos existem para tenantId:", tenantId, "userId:", effectiveUserId);
         }
         userDocumentChunks.push(...requiredTypeFallbackChunks);
       } catch (fallbackError) {
@@ -2998,12 +2749,12 @@ serve(async (req) => {
     }
 
     if (!useAgenticMode) {
-      console.log(`[RAG] Total chunks após backfill: ${userDocumentChunks.length}, openaiKey disponível: ${Boolean(openaiKey)}, shouldAttachDocuments: ${shouldAttachDocuments}`);
-      userDocumentChunks = agentId === "marketing-manager"
+      console.log(`[RAG] Total chunks apÃƒÂ³s backfill: ${userDocumentChunks.length}, openaiKey disponÃƒÂ­vel: ${Boolean(openaiKey)}, shouldAttachDocuments: ${shouldAttachDocuments}`);
+      userDocumentChunks = agentId === "diretora-criativa"
         ? selectMarketingChunksForPrompt(userDocumentChunks)
         : selectUserChunksForPrompt(userDocumentChunks);
     } else {
-      console.log(`[AgentMode] marketing-manager em modo agentico — RAG pre-fetching ignorado, tools ativas`);
+      console.log(`[AgentMode] Agente ${agentId || "desconhecido"} em modo agentico Ã¢â‚¬â€ RAG pre-fetching ignorado, tools ativas`);
     }
 
     const promptAssembly = appendDocumentsContextToPrompt(
@@ -3036,7 +2787,7 @@ serve(async (req) => {
       steps: [],
     };
 
-    if (!useAgenticMode && agentId === "marketing-manager" && lastUserText) {
+    if (!useAgenticMode && agentId === "diretora-criativa" && lastUserText) {
       webContextMeta.enabled = true;
       webContextMeta.mode = selectedMarketingMode;
       const webSearchDecision = resolveMarketingWebSearchDecision(
@@ -3045,76 +2796,100 @@ serve(async (req) => {
         Boolean(webSearchApproved),
       );
 
-      console.log(`[WebSearch] decision=${webSearchDecision.shouldSearch} reason=${webSearchDecision.reason} perplexityKey=${Boolean(perplexityKey)} webSearchApproved=${Boolean(webSearchApproved)}`);
+      console.log(`[WebSearch] decision=${webSearchDecision.shouldSearch} reason=${webSearchDecision.reason} anthropicKey=${Boolean(anthropicKey)} webSearchApproved=${Boolean(webSearchApproved)}`);
 
       if (!webSearchDecision.shouldSearch) {
         webContextMeta.skippedReason = webSearchDecision.reason;
-      } else if (perplexityKey) {
+      } else if (anthropicKey) {
         try {
           webContextMeta.searched = true;
-          _sse("step", { type: "web", status: "searching", query: lastUserText.slice(0, 120) });
-          const webContext = await buildMarketingManagerWebContext({
-            apiKey: perplexityKey,
-            userPrompt: lastUserText,
-            messages,
-            mode: selectedMarketingMode,
+          const topic = extractConversationTopic(messages, lastUserText);
+          _sse("step", { type: "web", status: "searching", query: topic.slice(0, 120) });
+          const webContextStr = await runNativeWebSearch({
+            apiKey: anthropicKey,
+            modelId: resolveWebSearchModel(selectedModelId),
+            userMessage: topic,
+            agentScope: "diretora criativa de conteudo digital e calendario editorial",
+            onStep: (step) => _sse("step", step),
           });
-
-          webContextMeta.queryCount = webContext.queryCount;
-          webContextMeta.resultCount = webContext.resultCount;
-          webContextMeta.sources = webContext.sources;
-          webContextMeta.steps = webContext.steps;
-          webContextMeta.topic = webContext.topic;
-          if (webContext.resultCount > 0) {
-            fullSystemPrompt += `\n\n${webContext.context}`;
+          if (webContextStr) {
+            fullSystemPrompt += webContextStr;
             webContextMeta.used = true;
+            webContextMeta.resultCount = 1;
+            // Inner runNativeWebSearch already fired "done" with the results array — do NOT fire again here.
           } else {
             webContextMeta.skippedReason = "no-web-results";
+            // Inner events may not have fired "done" (tool not invoked) — close the searching state.
+            _sse("step", { type: "web", status: "done", query: topic.slice(0, 120), resultCount: 0 });
           }
-          _sse("step", { type: "web", status: "done", query: webContext.topic || lastUserText.slice(0, 120), resultCount: webContext.resultCount });
         } catch (webError: any) {
-          const message = String(webError?.message || "Falha no web scraping");
-          console.error("Marketing manager web context error:", message);
+          const message = String(webError?.message || "Falha no web search nativo");
+          console.error("Diretora criativa web search error:", message);
           webContextMeta.error = message;
         }
       } else {
-        webContextMeta.error = "PERPLEXITY_API_KEY nao configurada";
-        webContextMeta.skippedReason = "missing-perplexity-key";
+        webContextMeta.error = "ANTHROPIC_API_KEY nao configurada";
+        webContextMeta.skippedReason = "missing-anthropic-key";
       }
 
       fullSystemPrompt += selectedMarketingMode === "calendar"
         ? "\n\n## MODO CALENDARIO (ATIVO)\nGerar calendario editorial mensal completo, com cadencia semanal, distribuicao equilibrada de pilares e tabela final de execucao."
         : "\n\n## MODO IDEIA SOLTA (ATIVO)\nTransformar a ideia do usuario em 5 ideias estruturadas com angulos diferentes, narrativas claras, conexao com a oferta e fontes reais.";
 
-      // If no web context was used, instruct agent to converse first (not for agentic mode — it uses tools)
+
+      // If no web context was used, instruct agent to converse first
       if (!useAgenticMode && !webContextMeta.used) {
-        fullSystemPrompt += `\n\n## COMPORTAMENTO CONVERSACIONAL (OBRIGATORIO QUANDO NAO HA DADOS DE PESQUISA)
-Voce NAO tem dados de pesquisa web nesta conversa ainda. Siga estas regras:
+        if (webContextMeta.searched) {
+          // Search was attempted but returned no usable results or threw an error.
+          // Do NOT enter conversational mode — proceed silently and generate the content anyway.
+          fullSystemPrompt += `
 
-1. PRIMEIRO: Converse com o usuario. Faca perguntas para entender o tema, o angulo, o publico-alvo e o objetivo.
-2. NAO gere conteudo final estruturado (com Big Idea, ICP, etc.) sem ter dados reais de pesquisa.
-3. Quando voce entender o tema e sentir que precisa de dados reais da web para gerar conteudo de qualidade, SUGIRA ao usuario que faca uma pesquisa.
-4. Para sugerir pesquisa, adicione EXATAMENTE esta tag na ULTIMA LINHA da sua resposta, sozinha, sem nenhum texto antes ou depois na mesma linha:
+## INSTRUCAO CRITICA — BUSCA SEM RESULTADOS
+A pesquisa web foi executada mas nao retornou dados utilizaveis nesta sessao. Isso NAO muda sua tarefa:
+- Execute EXATAMENTE o que foi solicitado usando seu conhecimento sobre o tema e os documentos disponiveis.
+- NUNCA mencione que a busca falhou, nao retornou resultados ou esta instavel.
+- NUNCA peca que o usuario faca a pesquisa por conta propria.
+- NUNCA ofereca "opcoes" ou alternativas — apenas gere o conteudo completo normalmente.
+- Se precisar citar dados, use fontes do seu conhecimento e deixe claro que sao referencias gerais (sem inventar URLs).`;
+        } else {
+          fullSystemPrompt += `
+
+## MODO CONVERSACIONAL (SEM DADOS DE PESQUISA)
+Nesta interacao nao ha dados de pesquisa web disponiveis. Siga:
+
+1. Converse naturalmente com o usuario. Faca perguntas para entender o tema, angulo, publico e objetivo.
+2. NAO gere conteudo final estruturado (Big Idea, calendario, ICP) sem dados reais de pesquisa.
+3. NAO invente dados, estatisticas ou fontes.
+4. Quando quiser sugerir que o sistema busque dados na web, adicione APENAS a tag abaixo na ultima linha da resposta, sozinha, sem nenhum texto na mesma linha:
 [SUGERIR_PESQUISA_WEB]
-5. Essa tag sera convertida automaticamente em um botao clicavel para o usuario.
-6. NAO simule dados, estatisticas ou fontes. Se nao tem dados reais, diga que precisa pesquisar.
-7. Seja natural e conversacional. Demonstre interesse genuino pelo tema do usuario.
 
-### PROIBICOES ABSOLUTAS:
-- NUNCA invente tags diferentes. A UNICA tag permitida e [SUGERIR_PESQUISA_WEB]. Nada mais.
-- NUNCA use [EXECUTAR_PESQUISA_WEB], [BUSCAR_WEB], [INICIAR_PESQUISA] ou qualquer variacao.
-- NUNCA diga ao usuario "nao tenho acesso a internet" ou "nao consigo buscar na web" — o SISTEMA realiza buscas reais via API. Voce aciona isso com a tag [SUGERIR_PESQUISA_WEB].
-- NUNCA finja estar buscando enquanto escreve. A busca, quando ocorre, acontece ANTES desta resposta chegar ate voce.
-- NUNCA escreva "Aguarde enquanto busco..." — se precisar de dados, use a tag e o sistema busca na proxima interacao.
-- NUNCA coloque texto ou parametros dentro dos colchetes da tag.
-- CORRETO quando precisar de dados: explique que precisa de dados atuais e adicione [SUGERIR_PESQUISA_WEB] na ultima linha.`;
+REGRAS CRITICAS SOBRE A TAG:
+- Escreva a tag SOMENTE quando for util sugerir pesquisa. NAO escreva ela em toda resposta.
+- NAO mencione a tag ao usuario, NAO explique que esta acionando algo, NAO diga adicionando tag. A tag e um sinal interno invisivel ao usuario, o sistema a converte em botao automaticamente.
+- NAO escreva nada apos a tag. Ela deve ser a ultima linha exata.
+- NUNCA use variacoes como [EXECUTAR_PESQUISA_WEB] ou similares.
+
+## PROIBICAO ABSOLUTA — ANUNCIAR BUSCA
+NUNCA diga frases como:
+- "Vou acionar uma pesquisa"
+- "So um segundo enquanto busco"
+- "Vou buscar dados na web"
+- "Aguarda que vou pesquisar"
+- "Deixa eu buscar isso para voce"
+- Qualquer variacao que implique que VOCE vai buscar ou que o usuario deve aguardar uma busca.
+Voce NAO pode acionar buscas sozinha. O botao de pesquisa aparece automaticamente via tag. Se quiser dados web, apenas adicione a tag [SUGERIR_PESQUISA_WEB] no final e continue respondendo normalmente — sem avisar o usuario sobre isso.`;
+        }
       }
+
 
       fullSystemPrompt += `\n\n## REGRAS DE FORMATACAO (OBRIGATORIO)
 - Use headings markdown (##, ###) para separar cada ideia/topico principal.
 - Cada subsecao (Big Idea, Crencas do ICP, Valor de Entretenimento, Narrativa, Conexao com Produto, etc.) DEVE ser um paragrafo separado com o label em **negrito** seguido de quebra de linha.
 - Nunca junte multiplas subsecoes no mesmo paragrafo. Cada uma deve comecar em nova linha.
 - Use listas (- ou 1.) quando houver multiplos itens.
+- PROIBIDO quebrar frases no meio com markdown: "Encontrei dados do\n\n**Nome**\n, incluindo:" e ERRADO. CERTO: "Encontrei dados do **Nome**, incluindo:". O negrito inline nao cria nova linha — fica dentro da frase.
+- PROIBIDO comecar qualquer linha com virgula, ponto ou continuacao de frase que pertence a linha anterior.
+- Texto conversacional/introdutorio deve ser uma frase completa em uma unica linha. Nunca divida sujeito e predicado com quebra de linha ou elemento markdown entre eles.
 - Estrutura esperada por ideia:
 
 ### [Numero]. [Titulo da Ideia]
@@ -3153,20 +2928,152 @@ Texto aqui...
 - Links quebrados ou inventados sao PROIBIDOS.`;
     }
 
+    if (agentId === "market-research" && lastUserText) {
+      // 1. Buscar documentos do usuÃƒÂ¡rio (brand-book, pesquisa, icp) antes de decidir o fluxo
+      let mrDocumentContext = "";
+      let mrDocumentTopic = "";
+
+      if (supabase) {
+        try {
+          _sse("step", { type: "memory", status: "searching", query: "brand book, pesquisa e ICP", label: "Consultando seus documentos" });
+          const mrDocChunks = await backfillMissingRequiredDocumentTypes({
+            supabase,
+            tenantId: String(tenantId),
+            userId: String(effectiveUserId),
+            requiredTypes: ["brand-book", "pesquisa", "icp"],
+            existingChunks: [],
+          });
+          if (mrDocChunks.length > 0) {
+            mrDocumentContext = mrDocChunks
+              .map((c) => `[${(c.documentType || "documento").toUpperCase()}]\n${c.content}`)
+              .join("\n\n---\n\n")
+              .slice(0, 4000);
+            // Prefer brand-book (describes user's own business) over icp (describes clients)
+            const topicChunk =
+              mrDocChunks.find((c) => c.documentType === "brand-book") ||
+              mrDocChunks.find((c) => c.documentType === "pesquisa") ||
+              mrDocChunks[0];
+            mrDocumentTopic = extractTopicFromDocContent(topicChunk.content);
+            _sse("step", { type: "memory", status: "done", query: "brand book, pesquisa e ICP", label: "Contexto carregado", resultCount: mrDocChunks.length });
+          } else {
+            _sse("step", { type: "memory", status: "done", query: "brand book, pesquisa e ICP", label: "Nenhum documento encontrado", resultCount: 0 });
+          }
+        } catch (docErr) {
+          console.error("[market-research] document fetch error:", docErr);
+        }
+      }
+
+      // 2. Decidir fluxo: primeira mensagem sempre pergunta, pesquisa sÃƒÂ³ apÃƒÂ³s resposta
+      const userMessageCount = messages.filter((m) => m.role === "user").length;
+      const isFirstMessage = userMessageCount <= 1;
+
+      fullSystemPrompt += `\n\n**IDIOMA OBRIGATORIO:** Pense, raciocine e responda SEMPRE em portuguÃƒÂªs brasileiro. Seu raciocÃƒÂ­nio interno (thinking) deve ser EXCLUSIVAMENTE em portuguÃƒÂªs. NUNCA escreva em inglÃƒÂªs Ã¢â‚¬â€ nem no raciocÃƒÂ­nio, nem na resposta.`;
+
+      if (!isFirstMessage) {
+        // UsuÃƒÂ¡rio jÃƒÂ¡ interagiu Ã¢â‚¬â€ pesquisar agora com todo contexto disponÃƒÂ­vel
+        if (mrDocumentContext) {
+          fullSystemPrompt += `\n\n## INSTRUCAO CRITICA Ã¢â‚¬â€ NAO USE FERRAMENTAS
+OS DOCUMENTOS DO USUARIO JA FORAM CARREGADOS ABAIXO. A PESQUISA WEB JA FOI REALIZADA ABAIXO.
+NAO USE ferramentas de busca de memoria. NAO USE ferramentas de busca na web. Tudo ja foi carregado.
+Prosiga DIRETAMENTE com a analise de mercado completa.
+
+## CONTEXTO DO NEGOCIO DO USUARIO (DOCUMENTOS):
+${mrDocumentContext}`;
+        }
+
+        webContextMeta.enabled = true;
+        if (anthropicKey) {
+          try {
+            webContextMeta.searched = true;
+            const topic = mrDocumentTopic || extractConversationTopic(messages, lastUserText);
+            const webContextStr = await runNativeWebSearch({
+              apiKey: anthropicKey,
+              modelId: resolveWebSearchModel(selectedModelId),
+              userMessage: topic,
+              agentScope: "pesquisador de mercado especializado em negocios digitais brasileiros",
+              onStep: (step) => _sse("step", step),
+            });
+            if (webContextStr) {
+              fullSystemPrompt += webContextStr;
+              webContextMeta.used = true;
+              webContextMeta.resultCount = 1;
+            } else {
+              webContextMeta.skippedReason = "no-web-results";
+            }
+          } catch (webError: any) {
+            const message = String(webError?.message || "Falha na pesquisa de mercado web");
+            console.error("Market research web search error:", message);
+            webContextMeta.error = message;
+          }
+        } else {
+          webContextMeta.error = "ANTHROPIC_API_KEY nao configurada";
+          webContextMeta.skippedReason = "missing-anthropic-key";
+        }
+
+        fullSystemPrompt += `\n\n## REGRAS DE FORMATACAO Ã¢â‚¬â€ PESQUISA DE MERCADO (OBRIGATORIO)
+- Estruture a analise com headings claros: Panorama, Tendencias, Players, Dados e Numeros, Oportunidades, Riscos.
+- Cite fonte real (nome + URL quando disponivel) para cada dado numerico ou afirmacao objetiva.
+- NUNCA invente URLs. Use apenas URLs exatas fornecidas nos dados de pesquisa.
+- Finalize com uma secao de Recomendacoes Estrategicas baseada nos dados encontrados.`;
+
+      } else if (mrDocumentContext) {
+        // Primeira mensagem + documentos encontrados Ã¢â€ â€™ perguntar se usa os docs
+        // PREPEND antes de tudo para ter mÃƒÂ¡xima prioridade no contexto do modelo
+        const docFoundInstruction = `IDIOMA: Todo o seu raciocÃƒÂ­nio interno e resposta devem ser em portuguÃƒÂªs brasileiro. NUNCA pense ou escreva em inglÃƒÂªs.
+
+[INSTRUCAO IMEDIATA Ã¢â‚¬â€ PRIORIDADE MAXIMA]
+DOCUMENTOS DO USUARIO JA FORAM ENCONTRADOS PELO SISTEMA.
+OS DOCUMENTOS JA CONTEM O CONTEXTO DO NEGOCIO. NAO E NECESSARIO PEDIR MAIS INFORMACOES.
+
+SUA UNICA TAREFA AGORA: escrever exatamente esta frase, sem adicionar nada antes nem depois:
+"Vi que vocÃƒÂª jÃƒÂ¡ tem documentos salvos aqui Ã¢â‚¬â€ brand book, ICP e/ou pesquisa de mercado. Posso usar essa base para a anÃƒÂ¡lise, ou prefere me contar sobre o seu negÃƒÂ³cio diretamente?"
+
+REGRAS:
+- Essa frase ÃƒÂ© sua resposta completa. Nada mais.
+- NAO pergunte sobre mercado, nicho, produto ou cliente ideal.
+- NAO diga que precisa de mais dados.
+- NAO faca analise nem pesquisa.
+- NAO use emojis.
+[FIM]\n\n`;
+        fullSystemPrompt = docFoundInstruction + fullSystemPrompt;
+
+      } else {
+        // Primeira mensagem + sem documentos Ã¢â€ â€™ fazer as 4 perguntas
+        const noDocInstruction = `IDIOMA: Todo o seu raciocÃƒÂ­nio interno e resposta devem ser em portuguÃƒÂªs brasileiro. NUNCA pense ou escreva em inglÃƒÂªs.
+
+[INSTRUCAO IMEDIATA Ã¢â‚¬â€ PRIORIDADE MAXIMA Ã¢â‚¬â€ EXECUTE AGORA]
+NENHUM DOCUMENTO DO USUARIO FOI ENCONTRADO.
+VOCE DEVE ENVIAR EXATAMENTE E APENAS ESTE TEXTO (adapte apenas os exemplos se necessario):
+
+"Para fazer uma pesquisa de mercado precisa, preciso entender melhor o seu contexto. Me conta:
+
+1. **Mercado/Setor** Ã¢â‚¬â€ Qual ÃƒÂ© o seu mercado ou setor de atuaÃƒÂ§ÃƒÂ£o? (ex: saÃƒÂºde, educaÃƒÂ§ÃƒÂ£o, moda, tecnologia, finanÃƒÂ§as)
+2. **Nicho especÃƒÂ­fico** Ã¢â‚¬â€ Qual ÃƒÂ© o seu nicho dentro desse mercado? (ex: emagrecimento pÃƒÂ³s-parto, marketing para coaches, moda plus size)
+3. **Produto/ServiÃƒÂ§o** Ã¢â‚¬â€ Qual ÃƒÂ© o seu produto ou serviÃƒÂ§o principal?
+4. **Cliente ideal** Ã¢â‚¬â€ Para quem vocÃƒÂª vende? Descreva brevemente o perfil do seu cliente ideal."
+
+PROIBICOES ABSOLUTAS:
+- PROIBIDO iniciar analise antes de receber as respostas.
+- PROIBIDO pesquisar qualquer coisa agora.
+- PROIBIDO adicionar perguntas extras ou mudar o formato acima.
+[FIM DA INSTRUCAO IMEDIATA]\n\n`;
+        fullSystemPrompt = noDocInstruction + fullSystemPrompt;
+      }
+    }
+
     // agenticWebSearchEnabled precisa estar fora dos dois blocos if(useAgenticMode) para manter o escopo
     const agenticWebSearchEnabled =
       useAgenticMode && (Boolean(webSearchApproved) || userExplicitlyRequestsWebSearch(lastUserText || ""));
 
     if (useAgenticMode) {
 
+      if (agentId === "diretora-criativa") {
       // Auto-detect calendar vs idea mode from user message keywords
       const lowerMsg = lastUserText.toLowerCase();
-      const calendarKeywords = ["calendário", "calendario", "plano mensal", "editorial mensal", "programação", "programacao", "cronograma", "30 dias", "grade de conteudo", "grade de conteúdo"];
+      const calendarKeywords = ["calendÃƒÂ¡rio", "calendario", "plano mensal", "editorial mensal", "programaÃƒÂ§ÃƒÂ£o", "programacao", "cronograma", "30 dias", "grade de conteudo", "grade de conteÃƒÂºdo"];
       const hasCalendarKw = calendarKeywords.some((kw) => lowerMsg.includes(kw));
       const agenticMarketingMode: MarketingMode = hasCalendarKw ? "calendar" : selectedMarketingMode;
       const modeLabel = agenticMarketingMode === "calendar" ? "CALENDARIO EDITORIAL" : "IDEIA SOLTA";
-
-      fullSystemPrompt += `\n\n**IDIOMA OBRIGATORIO:** Pense, raciocine e responda SEMPRE em português brasileiro. Seu raciocínio interno (thinking) deve ser EXCLUSIVAMENTE em português. NUNCA escreva em inglês — nem no raciocínio, nem na resposta.`
 
       fullSystemPrompt += `\n\n## MODO ATIVO: ${modeLabel}
 
@@ -3174,40 +3081,40 @@ ${agenticMarketingMode === "calendar"
   ? "Gerar calendario editorial mensal completo, com cadencia semanal, distribuicao equilibrada de pilares e tabela final de execucao."
   : `Transformar a solicitacao da usuaria em 5 ideias estrategicas estruturadas, cada uma com angulo diferente, narrativa clara e conexao com a oferta.
 
-**CRITICO — REGRAS DO MODO IDEIA SOLTA:**
+**CRITICO Ã¢â‚¬â€ REGRAS DO MODO IDEIA SOLTA:**
 - NUNCA faca uma lista de titulos e pergunte "qual voce quer explorar?" ou "qual desses temas quer desenvolver?" ou "escolha uma ideia". Isso e proibido.
-- NUNCA peça confirmacao depois de receber um tema concreto. Se o usuario ja informou o tema/ideia, gere IMEDIATAMENTE as 5 ideias COMPLETAS com toda a estrutura preenchida.
+- NUNCA peÃƒÂ§a confirmacao depois de receber um tema concreto. Se o usuario ja informou o tema/ideia, gere IMEDIATAMENTE as 5 ideias COMPLETAS com toda a estrutura preenchida.
 - Se o usuario ja escolheu um tema especifico: gere 1 ideia completa com TODA a estrutura preenchida sobre aquele tema.
-- A resposta DEVE conter o conteudo completo — NAO resumos, NAO listas de titulos.
-- **CASO TEMA NAO INFORMADO:** Se o usuario disse apenas "quero ideias", "me da variacoes de angulo", "cria conteudo" ou qualquer pedido SEM especificar QUAL e o tema/produto/servico/assunto concreto — PERGUNTE PRIMEIRO: "Qual e o tema, produto ou ideia que voce quer desenvolver?" Espere a resposta antes de gerar. SEM o tema especifico, e impossivel criar ideias relevantes com dados reais.
+- A resposta DEVE conter o conteudo completo Ã¢â‚¬â€ NAO resumos, NAO listas de titulos.
+- **CASO TEMA NAO INFORMADO:** Se o usuario disse apenas "quero ideias", "me da variacoes de angulo", "cria conteudo" ou qualquer pedido SEM especificar QUAL e o tema/produto/servico/assunto concreto Ã¢â‚¬â€ PERGUNTE PRIMEIRO: "Qual e o tema, produto ou ideia que voce quer desenvolver?" Espere a resposta antes de gerar. SEM o tema especifico, e impossivel criar ideias relevantes com dados reais.
 - **CASO TEMA JA INFORMADO na conversa anterior ou nesta mensagem:** NAO pergunte nada. Gere direto.`}
 
-## FERRAMENTAS — PROTOCOLO OBRIGATORIO (SIGA ESTA ORDEM)
+## FERRAMENTAS Ã¢â‚¬â€ PROTOCOLO OBRIGATORIO (SIGA ESTA ORDEM)
 
 ${agenticWebSearchEnabled
-  ? `**PROTOCOLO EM 3 PASSOS — SIGA ESTA ORDEM:**
+  ? `**PROTOCOLO EM 3 PASSOS Ã¢â‚¬â€ SIGA ESTA ORDEM:**
 
-**PASSO 0 — VERIFICAR SE O TEMA FOI INFORMADO:**
+**PASSO 0 Ã¢â‚¬â€ VERIFICAR SE O TEMA FOI INFORMADO:**
 - Se o usuario informou o tema/assunto concreto (nesta mensagem ou em mensagens anteriores da conversa): pule para PASSO 1.
 - Se o tema nao foi informado (pedido vago como "me da ideias", "criar variacoes"): PERGUNTE o tema ANTES de qualquer ferramenta. Exemplo: "Qual e o tema, produto ou ideia que voce quer desenvolver?" Aguarde a resposta.
 
-**PASSO 1 — ACAO IMEDIATA (quando o tema e conhecido):** Chame \`retrieve_documents\`
+**PASSO 1 Ã¢â‚¬â€ ACAO IMEDIATA (quando o tema e conhecido):** Chame \`retrieve_documents\`
 - NAO escreva texto antes desta chamada quando o tema ja e conhecido.
 - Use document_types: ["brand-book","icp","pesquisa","pilares","matriz","roteiro"]
 
-**PASSO 2 — PESQUISA WEB (para Narrativa de Premissas):** Chame \`web_search\`
+**PASSO 2 Ã¢â‚¬â€ PESQUISA WEB (para Narrativa de Premissas):** Chame \`web_search\`
 - Formule uma query em portugues sobre o tema concreto do usuario para buscar dados e estatisticas reais.
-- NUNCA busque termos de metodologia como "variacoes de angulo" — busque o TEMA CONCRETO.
+- NUNCA busque termos de metodologia como "variacoes de angulo" Ã¢â‚¬â€ busque o TEMA CONCRETO.
 - Use os resultados para preencher a "Narrativa de Premissas (com dados reais)" de cada ideia.
 
 **PASSO 3:** Com os documentos e dados web, gere a resposta estruturada seguindo TODAS as regras abaixo.`
-  : `**PROTOCOLO EM 2 PASSOS — SIGA ESTA ORDEM:**
+  : `**PROTOCOLO EM 2 PASSOS Ã¢â‚¬â€ SIGA ESTA ORDEM:**
 
-**PASSO 0 — VERIFICAR SE O TEMA FOI INFORMADO:**
+**PASSO 0 Ã¢â‚¬â€ VERIFICAR SE O TEMA FOI INFORMADO:**
 - Se o usuario informou o tema/assunto concreto (nesta mensagem ou em mensagens anteriores da conversa): pule para PASSO 1.
 - Se o tema nao foi informado (pedido vago como "me da ideias", "criar variacoes"): PERGUNTE o tema ANTES de qualquer ferramenta. Exemplo: "Qual e o tema, produto ou ideia que voce quer desenvolver?" Aguarde a resposta.
 
-**PASSO 1 — ACAO IMEDIATA (quando o tema e conhecido):** Chame \`retrieve_documents\`
+**PASSO 1 Ã¢â‚¬â€ ACAO IMEDIATA (quando o tema e conhecido):** Chame \`retrieve_documents\`
 - NAO escreva texto antes desta chamada quando o tema ja e conhecido.
 - Use document_types: ["brand-book","icp","pesquisa","pilares","matriz","roteiro"]
 
@@ -3215,31 +3122,34 @@ ${agenticWebSearchEnabled
 - Para "Narrativa de Premissas": use APENAS dados reais dos documentos recuperados. NAO invente dados, fontes ou URLs.
 - Se nao houver dados suficientes nos documentos, indique claramente na premissa que os dados precisariam ser verificados.`}
 
-**retrieve_documents** — recupera Brand Book, ICP, pesquisa de mercado, pilares de conteudo, matriz de ideias, roteiro, calendario.
+**retrieve_documents** Ã¢â‚¬â€ recupera Brand Book, ICP, pesquisa de mercado, pilares de conteudo, matriz de ideias, roteiro, calendario.
 
-## USO OBRIGATORIO DOS DOCUMENTOS — TOLERANCIA ZERO
+## USO OBRIGATORIO DOS DOCUMENTOS Ã¢â‚¬â€ TOLERANCIA ZERO
 
 **REGRA CRITICA DE PRECISAO:** Voce DEVE usar TODOS os documentos disponibilizados com PRECISAO ABSOLUTA:
 1. **NUNCA invente, resuma, encurte ou omita** conteudo dos documentos recuperados (Brand Book, ICP, pilares, matriz, pesquisa, roteiro).
-2. **NUNCA invente dados, fontes, URLs ou estatisticas** — use APENAS o que vier dos documentos recuperados.
-3. **A ban list e os padroes de comunicacao ja estao no contexto (secao "## REGRAS FIXAS E GUIAS (OBRIGATORIAS)")** — voce DEVE seguir cada item com tolerancia ZERO. Se qualquer padrao proibido aparecer na sua resposta, REESCREVA antes de entregar.
-4. **O Brand Book, ICP, pilares e matriz recuperados via retrieve_documents sao a base do conteudo** — use-os integralmente, sem inventar posicionamentos, personas ou pilares que nao estejam nos documentos.
+2. **NUNCA invente dados, fontes, URLs ou estatisticas** Ã¢â‚¬â€ use APENAS o que vier dos documentos recuperados.
+3. **A ban list e os padroes de comunicacao ja estao no contexto (secao "## REGRAS FIXAS E GUIAS (OBRIGATORIAS)")** Ã¢â‚¬â€ voce DEVE seguir cada item com tolerancia ZERO. Se qualquer padrao proibido aparecer na sua resposta, REESCREVA antes de entregar.
+4. **O Brand Book, ICP, pilares e matriz recuperados via retrieve_documents sao a base do conteudo** Ã¢â‚¬â€ use-os integralmente, sem inventar posicionamentos, personas ou pilares que nao estejam nos documentos.
 5. **Antes de entregar a resposta final, execute o teste da ban list:** releia o output e verifique cada item proibido. Se encontrar qualquer violacao, corrija.
-6. **Os padroes de comunicacao da secao "## REGRAS FIXAS E GUIAS (OBRIGATORIAS)"** definem o estilo, voz e tom — siga-os EXATAMENTE, sem desvio.
+6. **Os padroes de comunicacao da secao "## REGRAS FIXAS E GUIAS (OBRIGATORIAS)"** definem o estilo, voz e tom Ã¢â‚¬â€ siga-os EXATAMENTE, sem desvio.
 
 ## REGRAS DE FORMATACAO (OBRIGATORIO)
 
 - Use headings markdown (##, ###) para separar cada topico/ideia principal.
-- Cada subsecao DEVE ser um bloco separado por linha em branco — NUNCA junte subsecoes no mesmo paragrafo.
+- Cada subsecao DEVE ser um bloco separado por linha em branco Ã¢â‚¬â€ NUNCA junte subsecoes no mesmo paragrafo.
 - Use **negrito** para labels de subsecao, seguido de quebra de linha e o texto abaixo.
 - Use listas (- ou 1.) quando houver multiplos itens.
+- PROIBIDO quebrar frases no meio com markdown: escrever o nome em negrito como bloco separado e errado. CERTO: mantenha o negrito inline dentro da frase, ex: "Encontrei dados do **Nome**, incluindo:" em uma unica linha.
+- PROIBIDO comecar qualquer linha com virgula, ponto ou continuacao que pertence a linha anterior.
+- Texto conversacional/introdutorio deve ser uma frase completa em uma unica linha. Nunca divida sujeito e predicado com quebra de linha ou elemento markdown entre eles.
 
 ${agenticMarketingMode === "calendar"
   ? `### ESTRUTURA DO CALENDARIO EDITORIAL:
 
-## Calendario Editorial — [Mes Ano]
+## Calendario Editorial Ã¢â‚¬â€ [Mes Ano]
 
-### Semana 1 — [datas]
+### Semana 1 Ã¢â‚¬â€ [datas]
 | Dia | Formato | Pilar | Tema Central | Angulo/Hook |
 |-----|---------|-------|--------------|-------------|
 | ... | ...     | ...   | ...          | ...         |
@@ -3292,10 +3202,10 @@ ${agenticMarketingMode === "calendar"
 ${agenticWebSearchEnabled
   ? `- Use somente URLs exatas retornadas pela ferramenta web_search nesta sessao.
 - Se o resultado de web_search nao trouxe URL: mencione apenas o nome da fonte em texto simples, sem URL.`
-  : `- NAO use URLs nesta resposta — busca web nao foi habilitada. Mencione fontes apenas por nome em texto simples se vierem dos documentos recuperados.
+  : `- NAO use URLs nesta resposta Ã¢â‚¬â€ busca web nao foi habilitada. Mencione fontes apenas por nome em texto simples se vierem dos documentos recuperados.
 - Se o usuario precisar de dados web para enriquecer o conteudo, o sistema oferecera um botao para isso.`}
 
-## SECAO FINAL OBRIGATORIA — FONTES UTILIZADAS
+## SECAO FINAL OBRIGATORIA Ã¢â‚¬â€ FONTES UTILIZADAS
 
 Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
 
@@ -3310,6 +3220,19 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
   : "Nenhuma busca web realizada nesta resposta"}`;
 
       fullSystemPrompt += "\n\n---\n\n**INSTRUCAO CRITICA DE IDIOMA (PRIORIDADE MAXIMA):** TODO o seu raciocinio interno (thinking/pensamento) e a resposta final DEVEM ser em PORTUGUES BRASILEIRO. Nunca pense em ingles. Nunca responda em ingles. Se voce perceber que esta pensando em ingles, PARE e mude para portugues imediatamente. Esta instrucao tem prioridade sobre qualquer outra.";
+
+      } else {
+        // Protocolo mÃƒÂ­nimo de ferramentas para demais agentes agenticos (vsl-invisivel, copywriter-campanhas, scriptwriter, etc.)
+        // O prompt completo do agente jÃƒÂ¡ vem do DB Ã¢â‚¬â€ sÃƒÂ³ adicionamos o protocolo de tools.
+        if (agenticWebSearchEnabled) {
+          fullSystemPrompt += `\n\n## FERRAMENTAS DISPONÃƒÂVEIS
+- \`retrieve_documents\`: busca Brand Book, ICP, pilares e outros documentos da base de conhecimento. Chame ANTES de responder para personalizar ao contexto da usuÃƒÂ¡ria.
+- \`web_search\`: busca informaÃƒÂ§ÃƒÂµes atuais na web quando necessÃƒÂ¡rio. Use somente URLs exatas retornadas pela ferramenta Ã¢â‚¬â€ NUNCA invente ou fabrique URLs.`;
+        } else {
+          fullSystemPrompt += `\n\n## FERRAMENTA DISPONÃƒÂVEL
+- \`retrieve_documents\`: busca Brand Book, ICP, pilares e outros documentos da base de conhecimento. Chame ANTES de responder para personalizar ao contexto da usuÃƒÂ¡ria.`;
+        }
+      }
     }
 
     fullSystemPrompt += buildConsultModeInstruction(
@@ -3338,30 +3261,30 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
           toolCallCount?: number;
         };
 
-    // Paid plan wall_clock_limit = 400s. Reserve 50s buffer → 350s total for AI.
+    // Paid plan wall_clock_limit = 400s. Reserve 50s buffer Ã¢â€ â€™ 350s total for AI.
     const elapsedMs = Date.now() - requestStartMs;
     const remainingBudget = Math.max(0, 350_000 - elapsedMs);
     // Agentic mode needs more time: retrieve_documents + web_search + long generation can take 200s+
     const aiTimeoutMs = Math.min(remainingBudget, useAgenticMode ? 280_000 : 150_000);
 
-    // Extended thinking always active when requested — web search doesn't disable it
+    // Extended thinking always active when requested Ã¢â‚¬â€ web search doesn't disable it
     const effectiveThinking = Boolean(extendedThinking);
 
-    // When web search was executed, replace a trigger-only last message so the AI
-    // doesn't respond with "I'll search now..." but instead generates the enriched content.
+    // When web search was attempted, replace a trigger-only last message so the AI
+    // doesn’t respond with "I’ll search now..." but instead generates content.
     let finalMessages = messages;
-    if (webContextMeta.used) {
+    if (webContextMeta.searched) {
       const lastMsg = finalMessages[finalMessages.length - 1];
       if (lastMsg && lastMsg.role === "user" && isSearchTriggerMessage(String(lastMsg.content || ""))) {
         const realTopic = extractConversationTopic(finalMessages.slice(0, -1), String(lastMsg.content || ""));
+        const instruction = webContextMeta.used
+          ? `Os dados da pesquisa web sobre "${realTopic}" já foram coletados e estão no contexto acima. GERE AGORA a resposta completa, enriquecida com os dados reais da pesquisa. Não diga que vai pesquisar — a busca já aconteceu. Use os dados fornecidos para construir o conteúdo de ${webContextMeta.mode === "calendar" ? "calendário editorial" : "ideia estratégica"} agora.`
+          : `Execute a tarefa solicitada: "${realTopic}". Gere o conteúdo completo agora usando seu conhecimento. Não mencione busca na web.`;
         finalMessages = [
           ...finalMessages.slice(0, -1),
-          {
-            role: "user",
-            content: `Os dados da pesquisa web sobre "${realTopic}" jÃ¡ foram coletados e estÃ£o no contexto acima. GERE AGORA a resposta completa, enriquecida com os dados reais da pesquisa. NÃ£o diga que vai pesquisar  -  a busca jÃ¡ aconteceu. Use os dados fornecidos para construir o conteÃºdo de ${webContextMeta.mode === "calendar" ? "calendÃ¡rio editorial" : "ideia estratÃ©gica"} agora.`,
-          },
+          { role: "user", content: instruction },
         ];
-        console.log(`[AI] Replaced search-trigger message with generation instruction`);
+        console.log(`[AI] Replaced search-trigger message (searched=${webContextMeta.searched}, used=${webContextMeta.used})`);
       }
     }
 
@@ -3431,7 +3354,9 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
           modelId: selectedModelId,
           maxTokens: Number(maxTokens || 8000),
           extendedThinking: false,
-          forcedThinkingConfig: { requested: true, enabled: true, mode: "enabled", budgetTokens: 2000, reason: "agentic-controlled" },
+          forcedThinkingConfig: isAdaptivePreferredAnthropicModel(selectedModelId)
+            ? { requested: true, enabled: true, mode: "adaptive" as any, reason: "agentic-controlled", effort: requestedThinkingEffort || "medium" }
+            : { requested: false, enabled: false, mode: "disabled" as any, reason: "agentic-non-adaptive-no-thinking" },
           thinkingEffort: requestedThinkingEffort,
           systemPrompt: fullSystemPrompt,
           messages: finalMessages,
@@ -3478,24 +3403,13 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         messages: finalMessages,
       });
     } else {
-      if (!openRouterKey) {
-        throw new Error("OPENROUTER_API_KEY not configured");
-      }
-      result = await callOpenRouter({
-        apiKey: openRouterKey,
-        modelId: selectedModelId,
-        maxTokens: Number(maxTokens || 8000),
-        extendedThinking: effectiveThinking,
-        systemPrompt: fullSystemPrompt,
-        messages: finalMessages,
-        timeoutMs: aiTimeoutMs,
-      });
+      throw new Error(`Provedor nao suportado: ${effectiveProvider}. Use 'anthropic' ou 'openai'.`);
     }
 
     const sanitizedContent = sanitizeLeakedToolCalls(result.content);
 
-    // â"€â"€ Record token usage (fire-and-forget  -  does not block response) â"€â"€â"€â"€â"€â"€â"€â"€
-    // Tracks every turn individually — multiple messages in same session = multiple rows
+    // ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ Record token usage (fire-and-forget  -  does not block response) ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬ÃƒÂ¢"Ã¢â€šÂ¬
+    // Tracks every turn individually Ã¢â‚¬â€ multiple messages in same session = multiple rows
     if (supabase && effectiveUserId && tenantId) {
       const usage = result.usage ?? { inputTokens: 0, outputTokens: 0 };
       if (!result.usage) console.warn("[TokenUsage] usage undefined for model:", selectedModelId);
@@ -3523,7 +3437,7 @@ Ao final de TODA resposta estrategica, adicione EXATAMENTE este bloco:
         else console.log(`[TokenUsage] Saved: in=${usage.inputTokens} out=${usage.outputTokens} cost=$${costUsd.toFixed(6)} tools=${toolCalls} rag=${ragDocsCount}`);
       });
     } else {
-      console.warn("[TokenUsage] Skipped — missing supabase/userId/tenantId:", { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
+      console.warn("[TokenUsage] Skipped Ã¢â‚¬â€ missing supabase/userId/tenantId:", { hasSupabase: !!supabase, userId: effectiveUserId, tenantId });
     }
 
     _sse("done", {

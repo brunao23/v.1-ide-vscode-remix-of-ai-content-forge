@@ -18,6 +18,7 @@ type ChatConversationRow = {
   title: string;
   created_at: string;
   updated_at: string;
+  conversation_type: string | null;
   chat_messages?: ChatMessageRow[];
 };
 
@@ -50,16 +51,18 @@ function toConversation(row: ChatConversationRow): Conversation {
     messages,
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
+    conversationType: row.conversation_type || 'regular',
   };
 }
 
 export async function loadPersistedConversations(params: {
   userId: string;
   tenantId: string;
+  conversationType?: string;
 }): Promise<Conversation[]> {
-  const { userId, tenantId } = params;
+  const { userId, tenantId, conversationType } = params;
 
-  const { data, error } = await (supabase as any)
+  let query = (supabase as any)
     .from('chat_conversations')
     .select(`
       id,
@@ -67,6 +70,7 @@ export async function loadPersistedConversations(params: {
       title,
       created_at,
       updated_at,
+      conversation_type,
       chat_messages (
         id,
         role,
@@ -83,6 +87,14 @@ export async function loadPersistedConversations(params: {
     .order('updated_at', { ascending: false })
     .order('created_at', { ascending: true, foreignTable: 'chat_messages' });
 
+  if (conversationType) {
+    query = query.eq('conversation_type', conversationType);
+  } else {
+    query = query.neq('conversation_type', 'gemz');
+  }
+
+  const { data, error } = await query;
+
   if (error) {
     throw new Error(error.message || 'Falha ao carregar histórico de conversas.');
   }
@@ -90,12 +102,20 @@ export async function loadPersistedConversations(params: {
   return ((data || []) as ChatConversationRow[]).map(toConversation);
 }
 
+export async function loadGemzConversations(params: {
+  userId: string;
+  tenantId: string;
+}): Promise<Conversation[]> {
+  return loadPersistedConversations({ ...params, conversationType: 'gemz' });
+}
+
 export async function persistConversation(params: {
   conversation: Conversation;
   userId: string;
   tenantId: string;
+  conversationType?: string;
 }): Promise<void> {
-  const { conversation, userId, tenantId } = params;
+  const { conversation, userId, tenantId, conversationType } = params;
 
   const payload = {
     id: conversation.id,
@@ -105,6 +125,7 @@ export async function persistConversation(params: {
     title: conversation.title || 'Nova conversa',
     created_at: conversation.createdAt.toISOString(),
     updated_at: conversation.updatedAt.toISOString(),
+    conversation_type: conversationType || conversation.conversationType || 'regular',
   };
 
   const { error } = await (supabase as any)
@@ -180,5 +201,24 @@ export async function deletePersistedConversation(params: {
 
   if (error) {
     throw new Error(error.message || 'Falha ao excluir conversa.');
+  }
+}
+
+export async function updateConversationTitle(params: {
+  conversationId: string;
+  title: string;
+  userId: string;
+  tenantId: string;
+}): Promise<void> {
+  const { conversationId, title, userId, tenantId } = params;
+  const { error } = await (supabase as any)
+    .from('chat_conversations')
+    .update({ title, updated_at: new Date().toISOString() })
+    .eq('id', conversationId)
+    .eq('user_id', userId)
+    .eq('tenant_id', tenantId);
+
+  if (error) {
+    throw new Error(error.message || 'Falha ao atualizar título da conversa.');
   }
 }

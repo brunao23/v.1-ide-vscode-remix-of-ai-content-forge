@@ -33,6 +33,95 @@ function sanitizeContent(text: string): string {
   return cleaned.replace(/\n{3,}/g, '\n\n').trim();
 }
 
+function renderStreamingMarkdown(text: string): ReactNode {
+  const lines = text.split('\n');
+  const nodes: ReactNode[] = [];
+  let i = 0;
+  let nk = 0;
+
+  function parseInline(s: string): ReactNode[] {
+    const segs: ReactNode[] = [];
+    let rem = s;
+    let k = 0;
+    const pat = /(\*\*[^*\n]+\*\*|\*[^*\n]+\*|`[^`\n]+`|\[[^\]\n]+\]\(https?:\/\/[^)\n]+\))/;
+    while (rem) {
+      const m = pat.exec(rem);
+      if (!m) { segs.push(rem); break; }
+      if (m.index > 0) segs.push(rem.slice(0, m.index));
+      const t = m[0];
+      if (t.startsWith('**')) segs.push(<strong key={k++}>{t.slice(2, -2)}</strong>);
+      else if (t.startsWith('*')) segs.push(<em key={k++}>{t.slice(1, -1)}</em>);
+      else if (t.startsWith('`')) segs.push(<code key={k++}>{t.slice(1, -1)}</code>);
+      else {
+        const lm = /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/.exec(t);
+        if (lm) segs.push(<a key={k++} href={lm[2]} target="_blank" rel="noopener noreferrer">{lm[1]}</a>);
+        else segs.push(t);
+      }
+      rem = rem.slice(m.index + t.length);
+    }
+    return segs;
+  }
+
+  while (i < lines.length) {
+    const line = lines[i];
+    const k = nk++;
+
+    if (line.startsWith('```')) {
+      const codeLines: string[] = [];
+      i++;
+      while (i < lines.length && !lines[i].startsWith('```')) codeLines.push(lines[i++]);
+      nodes.push(<pre key={k}><code>{codeLines.join('\n')}</code></pre>);
+      i++;
+      continue;
+    }
+
+    const hm = line.match(/^(#{1,6})\s+(.+)$/);
+    if (hm) {
+      const lvl = hm[1].length;
+      if (lvl === 1) nodes.push(<h1 key={k}>{parseInline(hm[2])}</h1>);
+      else if (lvl === 2) nodes.push(<h2 key={k}>{parseInline(hm[2])}</h2>);
+      else if (lvl === 3) nodes.push(<h3 key={k}>{parseInline(hm[2])}</h3>);
+      else nodes.push(<h4 key={k}>{parseInline(hm[2])}</h4>);
+      i++;
+      continue;
+    }
+
+    if (/^(-{3,}|\*{3,})$/.test(line.trim())) {
+      nodes.push(<hr key={k} />);
+      i++;
+      continue;
+    }
+
+    if (line.startsWith('> ')) {
+      const qls: string[] = [];
+      while (i < lines.length && lines[i].startsWith('> ')) qls.push(lines[i++].slice(2));
+      nodes.push(<blockquote key={k}>{qls.map((ql, qi) => <p key={qi}>{parseInline(ql)}</p>)}</blockquote>);
+      continue;
+    }
+
+    if (/^[-*+]\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^[-*+]\s/.test(lines[i])) items.push(lines[i++].replace(/^[-*+]\s+/, ''));
+      nodes.push(<ul key={k}>{items.map((item, ii) => <li key={ii}>{parseInline(item)}</li>)}</ul>);
+      continue;
+    }
+
+    if (/^\d+\.\s/.test(line)) {
+      const items: string[] = [];
+      while (i < lines.length && /^\d+\.\s/.test(lines[i])) items.push(lines[i++].replace(/^\d+\.\s+/, ''));
+      nodes.push(<ol key={k}>{items.map((item, ii) => <li key={ii}>{parseInline(item)}</li>)}</ol>);
+      continue;
+    }
+
+    if (!line.trim()) { i++; continue; }
+
+    nodes.push(<p key={k}>{parseInline(line)}</p>);
+    i++;
+  }
+
+  return <>{nodes}</>;
+}
+
 import {
   Copy,
   ThumbsUp,
@@ -67,7 +156,7 @@ const SAVE_ENABLED_AGENTS = new Set([
   'icp-architect',
   'pillar-strategist',
   'matrix-generator',
-  'marketing-manager',
+  'diretora-criativa',
   'scriptwriter',
   'copywriter-campanhas',
   'expert-social-selling',
@@ -87,7 +176,7 @@ const AGENT_TO_DOCUMENT_TYPE: Record<string, string> = {
   'icp-architect': 'icp',
   'pillar-strategist': 'pilares',
   'matrix-generator': 'matriz',
-  'marketing-manager': 'calendario',
+  'diretora-criativa': 'calendario',
   'scriptwriter': 'roteiro',
   'feedback-conteudo': 'roteiro',
   'vsl-invisivel': 'roteiro',
@@ -201,7 +290,7 @@ function MemoryStepRow({ step }: { step: AgentStep }) {
         className={`w-full px-3 py-2 flex items-center gap-2 text-muted-foreground/80 text-left transition-colors ${hasChunks ? 'hover:bg-secondary/20 cursor-pointer' : 'cursor-default'}`}
       >
         <CheckCircle2 className="w-4 h-4 shrink-0 text-primary/70" />
-        <span className="text-foreground/70 truncate flex-1">"{step.query}"</span>
+        <span className="text-foreground/70 truncate flex-1">{step.label ? `"${step.label}"` : `"${step.query.slice(0, 80)}"`}</span>
         {step.resultCount !== undefined && step.resultCount > 0 && (
           <span className="shrink-0 opacity-50 text-[11px]">{step.resultCount} trechos</span>
         )}
@@ -238,7 +327,6 @@ function AgentStepsPanel({ steps }: { steps: AgentStep[] }) {
           icon={<Database className="w-4 h-4" />}
           label="Pesquisou a memória"
           count={memorySteps.length}
-          defaultOpen
         >
           {memorySteps.map((step, i) => (
             <MemoryStepRow key={i} step={step} />
@@ -257,7 +345,7 @@ function AgentStepsPanel({ steps }: { steps: AgentStep[] }) {
             <div key={i} className="px-3 py-2.5 text-muted-foreground/80">
               <div className="flex items-center gap-2 mb-1.5">
                 <CheckCircle2 className="w-4 h-4 shrink-0 text-primary/70" />
-                <span className="text-foreground/70 truncate text-xs">"{step.query}"</span>
+                <span className="text-foreground/70 truncate text-xs">{step.label ? `"${step.label}"` : `"${step.query}"`}</span>
                 {step.resultCount !== undefined && step.resultCount > 0 && (
                   <span className="ml-auto shrink-0 opacity-50 text-[11px]">{step.resultCount} resultados</span>
                 )}
@@ -302,7 +390,7 @@ function LiveStepsPanel({ steps }: { steps: LiveStep[] }) {
                 ? <Loader2 className="w-4 h-4 shrink-0 animate-spin text-primary/60" />
                 : <CheckCircle2 className="w-4 h-4 shrink-0 text-primary/70" />}
               <span className="text-foreground/70 truncate">
-                {step.status === 'searching' ? 'Buscando na memória...' : `"${step.query}"`}
+                {step.status === 'searching' ? 'Buscando na memória...' : `"${step.label || step.query.slice(0, 80)}"`}
               </span>
               {step.status === 'done' && step.resultCount !== undefined && step.resultCount > 0 && (
                 <span className="ml-auto shrink-0 opacity-50 text-[11px]">{step.resultCount} trechos</span>
@@ -320,7 +408,7 @@ function LiveStepsPanel({ steps }: { steps: LiveStep[] }) {
                   ? <Loader2 className="w-4 h-4 shrink-0 animate-spin text-primary/60" />
                   : <CheckCircle2 className="w-4 h-4 shrink-0 text-primary/70" />}
                 <span className="text-foreground/70 truncate">
-                  {step.status === 'searching' ? 'Pesquisando na web...' : `"${step.query}"`}
+                  {step.status === 'searching' ? 'Pesquisando na web...' : `"${step.label || step.query}"`}
                 </span>
                 {step.status === 'done' && step.resultCount !== undefined && step.resultCount > 0 && (
                   <span className="ml-auto shrink-0 opacity-50 text-[11px]">{step.resultCount} resultados</span>
@@ -362,6 +450,18 @@ export default function MessageBubble({ message, agentId, onWebSearchRequest, on
         : null,
     [activeTenant?.id, message.id, user?.id],
   );
+
+  const processedContent = useMemo(
+    () => sanitizeContent(stripWebSearchTags(message.content || '').trim()),
+    [message.content],
+  );
+
+  const isStatusMsg = useMemo(() => {
+    const c = message.content;
+    if (!c) return true;
+    if (/[#*_`\[\]>|]/.test(c)) return false;
+    return c.length < 40 && /\.\.\.\s*$/.test(c) && !c.includes('\n');
+  }, [message.content]);
 
   useEffect(() => {
     if (!localSaveKey) { setSaved(false); return; }
@@ -507,25 +607,32 @@ export default function MessageBubble({ message, agentId, onWebSearchRequest, on
       )}
 
       {message.isStreaming && !message.content?.startsWith('Erro:') ? (
-        <div className="flex items-center gap-2.5 py-1">
-          {message.content === 'Buscando na web...' ? (
-            <Globe className="w-4 h-4 text-muted-foreground animate-pulse" />
-          ) : (
-            <div className="flex gap-1">
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
-              <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
-            </div>
-          )}
-          <span className="text-sm text-muted-foreground animate-fade-in">
-            {message.content || 'Pensando...'}
-          </span>
-        </div>
+        isStatusMsg ? (
+          <div className="flex items-center gap-2.5 py-1">
+            {message.content === 'Buscando na web...' ? (
+              <Globe className="w-4 h-4 text-muted-foreground animate-pulse" />
+            ) : (
+              <div className="flex gap-1">
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:0ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:150ms]" />
+                <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground/60 animate-bounce [animation-delay:300ms]" />
+              </div>
+            )}
+            <span className="text-sm text-muted-foreground animate-fade-in">
+              {message.content || 'Pensando...'}
+            </span>
+          </div>
+        ) : (
+          <div className="prose-chat text-base">
+            {renderStreamingMarkdown(processedContent)}
+            <span className="inline-block w-[2px] h-[1em] bg-current opacity-70 animate-pulse ml-0.5 align-middle" />
+          </div>
+        )
       ) : (
         <>
           <div className="prose-chat text-base">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>
-              {sanitizeContent(stripWebSearchTags(message.content).trim())}
+              {processedContent}
             </ReactMarkdown>
           </div>
           {!message.isStreaming && hasWebSearchTag(message.content) && onWebSearchRequest && (

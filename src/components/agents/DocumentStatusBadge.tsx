@@ -18,7 +18,7 @@ const AGENT_DOC_LABELS: Record<string, string> = {
   'icp-architect': 'Mapa do ICP',
   'pillar-strategist': 'Pilares de Conteúdo',
   'matrix-generator': 'Matriz de Conteúdo',
-  'marketing-manager': 'Calendário Mensal',
+  'diretora-criativa': 'Calendário Mensal',
   'scriptwriter': 'Roteiro de Vídeo',
 };
 

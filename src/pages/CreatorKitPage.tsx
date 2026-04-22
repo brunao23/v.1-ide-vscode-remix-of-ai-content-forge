@@ -20,7 +20,7 @@ const SECTIONS = [
   {
     title: 'Conteúdo',
     description: 'Crie e gerencie sua estratégia de conteúdo',
-    agentIds: ['pillar-strategist', 'matrix-generator', 'marketing-manager', 'scriptwriter', 'feedback-conteudo', 'copywriter-campanhas', 'vsl-invisivel', 'voz-de-marca'],
+    agentIds: ['pillar-strategist', 'matrix-generator', 'diretora-criativa', 'scriptwriter', 'feedback-conteudo', 'copywriter-campanhas', 'vsl-invisivel', 'voz-de-marca'],
   },
 ];
 

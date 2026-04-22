@@ -164,7 +164,7 @@ export default function HomePage() {
     setIsStreaming(true);
 
     const stages =
-      targetAgentId === 'marketing-manager'
+      targetAgentId === 'diretora-criativa'
         ? [
             'Analisando contexto...',
             marketingMode === 'calendar'
@@ -199,7 +199,7 @@ export default function HomePage() {
         agentId: targetAgentId,
         modelId: selectedModel,
         extendedThinking: thinkingMode,
-        marketingMode: targetAgentId === 'marketing-manager' ? marketingMode : undefined,
+        marketingMode: targetAgentId === 'diretora-criativa' ? marketingMode : undefined,
         userId: user?.id,
         tenantId: activeTenant?.id,
       });
